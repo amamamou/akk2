@@ -20,7 +20,7 @@ function AudioListRow({
       onClick={() => setSelected((s) => !s)}
       className={cn(
         "group relative flex items-center gap-4 rounded-lg border border-gray-200 bg-white px-4 py-3 hover:shadow-md hover:border-gray-300 transition-all duration-200",
-        selected ? "bg-[#F5F5F5]" : ""
+        selected ? "bg-gray-50" : ""
       )}
     >
       {/* Icon + Title */}
@@ -43,12 +43,12 @@ function AudioListRow({
 
       {/* Actions - hidden until hover */}
       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
-          <button
+        <button
           onClick={(e) => {
             e.stopPropagation();
             onAction?.("play", audio.id);
           }}
-          className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-[#F5F5F5] rounded transition-all"
+          className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded transition-all"
           title="Play"
         >
           <Play size={16} className="fill-current" />
@@ -58,7 +58,7 @@ function AudioListRow({
             e.stopPropagation();
             onAction?.("addToPlaylist", audio.id);
           }}
-          className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-[#F5F5F5] rounded transition-all"
+          className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded transition-all"
           title="Add to playlist"
         >
           <PlusIcon size={16} />
@@ -69,7 +69,7 @@ function AudioListRow({
               e.stopPropagation();
               setMenuOpen(!menuOpen);
             }}
-            className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-[#F5F5F5] rounded transition-all"
+            className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded transition-all"
             aria-label="More options"
           >
             <MoreVertical size={16} />
