@@ -38,20 +38,20 @@ export default function LibraryAudioClient() {
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-white">
       {/* Header */}
-      <div className="sticky top-0 z-10 bg-white border-b border-gray-200">
-        <div className="px-8 py-6">
+      <div className="sticky top-0 z-10 bg-white border-b border-gray-100">
+        <div className="px-8 py-5">
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-2xl font-semibold text-gray-900">All Audio</h1>
               <p className="mt-1 text-sm text-gray-500">
-                Browse and manage your complete audio library
+                Manage your audio library
               </p>
             </div>
 
             <button
               type="button"
               onClick={() => setUploadOpen(true)}
-              className="inline-flex items-center gap-2 rounded-md bg-gray-900 text-white px-4 py-2 text-sm font-medium hover:bg-gray-800 transition-colors cursor-pointer"
+              className="inline-flex items-center gap-2 rounded-lg bg-gray-900 text-white px-4 py-2 text-sm font-medium hover:bg-gray-800 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-gray-900"
             >
               <Plus size={16} />
               <span>Upload</span>
@@ -61,7 +61,7 @@ export default function LibraryAudioClient() {
       </div>
 
       {/* Toolbar */}
-      <div className="border-b border-gray-200 bg-white">
+      <div className="border-b border-gray-100 bg-white">
         <div className="px-8 py-3 flex items-center justify-between gap-4">
           {/* Search */}
           <div className="flex-1 max-w-md">
@@ -75,14 +75,14 @@ export default function LibraryAudioClient() {
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Search audio..."
-                className="w-full pl-9 pr-8 py-2 text-sm rounded-md bg-gray-50 text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-200"
+                className="w-full pl-9 pr-8 py-2 text-sm rounded-lg bg-gray-50 text-gray-900 placeholder:text-gray-400 border border-transparent focus:outline-none focus:ring-2 focus:ring-gray-200 focus:bg-white transition-all"
               />
               {query && (
                 <button
                   type="button"
                   onClick={() => setQuery("")}
                   aria-label="Clear search"
-                  className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600"
+                  className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600 transition-colors"
                 >
                   <span className="text-sm">×</span>
                 </button>
@@ -91,13 +91,13 @@ export default function LibraryAudioClient() {
           </div>
 
           {/* View toggle */}
-          <div className="inline-flex rounded-md border border-gray-200 bg-gray-50 p-1">
+          <div className="inline-flex rounded-lg border border-gray-200 bg-gray-50 p-1">
             <button
               onClick={() => setAudioView("grid")}
               className={cn(
-                "px-3 py-1.5 rounded text-xs font-medium transition-colors",
+                "px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-150",
                 audioView === "grid"
-                  ? "bg-white text-gray-900 shadow-sm border border-gray-200"
+                  ? "bg-white text-gray-900 shadow-sm"
                   : "text-gray-600 hover:text-gray-900"
               )}
               title="Grid view"
@@ -107,9 +107,9 @@ export default function LibraryAudioClient() {
             <button
               onClick={() => setAudioView("list")}
               className={cn(
-                "px-3 py-1.5 rounded text-xs font-medium transition-colors",
+                "px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-150",
                 audioView === "list"
-                  ? "bg-white text-gray-900 shadow-sm border border-gray-200"
+                  ? "bg-white text-gray-900 shadow-sm"
                   : "text-gray-600 hover:text-gray-900"
               )}
               title="List view"
@@ -122,7 +122,7 @@ export default function LibraryAudioClient() {
 
       {/* Content */}
       <div className="flex-1 overflow-auto bg-white">
-        <div className="px-6 py-6">
+        <div className="px-8 py-6">
           {filteredLibrary.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16">
               <div className="text-center space-y-4 max-w-sm">
@@ -130,13 +130,13 @@ export default function LibraryAudioClient() {
                   <FileAudio size={28} className="text-gray-400" />
                 </div>
                 <h2 className="text-lg font-semibold text-gray-900">No audio found</h2>
-                <p className="text-sm text-gray-600">
+                <p className="text-sm text-gray-500">
                   {query ? "Try adjusting your search" : "Upload audio files to build your library"}
                 </p>
                 {!query && (
                   <button
                     onClick={() => setUploadOpen(true)}
-                    className="inline-flex items-center gap-2 rounded-md bg-gray-900 text-white px-5 py-2.5 text-sm font-medium hover:bg-gray-800 transition-colors mt-4"
+                    className="inline-flex items-center gap-2 rounded-lg bg-gray-900 text-white px-5 py-2.5 text-sm font-medium hover:bg-gray-800 transition-colors mt-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-gray-900"
                   >
                     <Plus size={16} />
                     Upload audio
