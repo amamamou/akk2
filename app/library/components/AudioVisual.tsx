@@ -20,13 +20,23 @@ export default function AudioVisual({
     slate: "from-slate-400 to-slate-600",
   };
 
-  const gradient = gradientMap[color] || gradientMap.indigo;
   const bars = [4, 8, 5, 7, 3];
+
+  // allow passing a hex color (e.g. '#7318FF') and fall back to preset gradients
+  const isHex = typeof color === "string" && color.startsWith("#");
+  const gradient = !isHex ? gradientMap[color] || gradientMap.indigo : undefined;
+  const bgClass = isHex ? "" : `bg-gradient-to-br ${gradient}`;
+
+  const style: React.CSSProperties = {
+    width: size,
+    height: size,
+    ...(isHex ? { background: color } : {}),
+  };
 
   return (
     <div
-      className={cn(`flex-shrink-0 rounded-md overflow-hidden flex items-center justify-center bg-gradient-to-br ${gradient}`)}
-      style={{ width: size, height: size }}
+      className={cn(`flex-shrink-0 rounded-md overflow-hidden flex items-center justify-center ${bgClass}`)}
+      style={style}
     >
       <div className="flex items-end gap-[2px] opacity-80">
         {bars.map((h, i) => (

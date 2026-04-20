@@ -67,9 +67,12 @@ interface NavItem {
 }
 // Small color tokens kept local here for readability; consider moving into tailwind.config.cjs
 const COLORS = {
-  hoverBg: "#F5F5F5",
+  hoverBg: "#F3F4F6",
   activeBg: "#E7E7E7",
   pressedBg: "#F3F4F6",
+  borderLight: "#E5E7EB",
+  bgHover: "#FAFAFA",
+  textMuted: "#9CA3AF",
 };
 
 export default function Sidebar() {
@@ -199,7 +202,7 @@ export default function Sidebar() {
       <nav
         className={cn(
           "flex flex-1 flex-col",
-          collapsed ? "space-y-4 py-1" : "space-y-6 py-2"
+          collapsed ? "space-y-2 py-2" : "space-y-6 py-3"
         )}
         role="navigation"
         aria-label="Main navigation"
@@ -207,8 +210,8 @@ export default function Sidebar() {
         {navigationGroups.map((group) => (
           <div key={group.label} className="flex flex-col space-y-2">
             {!collapsed && (
-              <div className={cn("px-3", collapsed ? "py-1" : "py-2")}>
-                <p className="text-xs text-gray-400 font-medium px-3">
+              <div className="px-3 py-1">
+                <p className="text-xs text-gray-400 font-semibold uppercase tracking-wider">
                   {group.label}
                 </p>
               </div>
@@ -247,7 +250,7 @@ export default function Sidebar() {
                     {showSubmenu && item.submenu && (
                       <div
                         className={cn(
-                          "flex flex-col space-y-1 mt-1 border-l border-gray-100",
+                          "flex flex-col space-y-1 mt-1 border-l border-gray-200",
                           collapsed ? "ml-3 pl-2" : "ml-4 pl-3"
                         )}
                       >
@@ -258,12 +261,12 @@ export default function Sidebar() {
                               key={subitem.name}
                               href={subitem.href}
                               className={cn(
-                                "block text-sm px-3 rounded-2xl transition-all duration-200 w-full text-left",
+                                "block text-sm px-3 rounded-lg transition-all duration-150 w-full text-left",
                                 collapsed ? "py-2" : "py-2.5",
-                                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-indigo-400",
+                                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-blue-400",
                                 isSubActive
-                                  ? `text-gray-900 bg-[${COLORS.pressedBg}] font-medium`
-                                  : "text-gray-600 hover:text-gray-700 hover:bg-[#F5F5F5]"
+                                  ? "text-gray-900 bg-gray-50 font-medium"
+                                  : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
                               )}
                             >
                               {subitem.name}
@@ -288,66 +291,64 @@ export default function Sidebar() {
       return (
         <div className="flex flex-col gap-4">
           {/* User Profile Section */}
-          <div className="border-t border-gray-200 pt-3">
-            <div className="flex items-center justify-between gap-2 rounded-lg bg-gray-50 p-2 hover:bg-gray-100 transition-colors cursor-default">
-              <div className="flex items-center gap-2 min-w-0">
-                <div className="h-7 w-7 rounded-full bg-gray-300 flex items-center justify-center text-xs font-semibold text-gray-600 shrink-0 overflow-hidden">
-                  {userAvatar ? (
-                    <Image
-                      src={userAvatar}
-                      alt={userName}
-                      width={32}
-                      height={32}
-                      className="object-cover"
-                      unoptimized
-                    />
-                  ) : (
-                    <span>{userInitials}</span>
-                  )}
-                </div>
-                <div className="min-w-0">
-                  <p className="text-sm font-medium text-gray-900 truncate">
-                    {userName}
-                  </p>
-                  <p className="text-xs text-gray-500 truncate">
-                    {userRole}
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  const ok = confirm("Sign out?");
-                  if (ok) {
-                    try {
-                      localStorage.removeItem("akou.session");
-                      localStorage.removeItem("akou.sidebar.collapsed");
-                    } catch {
-                      // noop
-                    }
-                    router.push("/");
-                  }
-                }}
-                className={cn(
-                  "flex items-center justify-center h-7 w-7 rounded-md",
-                  "text-gray-500 hover:text-gray-700 hover:bg-white",
-                  "transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-indigo-400"
+          <div className="flex items-center justify-between gap-2 rounded-lg bg-gray-50 p-2.5 hover:bg-gray-100 transition-colors duration-150 cursor-default">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-gray-200 to-gray-100 flex items-center justify-center text-xs font-semibold text-gray-700 shrink-0 overflow-hidden border border-gray-200">
+                {userAvatar ? (
+                  <Image
+                    src={userAvatar}
+                    alt={userName}
+                    width={32}
+                    height={32}
+                    className="object-cover"
+                    unoptimized
+                  />
+                ) : (
+                  <span>{userInitials}</span>
                 )}
-                title="Sign out"
-                aria-label="Sign out"
-              >
-                <LogOut className="h-4 w-4" />
-              </button>
+              </div>
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-gray-900 truncate">
+                  {userName}
+                </p>
+                <p className="text-xs text-gray-500 truncate">
+                  {userRole}
+                </p>
+              </div>
             </div>
+            <button
+              type="button"
+              onClick={() => {
+                const ok = confirm("Sign out?");
+                if (ok) {
+                  try {
+                    localStorage.removeItem("akou.session");
+                    localStorage.removeItem("akou.sidebar.collapsed");
+                  } catch {
+                    // noop
+                  }
+                  router.push("/");
+                }
+              }}
+              className={cn(
+                "flex items-center justify-center h-7 w-7 rounded-lg flex-shrink-0",
+                "text-gray-400 hover:text-gray-600 hover:bg-white",
+                "transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-blue-400"
+              )}
+              title="Sign out"
+              aria-label="Sign out"
+            >
+              <LogOut className="h-4 w-4" />
+            </button>
           </div>
         </div>
       );
     } else {
-      // Collapsed state - only show avatar to keep UI compact and avoid accidental sign-outs
+      // Collapsed state - only show avatar with enhanced styling
       return (
-        <div className="flex flex-col items-center gap-3">
+        <div className="flex flex-col items-center gap-2">
           <div
-            className="h-7 w-7 rounded-md bg-gray-100 flex items-center justify-center text-xs font-semibold text-gray-600 overflow-hidden"
+            className="h-8 w-8 rounded-lg bg-gradient-to-br from-gray-200 to-gray-100 flex items-center justify-center text-xs font-semibold text-gray-700 overflow-hidden border border-gray-200 hover:from-gray-300 hover:to-gray-200 transition-all duration-150"
             aria-hidden="true"
             title={userName}
           >
@@ -380,20 +381,20 @@ export default function Sidebar() {
       aria-label="Sidebar"
     >
       {/* Header with Logo and Toggle */}
-  <div className="flex h-12 shrink-0 items-center justify-between px-2  border-gray-200">
-    <div
-      className={cn(
-        "flex items-center gap-2 font-semibold text-gray-900 flex-1",
-        collapsed ? "justify-center" : ""
-      )}
-    >
+      <div className="flex h-16 shrink-0 items-center justify-between px-3 border-b border-gray-100">
+        <div
+          className={cn(
+            "flex items-center gap-2 font-semibold text-gray-900 flex-1",
+            collapsed ? "justify-center" : ""
+          )}
+        >
           {collapsed ? (
-            <div className="relative h-8 w-8 overflow-hidden rounded-md flex-shrink-0">
+            <div className="relative h-8 w-8 overflow-hidden rounded-lg flex-shrink-0 bg-gradient-to-br from-gray-100 to-gray-50 flex items-center justify-center">
               <Image
                 src="/akousticarts.webp"
                 alt="Akoustic Arts"
-                fill
-                sizes="32px"
+                width={32}
+                height={32}
                 className="object-contain"
                 priority
               />
@@ -404,8 +405,8 @@ export default function Sidebar() {
                 <Image
                   src="/akousticarts.webp"
                   alt="Akoustic Arts"
-                  fill
-                  sizes="24px"
+                  width={24}
+                  height={24}
                   className="object-contain"
                   priority
                 />
@@ -423,9 +424,9 @@ export default function Sidebar() {
           aria-expanded={!collapsed}
           onClick={toggle}
           className={cn(
-            "flex items-center justify-center h-8 w-8 rounded-md",
-            "text-gray-500 hover:text-gray-700 hover:bg-[#F5F5F5]",
-            "transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-indigo-400",
+            "flex items-center justify-center h-8 w-8 rounded-lg",
+            "text-gray-500 hover:text-gray-700 hover:bg-gray-100",
+            "transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-blue-400",
             collapsed ? "ml-0" : "-mr-1"
           )}
         >
@@ -438,17 +439,16 @@ export default function Sidebar() {
       </div>
 
       {/* Navigation Content */}
-      <div className="flex-1 px-2">
+      <div className="flex-1 px-2 ">
         {renderNavigation()}
       </div>
 
       {/* Bottom Controls */}
-      <div className="flex-shrink-0 px-3 py-3">{renderBottomSection()}</div>
+      <div className="flex-shrink-0 px-3 py-4 border-t border-gray-100">{renderBottomSection()}</div>
     </aside>
   );
 }
 
-// NavLink Component
 function NavLink({
   item,
   isActive,
@@ -488,26 +488,28 @@ function NavLink({
       onKeyDown={handleKeyDown}
       aria-current={isActive ? "page" : undefined}
       className={cn(
-        "group relative flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-2xl",
-        "transition-all duration-200",
+        "group relative flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg",
+        "transition-all duration-150",
         isActive
-          ? `bg-[${COLORS.pressedBg}] text-gray-900`
-          : "text-gray-500 hover:bg-[#F5F5F5] hover:text-gray-700",
-        collapsed ? "justify-center" : "",
+          ? "bg-gray-50 text-gray-900"
+          : "text-gray-600 hover:bg-gray-50 hover:text-gray-900",
+        collapsed ? "justify-center px-2.5" : "",
         hasSubmenu && !collapsed ? "cursor-pointer" : "",
-        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-indigo-400"
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-blue-400"
       )}
     >
       <div
         className={cn(
-          "w-8 h-8 flex items-center justify-center rounded-xl transition-all",
-          isActive ? `bg-[${COLORS.pressedBg}]` : "bg-gray-100 group-hover:bg-[#F5F5F5]"
+          "w-8 h-8 flex items-center justify-center rounded-lg transition-all duration-150",
+          isActive 
+            ? "bg-gray-200" 
+            : "bg-gray-100 group-hover:bg-gray-200"
         )}
       >
         <Icon
           className={cn(
             "h-4 w-4",
-            isActive ? "text-gray-900" : "text-gray-600 group-hover:text-gray-700"
+            isActive ? "text-gray-900" : "text-gray-600 group-hover:text-gray-800"
           )}
           aria-hidden="true"
         />
@@ -521,7 +523,7 @@ function NavLink({
             <ChevronRight
               aria-hidden="true"
               className={cn(
-                "h-4 w-4 ml-2 flex-shrink-0 transition-transform",
+                "h-4 w-4 ml-2 flex-shrink-0 transition-transform duration-150",
                 isExpanded ? "rotate-90" : ""
               )}
             />
@@ -534,10 +536,10 @@ function NavLink({
         <span
           className={cn(
             "pointer-events-none absolute left-20 top-1/2 -translate-y-1/2",
-            "whitespace-nowrap rounded-md bg-gray-700 text-white text-xs px-2 py-1.5",
+            "whitespace-nowrap rounded-lg bg-gray-900 text-white text-xs px-2.5 py-1.5",
             "font-medium opacity-0 group-hover:opacity-100",
             "transition-opacity duration-200 z-50",
-            "transform group-hover:translate-x-1"
+            "shadow-lg"
           )}
           role="tooltip"
           aria-hidden="true"

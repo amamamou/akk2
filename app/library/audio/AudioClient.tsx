@@ -1,10 +1,10 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
-import { Search, Plus, FileAudio } from "lucide-react";
-import { cn } from "../../../utils/cn";
+import React, { useEffect, useMemo, useState } from "react";
+import { Search, Plus, FileAudio, Edit, Trash } from "lucide-react";
 import AudioGrid from "../components/AudioGrid";
-import AudioList from "../components/AudioList";
+import AudioVisual from "../components/AudioVisual";
+import ViewToggle from "../../players/components/ViewToggle";
 import UploadModal from "../components/UploadModal";
 import type { AudioItem } from "../components/AudioTile";
 
@@ -20,16 +20,63 @@ const library: AudioItem[] = [
 export default function LibraryAudioClient() {
   const [query, setQuery] = useState("");
   const [audioView, setAudioView] = useState<"list" | "grid">("list");
+  const [activeCategory, setActiveCategory] = useState<string>("All");
   const [uploadOpen, setUploadOpen] = useState(false);
+
+  type Playlist = { id: string; title?: string; trackIds?: string[]; tracks?: string[]; items?: string[] };
+  const [playlists, setPlaylists] = useState<Playlist[]>([]);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("aa_playlists");
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) setPlaylists(parsed as Playlist[]);
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
 
   const filteredLibrary = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
-    if (!normalizedQuery) return library;
+    const tokens = normalizedQuery ? normalizedQuery.split(/\s+/).filter(Boolean) : [];
+
     return library.filter((item) => {
-      const haystack = `${item.title} ${item.category}`.toLowerCase();
-      return haystack.includes(normalizedQuery);
+      // playlist filter
+      if (activeCategory !== "All" && activeCategory.startsWith("pl:")) {
+        const pid = activeCategory.replace("pl:", "");
+        const pl = playlists.find((p) => String(p.id) === pid);
+        if (pl) {
+          const maybeIds = pl.trackIds ?? pl.tracks ?? pl.items ?? [];
+          let ids: string[] = [];
+          if (Array.isArray(maybeIds) && maybeIds.every((x) => typeof x === "string")) {
+            ids = maybeIds as string[];
+          }
+          if (ids.length > 0) return ids.includes(item.id);
+          if (pl.title && item.category !== pl.title) return false;
+        }
+      } else if (activeCategory !== "All" && item.category !== activeCategory) {
+        return false;
+      }
+
+      if (tokens.length === 0) return true;
+      const hay = `${item.title} ${item.category} ${item.duration}`.toLowerCase();
+      return tokens.every((t) => hay.includes(t));
     });
-  }, [query]);
+  }, [query, activeCategory, playlists]);
+
+  const totalCount = library.length;
+  const filteredCount = filteredLibrary.length;
+
+  const singerMap: Record<string, string> = {
+    a1: "Lila Blue",
+    a2: "Deep Focusors",
+    a3: "Lobby Ensemble",
+    a4: "Upbeat Co.",
+    a5: "Nature Choir",
+    a6: "Evening Strings",
+  };
 
   const handleAudioAction = (action: "play" | "edit" | "delete" | "addToPlaylist", audioId: string) => {
     console.log(`[v0] Audio action: ${action} on ${audioId}`);
@@ -39,84 +86,20 @@ export default function LibraryAudioClient() {
     <div className="flex-1 flex flex-col overflow-hidden bg-white">
       {/* Header */}
       <div className="sticky top-0 z-10 bg-white border-b border-gray-200">
-        <div className="px-8 py-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-semibold text-gray-900">All Audio</h1>
-              <p className="mt-1 text-sm text-gray-500">
-                Browse and manage your complete audio library
-              </p>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => setUploadOpen(true)}
-              className="inline-flex items-center gap-2 rounded-md bg-gray-900 text-white px-4 py-2 text-sm font-medium hover:bg-gray-800 transition-colors cursor-pointer"
-            >
-              <Plus size={16} />
-              <span>Upload</span>
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Toolbar */}
-      <div className="border-b border-gray-200 bg-white">
-        <div className="px-8 py-3 flex items-center justify-between gap-4">
-          {/* Search */}
-          <div className="flex-1 max-w-md">
-            <div className="relative w-full">
-              <Search
-                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-                size={16}
-              />
-              <input
-                aria-label="Search audio"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search audio..."
-                className="w-full pl-9 pr-8 py-2 text-sm rounded-md bg-gray-50 text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-200"
-              />
-              {query && (
-                <button
-                  type="button"
-                  onClick={() => setQuery("")}
-                  aria-label="Clear search"
-                  className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600"
-                >
-                  <span className="text-sm">×</span>
-                </button>
-              )}
-            </div>
+        <div className="px-8 py-6 flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-semibold text-gray-900">All Audio</h1>
+            <p className="mt-1 text-sm text-gray-500">Browse and manage your complete audio library</p>
           </div>
 
-          {/* View toggle */}
-          <div className="inline-flex rounded-md border border-gray-200 bg-gray-50 p-1">
-            <button
-              onClick={() => setAudioView("grid")}
-              className={cn(
-                "px-3 py-1.5 rounded text-xs font-medium transition-colors",
-                audioView === "grid"
-                  ? "bg-white text-gray-900 shadow-sm border border-gray-200"
-                  : "text-gray-600 hover:text-gray-900"
-              )}
-              title="Grid view"
-            >
-              ⊞
-            </button>
-            <button
-              onClick={() => setAudioView("list")}
-              className={cn(
-                "px-3 py-1.5 rounded text-xs font-medium transition-colors",
-                audioView === "list"
-                  ? "bg-white text-gray-900 shadow-sm border border-gray-200"
-                  : "text-gray-600 hover:text-gray-900"
-              )}
-              title="List view"
-            >
-              ≡
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={() => setUploadOpen(true)}
+            className="inline-flex items-center gap-2 rounded-md bg-[#F3F4F6] text-gray-900 px-4 py-2 text-sm font-medium hover:bg-[#E7E7E7]"
+          >
+            <Plus size={16} />
+            <span>New audio</span>
+          </button>
         </div>
       </div>
 
@@ -125,41 +108,87 @@ export default function LibraryAudioClient() {
         <div className="px-6 py-6">
           {filteredLibrary.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16">
-              <div className="text-center space-y-4 max-w-sm">
-                <div className="inline-flex items-center justify-center w-14 h-14 rounded-lg bg-gray-100">
-                  <FileAudio size={28} className="text-gray-400" />
-                </div>
-                <h2 className="text-lg font-semibold text-gray-900">No audio found</h2>
-                <p className="text-sm text-gray-600">
-                  {query ? "Try adjusting your search" : "Upload audio files to build your library"}
-                </p>
-                {!query && (
-                  <button
-                    onClick={() => setUploadOpen(true)}
-                    className="inline-flex items-center gap-2 rounded-md bg-gray-900 text-white px-5 py-2.5 text-sm font-medium hover:bg-gray-800 transition-colors mt-4"
-                  >
-                    <Plus size={16} />
-                    Upload audio
-                  </button>
-                )}
-              </div>
+              <FileAudio size={48} className="text-gray-300" />
+              <h2 className="mt-6 text-lg font-semibold">No audio found</h2>
             </div>
           ) : audioView === "grid" ? (
             <AudioGrid items={filteredLibrary} onAudioAction={handleAudioAction} />
           ) : (
-            <AudioList items={filteredLibrary} onAudioAction={handleAudioAction} />
+            <div className="space-y-2">
+              {filteredLibrary.map((t) => (
+                <div
+                  key={t.id}
+                  className="group grid grid-cols-[48px_1fr_96px] gap-4 items-center p-3 rounded-lg  border-gray-100 bg-white hover:bg-gray-50 hover:shadow-sm transition-all duration-150"
+                >
+                  <div className="flex items-center justify-center">
+                    <AudioVisual size={36} color="#7318FF" />
+                  </div>
+
+                  <div className="min-w-0 relative">
+                    <div className="text-sm font-medium text-gray-900 truncate">{t.title}</div>
+                    <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-xs text-gray-500 pointer-events-none">{singerMap[t.id] ?? "Unknown Artist"}</div>
+                  </div>
+
+                  <div className="flex items-center justify-end gap-3">
+                    <div className="text-right text-sm text-gray-500">{t.duration}</div>
+                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button onClick={() => handleAudioAction("edit", t.id)} title="Edit" className="p-1.5 rounded hover:bg-gray-100 text-gray-500 hover:text-gray-700">
+                        <Edit size={16} />
+                      </button>
+                      <button onClick={() => handleAudioAction("delete", t.id)} title="Delete" className="p-1.5 rounded hover:bg-red-50 text-gray-500 hover:text-red-600">
+                        <Trash size={16} />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
           )}
         </div>
       </div>
 
-      {/* Upload modal */}
-      <UploadModal
-        open={uploadOpen}
-        onClose={() => setUploadOpen(false)}
-        onUpload={(files) => {
-          console.log("[v0] Files uploaded:", files);
-        }}
-      />
+      {/* Toolbar (under listing) */}
+      <div className="border-gray-100 bg-white">
+        <div className="px-8 py-3">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3 w-full max-w-md">
+              {/* Playlist selector (if playlists available) */}
+              {playlists.length > 0 && (
+                <select
+                  value={activeCategory}
+                  onChange={(e) => setActiveCategory(e.target.value)}
+                  className="text-sm bg-[#F3F4F6] rounded-md px-3 py-2"
+                >
+                  <option value="All">All</option>
+                  {playlists.map((p) => (
+                    <option key={p.id} value={`pl:${p.id}`}>
+                      {p.title ?? `Playlist ${p.id}`}
+                    </option>
+                  ))}
+                </select>
+              )}
+
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={16} />
+                <input aria-label="Search audio" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search audio..." className="w-full pl-9 pr-3 py-2 text-sm rounded-md bg-[#F3F4F6]" />
+              </div>
+
+              <div className="text-sm text-gray-600 whitespace-nowrap">{query ? `${filteredCount} of ${totalCount}` : `All ${totalCount}`}</div>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <ViewToggle view={audioView} onChange={(v) => setAudioView(v)} />
+              <button onClick={() => setUploadOpen(true)} className="inline-flex items-center gap-2 rounded-md bg-[#F3F4F6] text-gray-900 px-3 py-2 text-sm font-medium hover:bg-[#E7E7E7]">
+                <Plus size={14} />
+                <span>New audio</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <UploadModal open={uploadOpen} onClose={() => setUploadOpen(false)} onUpload={(files) => console.log("[v0] Files uploaded:", files)} />
     </div>
   );
 }
+
