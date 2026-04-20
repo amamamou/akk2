@@ -265,7 +265,7 @@ export default function Sidebar() {
                                 collapsed ? "py-2" : "py-2.5",
                                 "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-blue-400",
                                 isSubActive
-                                  ? "text-gray-900 bg-gray-100 font-medium shadow-sm"
+                                  ? "text-gray-900 bg-gray-50 font-medium"
                                   : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
                               )}
                             >
@@ -491,7 +491,7 @@ function NavLink({
         "group relative flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg",
         "transition-all duration-150",
         isActive
-          ? "bg-gray-100 text-gray-900 shadow-sm"
+          ? "bg-gray-50 text-gray-900"
           : "text-gray-600 hover:bg-gray-50 hover:text-gray-900",
         collapsed ? "justify-center px-2.5" : "",
         hasSubmenu && !collapsed ? "cursor-pointer" : "",
@@ -502,7 +502,7 @@ function NavLink({
         className={cn(
           "w-8 h-8 flex items-center justify-center rounded-lg transition-all duration-150",
           isActive 
-            ? "bg-gray-200 shadow-sm" 
+            ? "bg-gray-200" 
             : "bg-gray-100 group-hover:bg-gray-200"
         )}
       >
