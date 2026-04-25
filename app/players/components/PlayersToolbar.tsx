@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { Search, Speaker, SlidersHorizontal } from "lucide-react";
+import { Search, SlidersHorizontal } from "lucide-react";
 
 type StatusFilter = "all" | "online" | "offline" | "idle";
 
@@ -10,24 +10,20 @@ export default function PlayersToolbar({
   onQueryChange,
   statusFilter,
   onChangeStatus,
-  totalCount,
-  filteredCount,
 }: {
   query: string;
   onQueryChange: (q: string) => void;
   statusFilter: StatusFilter;
   onChangeStatus: (s: StatusFilter) => void;
-  totalCount: number;
-  filteredCount: number;
 }) {
-  const showingAll = totalCount === filteredCount;
+  // simplified toolbar: remove summary text
 
   return (
     <div className="border-b border-gray-100 bg-white">
       <div className="px-4 sm:px-6 lg:px-8 py-2.5 flex flex-col gap-2.5 md:flex-row md:items-center md:justify-between">
         {/* Left: Search */}
         <div className="flex flex-col gap-1.5 min-w-0 flex-1">
-          <div className="relative w-full max-w-md" role="search">
+            <div className="relative w-full max-w-md" role="search">
             <Search
               className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
               size={16}
@@ -36,7 +32,7 @@ export default function PlayersToolbar({
               aria-label="Search players"
               value={query}
               onChange={(e) => onQueryChange(e.target.value)}
-              placeholder="Search by room, player, track..."
+                placeholder=""
               className="w-full pl-9 pr-8 py-1.5 text-sm rounded-md bg-gray-50 text-gray-900 placeholder:text-gray-400 focus:outline-none"
             />
 
@@ -54,22 +50,7 @@ export default function PlayersToolbar({
         </div>
 
         {/* Right: Count + Filters */}
-        <div className="flex items-center gap-3 md:gap-4 justify-between md:justify-end">
-          <div className="flex items-center gap-1.5 text-[11px] text-gray-600">
-            <Speaker size={14} className="text-gray-400" />
-            {totalCount === 0 ? (
-              <span>No players</span>
-            ) : showingAll ? (
-              <span>
-                Showing all {totalCount} {totalCount === 1 ? "player" : "players"}
-              </span>
-            ) : (
-              <span>
-                Showing {filteredCount} of {totalCount} players
-              </span>
-            )}
-          </div>
-
+        <div className="flex items-center gap-3 md:gap-4 justify-end">
           <div className="relative">
             <SlidersHorizontal
               size={14}

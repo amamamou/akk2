@@ -1,7 +1,7 @@
 "use client";
 import React, { useEffect, useRef, useState } from "react";
-import { Speaker, MoreHorizontal, Pencil, Trash } from "lucide-react";
-import NowPlaying from "./NowPlaying";
+import { createPortal } from "react-dom";
+import { Cast, MoreHorizontal, Pencil, Trash } from "lucide-react";
 import PlayerActions from "./PlayerActions";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import { useRouter } from "next/navigation";
@@ -30,17 +30,78 @@ export default function PlayerRow({ player, onPlayPause, onSkip, onRename, onDel
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const menuRefDesktop = useRef<HTMLDivElement | null>(null);
+  const menuRefMobile = useRef<HTMLDivElement | null>(null);
+  const menuTriggerDesktopRef = useRef<HTMLButtonElement | null>(null);
+  const menuTriggerMobileRef = useRef<HTMLButtonElement | null>(null);
+  const [menuTarget, setMenuTarget] = useState<"desktop" | "mobile" | null>(null);
+  const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(null);
 
   useEffect(() => {
     if (editing) {
       const t = setTimeout(() => {
         setIsEditing(true);
-  inputRef.current?.focus();
-  inputRef.current?.select?.();
+        inputRef.current?.focus();
+        inputRef.current?.select?.();
       }, 50);
       return () => clearTimeout(t);
     }
   }, [editing]);
+
+  // close menu on outside pointer interactions or Escape
+  useEffect(() => {
+    function onDocPointer(e: PointerEvent) {
+      if (!menuOpen) return;
+
+      // Walk up from the event target to check if it's inside one of our elements.
+  let node: Node | null = e.target as Node | null;
+      while (node) {
+        if (menuRefDesktop.current && node === menuRefDesktop.current) return;
+        if (menuTriggerDesktopRef.current && node === menuTriggerDesktopRef.current) return;
+        if (menuRefMobile.current && node === menuRefMobile.current) return;
+        if (menuTriggerMobileRef.current && node === menuTriggerMobileRef.current) return;
+        node = node.parentNode;
+      }
+
+      setMenuOpen(false);
+    }
+
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setMenuOpen(false);
+    }
+
+    // use pointerdown in capture so we can inspect the composed path before React synthetic events
+    document.addEventListener("pointerdown", onDocPointer, true);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("pointerdown", onDocPointer, true);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [menuOpen]);
+
+  // compute and update portal menu position
+  useEffect(() => {
+  if (!menuOpen || !menuTarget) return;
+  const trigger = menuTarget === "desktop" ? menuTriggerDesktopRef.current : menuTriggerMobileRef.current;
+  if (!trigger) return;
+
+    const menuWidth = 192; // w-48 -> 12rem -> 192px
+    function updatePos() {
+      if (!trigger) return;
+      const rect = trigger.getBoundingClientRect();
+      const left = Math.min(Math.max(rect.right - menuWidth, 8), window.innerWidth - menuWidth - 8) + window.scrollX;
+      const top = rect.bottom + 8 + window.scrollY;
+      setMenuPos({ top, left });
+    }
+
+    updatePos();
+    window.addEventListener("resize", updatePos);
+    window.addEventListener("scroll", updatePos, { passive: true });
+    return () => {
+      window.removeEventListener("resize", updatePos);
+      window.removeEventListener("scroll", updatePos);
+    };
+  }, [menuOpen, menuTarget]);
 
   function save() {
     if (name.trim() === "") return;
@@ -49,133 +110,150 @@ export default function PlayerRow({ player, onPlayPause, onSkip, onRename, onDel
   }
 
   return (
-    <div className="relative flex items-center gap-4 rounded-lg border border-gray-200 bg-white px-4 py-3 hover:bg-gray-50 transition-colors duration-150">
-      {/* LEFT: Location (Fixed Width) */}
-      <div className="relative  flex min-w-[220px] items-center gap-3">
-        {/* Icon */}
-        <div className="relative shrink-0">
-          <div className="rounded-md border border-gray-200 bg-gray-50 p-2">
-            <Speaker size={16} className="text-gray-600" />
-          </div>
-          {(player.status === "online" || player.status === "idle") && (
-            <div className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-green-500 border border-white" />
+    <div
+      role="button"
+      tabIndex={0}
+      aria-pressed={false}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+        }
+      }}
+      className={`group grid grid-cols-[48px_1fr] md:grid-cols-[48px_1fr_140px] gap-4 items-center p-3 rounded-md border border-gray-100 bg-white transition-all duration-150 ${isEditing ? "shadow-sm" : "hover:shadow-sm"} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-blue-400`}
+      onClick={() => { /* keep row click available for parent if needed */ }}
+    >
+      {/* ICON with status overlay */}
+      <div className={"relative flex items-center justify-center rounded-md w-12 h-12 transition-transform"}>
+        <div className="relative rounded-md p-2" style={{ backgroundColor: '#A473FF' }}>
+          <Cast size={16} style={{ color: '#F3F4F6' }} />
+
+          {/* status indicator: small ringed dot at bottom-right of icon */}
+          <span
+            className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-white ${player.status === 'online' ? 'bg-green-500' : 'bg-gray-300'}`}
+            aria-hidden
+          />
+          <span className="sr-only">{player.status === 'online' ? 'Online' : 'Offline'}</span>
+        </div>
+      </div>
+
+      {/* MAIN */}
+      <div className="min-w-0">
+        <div className="text-sm font-medium text-gray-900 truncate">
+          {isEditing ? (
+            <input
+              ref={inputRef}
+              value={name}
+              placeholder="Enter location name"
+              onChange={(e) => setName(e.target.value)}
+              onBlur={save}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") save();
+                if (e.key === "Escape") {
+                  setName(player.roomName);
+                  setIsEditing(false);
+                }
+              }}
+              className={`w-full rounded-md border px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-gray-300 transition-colors md:mr-36 md:max-w-[40ch] max-w-[28ch] ${
+                name.trim() === "" ? "border-dashed border-gray-300 bg-gray-50" : "border-gray-300 bg-white"
+              }`}
+            />
+          ) : (
+            <span
+              onClick={(e) => { e.stopPropagation(); setIsEditing(true); setTimeout(() => { inputRef.current?.focus(); inputRef.current?.select?.(); }, 50); }}
+              className="line-clamp-1 cursor-pointer px-2 py-0.5 text-sm font-medium text-gray-900 hover:text-gray-700 truncate inline-block max-w-[28ch] md:max-w-[40ch]"
+              title={player.roomName}
+            >
+              {player.roomName}
+            </span>
           )}
         </div>
-        <div className="flex flex-col min-w-0">
-          <div className="text-sm">
-            {isEditing ? (
-              <input
-                ref={inputRef}
-                value={name}
-                placeholder="Enter location name"
-                onChange={(e) => setName(e.target.value)}
-                onBlur={save}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") save();
-                  if (e.key === "Escape") {
-                    setName(player.roomName);
-                    setIsEditing(false);
-                  }
-                }}
-                className={`w-full rounded-md border px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-gray-300 transition-colors ${
-                  name.trim() === ""
-                    ? "border-dashed border-gray-300 bg-gray-50"
-                    : "border-gray-300 bg-white"
-                }`}
-              />
-            ) : (
-              <span
-                onClick={(e) => { e.stopPropagation(); setIsEditing(true); setTimeout(() => { inputRef.current?.focus(); inputRef.current?.select?.(); }, 50); }}
-                className="line-clamp-1 cursor-pointer px-2 py-0.5 text-sm font-medium text-gray-900 hover:text-gray-700"
-                title={player.roomName}
-              >
-                {player.roomName}
-              </span>
+        {/* removed playerName and tracks count for minimal header */}
+      </div>
+
+      {/* STATUS + NOW PLAYING */}
+      <div className="md:col-auto col-span-2 flex items-center md:justify-end justify-start gap-3 w-full">
+  <div className={`hidden md:flex items-center gap-2 transition-all transform z-30 ${menuOpen ? 'opacity-100 translate-x-0' : 'opacity-0 md:group-hover:opacity-100 md:group-hover:translate-x-0 md:translate-x-2'}`}>
+          <PlayerActions
+            isPlaying={!!player.isPlaying}
+            onPlayPause={(e) => { e?.stopPropagation(); onPlayPause(player.id); }}
+            onSkip={(e) => { e?.stopPropagation(); onSkip(player.id); }}
+            onOpenSchedule={(e) => { e?.stopPropagation(); router.push(`/schedule?roomId=${player.id}`); }}
+          />
+
+
+          <div className="relative">
+            <button
+              ref={menuTriggerDesktopRef}
+              onClick={(e) => { e.stopPropagation(); setMenuTarget('desktop'); setMenuOpen((s) => !s); }}
+              title="More options"
+              className="p-1.5 rounded hover:bg-gray-100 text-gray-500 hover:text-gray-700 transition-colors focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-gray-200"
+            >
+              <MoreHorizontal size={16} />
+            </button>
+            {menuOpen && menuTarget === 'desktop' && menuPos && createPortal(
+              <div ref={menuRefDesktop} onPointerDown={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()} style={{ position: 'absolute', top: menuPos.top, left: menuPos.left, width: 192 }} className="bg-white border border-gray-200 rounded-xl shadow-xl z-50 overflow-hidden backdrop-blur-sm">
+                <button
+                  aria-label="Rename"
+                  onClick={() => { setMenuOpen(false); setMenuTarget(null); onRequestEdit?.(player.id); }}
+                  className="w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 cursor-pointer transition-colors"
+                >
+                  <Pencil size={16} className="text-gray-500" />
+                  <span>Rename</span>
+                </button>
+                <div className="h-px bg-gray-100" />
+                <button
+                  aria-label="Delete"
+                  onClick={() => { setMenuOpen(false); setMenuTarget(null); setConfirmOpen(true); }}
+                  className="group w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 cursor-pointer transition-colors"
+                >
+                  <Trash size={16} className="text-gray-500" />
+                  <span>Delete</span>
+                </button>
+              </div>,
+              document.body
             )}
-            <div className="mt-0.5 text-xs font-medium text-gray-500">
-              {player.playerName}
-            </div>
           </div>
+          {/* delete moved to kebab menu */}
         </div>
-      </div>
 
-      {/* NOW PLAYING (Flex) */}
-      <div className="flex-1 relative z-10">
-        <NowPlaying
-          evt={player.nowPlaying ?? null}
-          playingProgress={player.playingProgress ?? 0}
-          playlistLength={player.playlist?.length ?? 0}
-          onEmptyClick={() => router.push(`/schedule?roomId=${player.id}`)}
-          isPlaying={!!player.isPlaying}
-        />
-      </div>
-
-      {/* NEXT EVENT (Fixed Width) */}
-
-
-      {/* STATUS BADGE (Fixed Width) */}
-      <div className="relative  flex w-20 justify-end">
-        {player.status === "online" ? (
-          <span
-            className="inline-flex items-center gap-1.5 rounded-full bg-green-50 px-2 py-1 text-xs font-medium text-green-700"
-            aria-label="Online"
+  {/* mobile kebab */}
+  <div className="md:hidden ml-auto relative z-30">
+          <button
+            ref={menuTriggerMobileRef}
+            onClick={(e) => { e.stopPropagation(); setMenuTarget('mobile'); setMenuOpen((s) => !s); }}
+            title="Actions"
+            className="p-2 rounded-md text-gray-500 hover:bg-gray-100"
+            aria-label="Open actions"
           >
-            <span className="h-1.5 w-1.5 rounded-full bg-green-500" />
-            <span>Online</span>
-          </span>
-        ) : (
-          <span
-            className="inline-flex items-center gap-1.5 rounded-full bg-gray-50 px-2 py-1 text-xs font-medium text-gray-600"
-            aria-label="Offline"
-          >
-            <span className="h-1.5 w-1.5 rounded-full bg-gray-400" />
-            <span>Offline</span>
-          </span>
-        )}
-      </div>
-
-      {/* CONTROLS (Compact) */}
-      <div className="flex items-center gap-2 shrink-0 relative ">
-        <PlayerActions
-          isPlaying={!!player.isPlaying}
-          onPlayPause={(e) => { e?.stopPropagation(); onPlayPause(player.id); }}
-          onSkip={(e) => { e?.stopPropagation(); onSkip(player.id); }}
-          onOpenSchedule={(e) => { e?.stopPropagation(); router.push(`/schedule?roomId=${player.id}`); }}
-        />
-
-        <div className="relative">
-          <button 
-            onClick={(e) => { e.stopPropagation(); setMenuOpen((s) => !s); }} 
-            aria-label="Open menu" 
-            title="More options"
-            className="p-2.5 rounded-lg border border-gray-200/60 bg-white hover:bg-gray-100 text-gray-600 cursor-pointer transition-all duration-200 hover:shadow-sm"
-          >
-            <MoreHorizontal size={16} />
+            <MoreHorizontal size={18} />
           </button>
-
-          {menuOpen && (
-            <div onClick={(e) => e.stopPropagation()} className="absolute right-0 mt-2 w-48 bg-white border border-gray-200 rounded-xl shadow-xl z-50 overflow-hidden backdrop-blur-sm">
-              <button 
-                aria-label="Rename" 
-                onClick={() => { setMenuOpen(false); onRequestEdit?.(player.id); }} 
+          {menuOpen && menuTarget === 'mobile' && menuPos && createPortal(
+            <div ref={menuRefMobile} onPointerDown={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()} style={{ position: 'absolute', top: menuPos.top, left: menuPos.left, width: 192 }} className="bg-white border border-gray-200 rounded-xl shadow-xl z-50 overflow-hidden backdrop-blur-sm">
+              <button
+                aria-label="Rename"
+                onClick={() => { setMenuOpen(false); setMenuTarget(null); onRequestEdit?.(player.id); }}
                 className="w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 cursor-pointer transition-colors"
               >
                 <Pencil size={16} className="text-gray-500" />
                 <span>Rename</span>
               </button>
               <div className="h-px bg-gray-100" />
-              <button 
-                aria-label="Delete" 
-                onClick={() => { setMenuOpen(false); setConfirmOpen(true); }} 
+              <button
+                aria-label="Delete"
+                onClick={() => { setMenuOpen(false); setMenuTarget(null); setConfirmOpen(true); }}
                 className="group w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 cursor-pointer transition-colors"
               >
                 <Trash size={16} className="text-gray-500" />
                 <span>Delete</span>
               </button>
-            </div>
+            </div>,
+            document.body
           )}
         </div>
       </div>
+
+      {/* menu */}
+      {/* menu is now rendered adjacent to the buttons above */}
 
       <ConfirmDialog
         open={confirmOpen}

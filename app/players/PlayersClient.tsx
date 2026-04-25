@@ -6,7 +6,9 @@ import { useRouter } from "next/navigation";
 import PlayersHeader from "./components/PlayersHeader";
 import PlayerRow from "./components/PlayerRow";
 import PlayerCard from "./components/PlayerCard";
-import PlayersToolbar from "./components/PlayersToolbar";
+// top toolbar removed per UX request
+import AudioToolbar from "../library/components/AudioToolbar";
+import PlayersTriageBar from "./components/PlayersTriageBar";
 
 export type Track = { id: string; title: string; duration: number };
 
@@ -32,16 +34,57 @@ const STORAGE_KEY = "akou.players";
 // and optionally restored from localStorage.
 const initialPlayers: PlayerType[] = [];
 
-type PlayerStatusFilter = "all" | PlayerType["status"];
+// PlayerStatusFilter removed (top filter removed)
 
 export default function PlayersClient() {
-  const [view, setView] = useState<"list" | "grid">("list");
+  const [view, setView] = useState<"list" | "grid">("grid");
   const [players, setPlayers] = useState<PlayerType[]>(initialPlayers);
   const [counter, setCounter] = useState(1);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
-  const [statusFilter, setStatusFilter] =
-    useState<PlayerStatusFilter>("all");
+  // top filter removed, keep query only
+  // pagination (reuse audio/playlist toolbar controls)
+  const [page, setPage] = useState(1);
+  const [perPage, setPerPage] = useState(10);
+  const perPageOptions = [5, 10, 20, 50];
+
+  // players triage / filters state (for PlayersTriageBar)
+  const [sortBy, setSortBy] = useState<'added'|'title'|'duration'>('added');
+  const [sortDir, setSortDir] = useState<'desc'|'asc'>('desc');
+  const [sortOpen, setSortOpen] = useState(false);
+
+  const [datePickerOpen, setDatePickerOpen] = useState(false);
+  const [customDate, setCustomDate] = useState<string | null>(null);
+  const [dateFilterType, setDateFilterType] = useState<'all'|'last7'|'last30'|'custom'>('all');
+  const [calendarMonth, setCalendarMonth] = useState(() => new Date());
+
+  const [singerFilter, setSingerFilter] = useState<string | null>(null);
+  const [singerOpen, setSingerOpen] = useState(false);
+  const [singerQuery, setSingerQuery] = useState("");
+  const singerOptions: string[] = [];
+
+  const [playlistFilter, setPlaylistFilter] = useState<string | null>(null);
+  const [playlistOpen, setPlaylistOpen] = useState(false);
+  const [playlistQuery, setPlaylistQuery] = useState("");
+  const playlistOptions: { id: string; title: string }[] = [];
+
+  const [creatorFilter, setCreatorFilter] = useState<string | null>(null);
+  const [creatorOpen, setCreatorOpen] = useState(false);
+  const [creatorQuery, setCreatorQuery] = useState("");
+  const creatorOptions: string[] = [];
+
+  // helper: monthDays for calendar rendering
+  const monthDays = (y:number,m:number) => {
+    const first = new Date(y, m, 1);
+    const days: Array<{day:number|null;date?:string}> = [];
+    const startDay = first.getDay();
+    for (let i=0;i<startDay;i++) days.push({day:null});
+    const d = new Date(y,m+1,0).getDate();
+    for (let i=1;i<=d;i++) days.push({day:i,date: new Date(y,m,i).toISOString().slice(0,10)});
+    return days;
+  };
+
+  const formatDateLabel = (iso:string|null) => iso ? new Date(iso).toLocaleDateString() : null;
 
   const persistPlayers = useCallback((next: PlayerType[]) => {
     try {
@@ -206,10 +249,6 @@ export default function PlayersClient() {
     const normalizedQuery = query.trim().toLowerCase();
 
     return players.filter((player) => {
-      if (statusFilter !== "all" && player.status !== statusFilter) {
-        return false;
-      }
-
       if (!normalizedQuery) return true;
 
       const haystack = [
@@ -223,7 +262,20 @@ export default function PlayersClient() {
 
       return haystack.includes(normalizedQuery);
     });
-  }, [players, query, statusFilter]);
+  }, [players, query]);
+
+  const totalFiltered = filteredPlayers.length;
+  const totalPages = Math.max(1, Math.ceil(totalFiltered / perPage));
+
+  // ensure page is valid when filtered count or perPage changes
+  useEffect(() => {
+    if (page > totalPages) setPage(1);
+  }, [totalPages, page]);
+
+  const paginatedPlayers = useMemo(() => {
+    const start = (page - 1) * perPage;
+    return filteredPlayers.slice(start, start + perPage);
+  }, [filteredPlayers, page, perPage]);
 
   const gridCols = useMemo(
     () => "grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3",
@@ -232,23 +284,55 @@ export default function PlayersClient() {
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-white">
-      <PlayersHeader
-        view={view}
-        onToggleView={(v) => setView(v)}
-        onAdd={handleAddPlayer}
-      />
+      <PlayersHeader view={view} onToggleView={(v) => setView(v)} onAdd={handleAddPlayer} />
+      {/* Players triage bar (sort / date / filters) */}
+      <PlayersTriageBar
+        sortBy={sortBy}
+        sortDir={sortDir}
+        sortOpen={sortOpen}
+        setSortOpen={setSortOpen}
+        setSortBy={setSortBy}
+        setSortDir={setSortDir}
 
-      <PlayersToolbar
-        query={query}
-        onQueryChange={setQuery}
-        statusFilter={statusFilter}
-        onChangeStatus={setStatusFilter}
-        totalCount={players.length}
-        filteredCount={filteredPlayers.length}
+        singerFilter={singerFilter}
+        singerOpen={singerOpen}
+        singerQuery={singerQuery}
+        singerOptions={singerOptions}
+        setSingerFilter={setSingerFilter}
+        setSingerOpen={setSingerOpen}
+        setSingerQuery={setSingerQuery}
+
+        datePickerOpen={datePickerOpen}
+        customDate={customDate}
+        dateFilterType={dateFilterType}
+        calendarMonth={calendarMonth}
+        setCalendarMonth={setCalendarMonth}
+        setDatePickerOpen={setDatePickerOpen}
+        setCustomDate={setCustomDate}
+        setDateFilterType={setDateFilterType}
+        monthDays={monthDays}
+        formatDateLabel={formatDateLabel}
+
+        playlistFilter={playlistFilter}
+        playlistOpen={playlistOpen}
+        playlistQuery={playlistQuery}
+        playlistOptions={playlistOptions}
+        setPlaylistFilter={setPlaylistFilter}
+        setPlaylistOpen={setPlaylistOpen}
+        setPlaylistQuery={setPlaylistQuery}
+        setActiveCategory={() => {}}
+
+        creatorFilter={creatorFilter}
+        creatorOpen={creatorOpen}
+        creatorQuery={creatorQuery}
+        creatorOptions={creatorOptions}
+        setCreatorFilter={setCreatorFilter}
+        setCreatorOpen={setCreatorOpen}
+        setCreatorQuery={setCreatorQuery}
       />
 
       <div className="flex-1 overflow-auto">
-        <div className="px-4 py-4">
+  <div className="px-6 py-6">
           {players.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16">
               <div className="text-center space-y-2">
@@ -274,7 +358,7 @@ export default function PlayersClient() {
             </div>
           ) : view === "list" ? (
             <div className="space-y-2">
-              {filteredPlayers.map((p) => (
+              {paginatedPlayers.map((p) => (
                 <PlayerRow
                   key={p.id}
                   player={p}
@@ -289,7 +373,7 @@ export default function PlayersClient() {
             </div>
           ) : (
             <div className={`grid gap-4 ${gridCols}`}>
-              {filteredPlayers.map((p) => (
+              {paginatedPlayers.map((p) => (
                 <PlayerCard
                   key={p.id}
                   player={p}
@@ -304,6 +388,19 @@ export default function PlayersClient() {
           )}
         </div>
       </div>
+      <AudioToolbar
+        query={query}
+        setQuery={setQuery}
+        filteredCount={totalFiltered}
+        totalCount={players.length}
+        page={page}
+        setPage={setPage}
+        perPage={perPage}
+        setPerPage={setPerPage}
+        perPageOptions={perPageOptions}
+        totalPages={totalPages}
+        placeholder="Search by room, player, track..."
+      />
     </div>
   );
 }

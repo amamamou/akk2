@@ -1,9 +1,9 @@
 "use client";
 import React, { useEffect, useRef, useState } from "react";
-import NowPlaying from "./NowPlaying";
+import { createPortal } from "react-dom";
+import PlayerActions from "./PlayerActions";
 import { 
-  CalendarDays, MoreHorizontal, Pencil, Trash, Speaker, 
-  Wifi, WifiOff, Radio, ChevronRight 
+  MoreHorizontal, Pencil, Trash, Cast
 } from "lucide-react";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
 
@@ -20,11 +20,7 @@ type Player = {
   playlist?: { id: string; title: string; duration?: number }[];
 };
 
-function getLastActiveLabel(player: Player) {
-  if (player.status === "online") return "Just now";
-  if (player.status === "idle") return "10 min ago";
-  return "2 hours ago";
-}
+
 
 export default function PlayerCard({
   player,
@@ -45,6 +41,8 @@ export default function PlayerCard({
   const [name, setName] = useState(player.roomName);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  const menuTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const menuRef = useRef<HTMLDivElement | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
 
   useEffect(() => {
@@ -67,167 +65,114 @@ export default function PlayerCard({
   const isActive = player.status === "online" || player.status === "idle";
 
   return (
-    <div className=" relative overflow-hidden rounded-md border border-gray-200 bg-white transition-colors duration-150 hover:border-gray-300 hover:bg-gray-50">
-      <div className="relative z-10 flex flex-col gap-4 p-4">
-        {/* Header: Icon, Title, Actions */}
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex min-w-0 flex-1 items-start gap-3">
-            {/* Icon */}
-            <div className="relative shrink-0">
-              <div className="rounded-md border border-gray-200 bg-gray-50 p-2.5">
-                <Speaker size={18} className="text-gray-600" />
-              </div>
-              {isActive && (
-                <div className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-green-500 border border-white" />
-              )}
-            </div>
+    <div
+      role="button"
+      tabIndex={0}
+      aria-pressed={false}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+        }
+      }}
+      className={`group grid grid-cols-[64px_1fr] md:grid-cols-[64px_1fr_160px] gap-4 items-start p-4 rounded-md border border-gray-100 bg-white transition-all duration-150 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-blue-400 min-h-[72px]`}
+      onClick={() => { /* keep card click available for parent if needed */ }}
+    >
+      {/* ICON with status overlay */}
+      <div className={"relative flex items-center justify-center rounded-md w-16 h-16 transition-transform"}>
+        <div className="relative rounded-md p-3 shadow-sm" style={{ backgroundColor: '#A473FF' }}>
+          <Cast size={20} style={{ color: '#F3F4F6' }} />
 
-            {/* Room and Player Info */}
-            <div className="min-w-0 flex-1">
-              {isEditing ? (
-                <input
-                  ref={inputRef}
-                  value={name}
-                  placeholder="Enter location name"
-                  onChange={(e) => setName(e.target.value)}
-                  onBlur={save}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") save();
-                    if (e.key === "Escape") {
-                      setName(player.roomName);
-                      setIsEditing(false);
-                    }
-                  }}
-                  className={`w-full rounded-md border px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-gray-300 transition-colors ${
-                    name.trim() === ""
-                      ? "border-dashed border-gray-300 bg-gray-50"
-                      : "border-gray-300 bg-white"
-                  }`}
-                />
-              ) : (
-                <div
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setIsEditing(true);
-                    setTimeout(() => {
-                      inputRef.current?.focus();
-                      inputRef.current?.select?.();
-                    }, 50);
-                  }}
-                  className="truncate cursor-pointer px-2 py-0.5 text-sm font-medium text-gray-900 hover:text-gray-700"
-                  title={player.roomName}
-                >
-                  {player.roomName}
-                </div>
-              )}
-              <div
-                className="mt-1 flex items-center gap-1.5 text-xs font-medium text-gray-500"
-                title={player.playerName}
-              >
-                <Radio size={12} className="shrink-0 opacity-70" />
-                <span className="truncate">{player.playerName}</span>
-              </div>
-            </div>
-          </div>
+          {/* status indicator */}
+          <span className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-white ${isActive ? 'bg-green-500' : 'bg-gray-300'}`} />
+          <span className="sr-only">{isActive ? 'Online' : 'Offline'}</span>
+        </div>
+      </div>
 
-          {/* Action Buttons */}
-          <div className="flex items-center gap-2 shrink-0">
+      {/* MAIN */}
+      <div className="min-w-0">
+        <div className="text-sm font-medium text-gray-900">
+          {isEditing ? (
+            <input
+              ref={inputRef}
+              value={name}
+              placeholder="Enter location name"
+              onChange={(e) => setName(e.target.value)}
+              onBlur={save}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") save();
+                if (e.key === "Escape") {
+                  setName(player.roomName);
+                  setIsEditing(false);
+                }
+              }}
+              className={`w-full rounded-md border px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-gray-300 transition-colors md:mr-40 md:max-w-[46ch] max-w-[36ch] ${
+                name.trim() === "" ? "border-dashed border-gray-300 bg-gray-50" : "border-gray-300 bg-white"
+              }`}
+            />
+          ) : (
+            <span
+              onClick={(e) => { e.stopPropagation(); setIsEditing(true); setTimeout(() => { inputRef.current?.focus(); inputRef.current?.select?.(); }, 50); }}
+              className="line-clamp-1 cursor-pointer px-2 py-0.5 text-sm font-medium text-gray-900 hover:text-gray-700 truncate inline-block max-w-[36ch] md:max-w-[46ch]"
+              title={player.roomName}
+            >
+              {player.roomName}
+            </span>
+          )}
+        </div>
+        <div className="mt-2">
+          <p className="text-sm text-gray-500 line-clamp-3">
+            {player.playerName ? player.playerName : 'No description provided.'}
+          </p>
+        </div>
+      </div>
+
+      {/* ACTIONS */}
+      <div className="md:col-auto col-span-2 flex items-center md:justify-end justify-start gap-3 w-full">
+        <div className={`hidden md:flex items-center gap-2 transition-all transform z-30 opacity-100`}> 
+          <PlayerActions
+            isPlaying={!!player.isPlaying}
+            onPlayPause={(e) => { e?.stopPropagation(); onOpenSchedule?.(); }}
+            onSkip={(e) => { e?.stopPropagation(); /* keep noop or wire if needed */ }}
+            onOpenSchedule={(e) => { e?.stopPropagation(); onOpenSchedule?.(); }}
+          />
+
+          <div className="relative">
             <button
-              type="button"
+              ref={menuTriggerRef}
               onClick={(e) => {
                 e.stopPropagation();
-                onOpenSchedule?.();
+                setMenuOpen((s) => !s);
               }}
-              aria-label="Open schedule"
-              title="View schedule"
-              className="rounded-md border border-gray-200 bg-white p-2 text-gray-600 transition-colors duration-150 hover:bg-gray-100 cursor-pointer"
+              title="More options"
+              className="p-1.5 rounded hover:bg-gray-100 text-gray-500 hover:text-gray-700 transition-colors focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-gray-200"
             >
-              <CalendarDays size={16} />
+              <MoreHorizontal size={16} />
             </button>
 
-            <div className="relative">
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setMenuOpen((s) => !s);
-                }}
-                aria-label="Menu"
-                title="More options"
-                className="rounded-md border border-gray-200 bg-white p-2 text-gray-600 transition-colors duration-150 hover:bg-gray-100 cursor-pointer"
-              >
-                <MoreHorizontal size={16} />
-              </button>
-
-              {menuOpen && (
-                <div
-                  onClick={(e) => e.stopPropagation()}
-                  className="absolute right-0 z-50 mt-2 w-52 overflow-hidden rounded-md border border-gray-200 bg-white shadow-lg"
-                >
-                  <button
-                    onClick={() => {
-                      setMenuOpen(false);
-                      onRequestEdit?.(player.id);
-                    }}
-                    className="flex w-full items-center gap-3 px-4 py-2 text-sm text-gray-700 transition-colors hover:bg-gray-50 cursor-pointer"
-                  >
-                    <Pencil size={16} className="text-gray-500" />
-                    <span>Rename</span>
-                  </button>
-                  <div className="h-px bg-gray-100" />
-               <button
-  onClick={() => {
-    setMenuOpen(false);
-    setConfirmOpen(true);
-  }}
-  className="group flex w-full items-center gap-3 px-4 py-2 text-sm text-gray-700 transition-colors hover:bg-red-50 hover:text-red-600 cursor-pointer"
->
-  <Trash
-    size={16}
-    className="text-gray-500 transition-colors group-hover:text-red-600"
-  />
-  <span>Delete</span>
-</button>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Now Playing Section */}
-        <div className="space-y-3">
-          <NowPlaying
-            evt={player.nowPlaying ?? null}
-            playingProgress={player.playingProgress ?? 0}
-            playlistLength={player.playlist?.length ?? 0}
-            onEmptyClick={() => onOpenSchedule?.()}
-            isPlaying={!!player.isPlaying}
-          />
-        </div>
-
-        {/* Status Footer */}
-        <div className="flex items-center justify-between border-t border-gray-100 pt-3">
-          <div className="flex items-center gap-2">
-            {player.status === "online" ? (
-              <span
-                className="inline-flex items-center gap-1.5 rounded-full bg-green-50 px-2 py-1 text-xs font-medium text-green-700"
-                aria-label="Online"
-              >
-                <span className="h-1.5 w-1.5 rounded-full bg-green-600" />
-                <span>Online</span>
-              </span>
-            ) : (
-              <span
-                className="inline-flex items-center gap-1.5 rounded-full bg-gray-50 px-2 py-1 text-xs font-medium text-gray-600"
-                aria-label="Offline"
-              >
-                <span className="h-1.5 w-1.5 rounded-full bg-gray-400" />
-                <span>Offline</span>
-              </span>
+            {/* Portal-anchored menu to avoid stacking context issues */}
+            {menuOpen && typeof document !== "undefined" && (
+              // compute/render into body
+              <PortalMenu
+                triggerRef={menuTriggerRef}
+                menuRef={menuRef}
+                onClose={() => setMenuOpen(false)}
+                onRename={() => { setMenuOpen(false); onRequestEdit?.(player.id); }}
+                onDelete={() => { setMenuOpen(false); setConfirmOpen(true); }}
+              />
             )}
           </div>
-          <span className="text-xs font-medium text-gray-400">
-            {getLastActiveLabel(player)}
-          </span>
+        </div>
+
+        {/* mobile kebab */}
+        <div className="md:hidden ml-auto relative z-30">
+          <button
+            onClick={(e) => { e.stopPropagation(); setMenuOpen((s) => !s); }}
+            title="Actions"
+            className="p-2 rounded-md text-gray-500 hover:bg-gray-100"
+            aria-label="Open actions"
+          >
+            <MoreHorizontal size={18} />
+          </button>
         </div>
       </div>
 
@@ -245,4 +190,107 @@ export default function PlayerCard({
       />
     </div>
   );
+}
+
+function PortalMenu({
+  triggerRef,
+  menuRef,
+  onClose,
+  onRename,
+  onDelete,
+}: {
+  triggerRef: React.RefObject<HTMLButtonElement | null>;
+  menuRef: React.RefObject<HTMLDivElement | null>;
+  onClose: () => void;
+  onRename: () => void;
+  onDelete: () => void;
+}) {
+  const [menuStyle, setMenuStyle] = useState<React.CSSProperties | null>(null);
+
+  useEffect(() => {
+    let mounted = true;
+
+    function compute() {
+      const trigger = triggerRef.current;
+      const menuEl = menuRef.current;
+      if (!trigger || !menuEl) return;
+
+      const rect = trigger.getBoundingClientRect();
+      const menuRect = menuEl.getBoundingClientRect();
+      const width = menuRect.width || 192;
+      const height = menuRect.height || 120;
+
+      // try to place below the trigger, align right edge to trigger
+      let top = rect.bottom + 8;
+      let left = rect.right - width;
+
+      // clamp horizontally
+      left = Math.max(8, Math.min(left, window.innerWidth - width - 8));
+
+      // if overflowing bottom, place above
+      if (top + height > window.innerHeight - 8) {
+        top = Math.max(8, rect.top - height - 8);
+      }
+
+      if (mounted) setMenuStyle({ position: "fixed", top, left, zIndex: 9999 });
+    }
+
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") onClose();
+    }
+
+    function onDown(e: PointerEvent) {
+      const menuEl = menuRef.current;
+      const trigger = triggerRef.current;
+      const target = e.target as Node | null;
+      if (!menuEl || !trigger) return;
+      if (menuEl.contains(target) || trigger.contains(target)) return;
+      onClose();
+    }
+
+    // compute after a frame so menuRef has layout
+    requestAnimationFrame(compute);
+    window.addEventListener("resize", compute);
+    window.addEventListener("scroll", compute, true);
+    document.addEventListener("keydown", onKey);
+    document.addEventListener("pointerdown", onDown);
+
+    return () => {
+      mounted = false;
+      window.removeEventListener("resize", compute);
+      window.removeEventListener("scroll", compute, true);
+      document.removeEventListener("keydown", onKey);
+      document.removeEventListener("pointerdown", onDown);
+    };
+  }, [onClose, triggerRef, menuRef]);
+
+  const menu = (
+    <div
+      ref={menuRef}
+      onPointerDown={(e) => e.stopPropagation()}
+      className="w-48 bg-white border border-gray-200 rounded-xl shadow-xl overflow-hidden backdrop-blur-sm"
+      style={menuStyle || { position: "fixed", top: -9999, left: -9999, zIndex: 9999 }}
+    >
+      <button
+        aria-label="Rename"
+        onClick={() => { onClose(); onRename(); }}
+        className="w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 cursor-pointer transition-colors"
+      >
+        <Pencil size={16} className="text-gray-500" />
+        <span>Rename</span>
+      </button>
+      <div className="h-px bg-gray-100" />
+      <button
+        aria-label="Delete"
+        onClick={() => { onClose(); onDelete(); }}
+        className="group w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 cursor-pointer transition-colors"
+      >
+        <Trash size={16} className="text-gray-500" />
+        <span>Delete</span>
+      </button>
+    </div>
+  );
+
+  if (typeof document === "undefined") return null;
+  return createPortal(menu, document.body);
 }
