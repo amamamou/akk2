@@ -6,7 +6,7 @@ import { Music, Clock, List, Edit, Trash, Upload } from "lucide-react";
 import UploadModal from "../../components/UploadModal";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import type { Playlist } from "../../components/PlaylistModal";
-import AudioVisual from "../../components/AudioVisual";
+// AudioVisual removed — inline neutral waveform glyph used instead
 
 export default function PlaylistDetailClient({ playlistId }: { playlistId: string }) {
   const [playlist, setPlaylist] = useState<Playlist | null>(null);
@@ -98,6 +98,7 @@ export default function PlaylistDetailClient({ playlistId }: { playlistId: strin
     id: `${playlist.id}-t${i + 1}`,
     title: `${displayTitle} — Track ${i + 1}`,
     duration: 180 + i * 15,
+    size: Math.round((2.8 + i * 0.3) * 1024 * 1024),
   }));
 
   return (
@@ -205,7 +206,6 @@ export default function PlaylistDetailClient({ playlistId }: { playlistId: strin
         <UploadModal
           open={uploadOpen}
           onClose={() => setUploadOpen(false)}
-          showCategory={false}
           onUpload={(files) => {
             console.log('[v0] Uploaded files from detail page:', files);
             // TODO: attach uploaded files to playlist/library
@@ -252,13 +252,22 @@ export default function PlaylistDetailClient({ playlistId }: { playlistId: strin
               {tracks.map((t) => (
                 <div key={t.id} className="grid grid-cols-[48px_1fr_96px] gap-4 items-center px-6 py-4 hover:bg-gray-50">
                   <div className="flex items-center justify-center">
-                    <AudioVisual size={36} color={playlist.coverColor} />
+                    <svg className="w-8 h-8 text-gray-600" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden>
+                      <path d="M3 15h2v-6H3v6zm4 0h2v-4H7v4zm4 0h2v-10h-2v10zm4 0h2v-7h-2v7zm4 0h2v-5h-2v5z" fill="currentColor" />
+                    </svg>
                   </div>
                   <div>
                     <div className="text-sm font-medium text-gray-900">{t.title}</div>
-                    <div className="text-xs text-gray-500 mt-0.5">{Math.floor(t.duration / 60)}:{String(t.duration % 60).padStart(2, '0')}</div>
+                    <div className="text-xs text-gray-500 mt-0.5 flex items-center gap-2">
+                      <span>{Math.floor(t.duration / 60)}:{String(t.duration % 60).padStart(2, '0')}</span>
+                      {typeof (t as unknown as { size?: number }).size === 'number' && (
+                        <span className="text-xs text-gray-400">• {(((t as unknown as { size?: number }).size ?? 0) / 1024 / 1024).toFixed(1)}MB</span>
+                      )}
+                    </div>
                   </div>
-                  <div className="text-right text-sm text-gray-500">{Math.floor(t.duration / 60)}:{String(t.duration % 60).padStart(2, '0')}</div>
+                  <div className="text-right text-sm text-gray-500">
+                    {typeof (t as unknown as { size?: number }).size === 'number' ? `${(((t as unknown as { size?: number }).size ?? 0) / 1024 / 1024).toFixed(1)}MB` : `${Math.floor(t.duration / 60)}:${String(t.duration % 60).padStart(2, '0')}`}
+                  </div>
                 </div>
               ))}
             </div>

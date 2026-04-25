@@ -3,7 +3,7 @@
 import React from "react";
 import { Plus, List } from "lucide-react";
 
-type Cols = { duration: boolean; added: boolean; modified: boolean; addedBy: boolean };
+type Cols = { duration: boolean; added: boolean; modified: boolean; addedBy: boolean; size: boolean };
 
 export default function AudioHeader({
   colsOpen,
@@ -43,6 +43,10 @@ export default function AudioHeader({
                   <label className="flex items-center gap-2">
                     <input type="checkbox" checked={visibleCols.duration} onChange={() => toggleCol("duration" as keyof Cols)} />
                     <span>Duration</span>
+                  </label>
+                  <label className="flex items-center gap-2">
+                    <input type="checkbox" checked={visibleCols.size} onChange={() => toggleCol("size" as keyof Cols)} />
+                    <span>Size</span>
                   </label>
                   <label className="flex items-center gap-2">
                     <input type="checkbox" checked={visibleCols.added} onChange={() => toggleCol("added" as keyof Cols)} />

@@ -21,7 +21,7 @@ export default function AudioListItem({
   onView: (item: AudioItem) => void;
   onEdit: (id: string) => void;
   onDelete: (id: string) => void;
-  visibleCols: { duration: boolean; added: boolean; modified: boolean; addedBy: boolean };
+  visibleCols: { duration: boolean; added: boolean; modified: boolean; addedBy: boolean; size: boolean };
 }) {
   return (
     <div
@@ -43,12 +43,17 @@ export default function AudioListItem({
         )}
     >
       <div className={cn("flex items-center justify-center rounded-md w-12 h-12", "transition-transform") }>
-        <AudioVisual size={36} color={item.color ?? "#A473FF"} />
+        <AudioVisual size={36} color={item.color ?? "#A473FF"} src={item.url} />
       </div>
 
       <div className="min-w-0">
         <div className="text-sm font-medium text-gray-900 truncate">{item.title}</div>
-        <div className="mt-1 text-xs text-gray-500">{item.singer ?? "Unknown Artist"}</div>
+        <div className="mt-1 text-xs text-gray-500 flex items-center gap-2">
+          <span>{item.singer ?? "Unknown Artist"}</span>
+          {visibleCols.size && typeof item.size === 'number' && (
+            <span className="text-xs text-gray-400">• {(item.size / 1024 / 1024).toFixed(1)}MB</span>
+          )}
+        </div>
       </div>
 
       <div className="md:col-auto col-span-2 flex items-center md:justify-end justify-start gap-3 w-full">
@@ -81,18 +86,22 @@ export default function AudioListItem({
           <button
             onClick={(e) => { e.stopPropagation(); onView(item); }}
             title="View"
-            className="p-1.5 rounded hover:bg-gray-100 text-gray-600 hover:text-gray-800 transition-colors"
+            className="p-1.5 rounded hover:bg-emerald-50 text-emerald-600 hover:text-emerald-800 transition-colors focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-emerald-200"
           >
             <Eye size={16} />
           </button>
           <button
             onClick={(e) => { e.stopPropagation(); onEdit(item.id); }}
             title="Edit"
-            className="p-1.5 rounded hover:bg-gray-100 text-gray-500 hover:text-gray-800 transition-colors"
+            className="p-1.5 rounded hover:bg-amber-50 text-amber-600 hover:text-amber-800 transition-colors focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-amber-200"
           >
             <Edit size={16} />
           </button>
-          <button onClick={(e) => { e.stopPropagation(); onDelete(item.id); }} title="Delete" className="p-1.5 rounded text-gray-500 hover:bg-gray-100 hover:text-gray-800 transition-colors">
+          <button
+            onClick={(e) => { e.stopPropagation(); onDelete(item.id); }}
+            title="Delete"
+            className="p-1.5 rounded text-rose-600 hover:bg-rose-50 hover:text-rose-800 transition-colors focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-rose-200"
+          >
             <Trash size={16} />
           </button>
         </div>

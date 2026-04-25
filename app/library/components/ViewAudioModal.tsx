@@ -57,12 +57,12 @@ export default function ViewAudioModal({
 
             <div className="flex items-start gap-3">
               <div className="w-9 h-9 rounded-md bg-gray-50 flex items-center justify-center text-gray-600 border border-gray-100">
-                <Play size={16} />
-              </div>
-              <div>
-                <p className="text-xs text-gray-400">Usage</p>
-                <p className="text-sm text-gray-700">{item.usageCount ?? 0} plays</p>
-              </div>
+                  <Play size={16} />
+                </div>
+                <div>
+                  <p className="text-xs text-gray-400">Size</p>
+                  <p className="text-sm text-gray-700">{typeof item.size === 'number' ? `${(item.size / 1024 / 1024).toFixed(1)} MB` : '—'}</p>
+                </div>
             </div>
 
             <div className="flex items-start gap-3">

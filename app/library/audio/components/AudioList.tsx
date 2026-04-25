@@ -20,7 +20,7 @@ export default function AudioList({
   onView: (item: AudioItem) => void;
   onEdit: (id: string) => void;
   onDelete: (id: string) => void;
-  visibleCols: { duration: boolean; added: boolean; modified: boolean; addedBy: boolean };
+  visibleCols: { duration: boolean; added: boolean; modified: boolean; addedBy: boolean; size: boolean };
 }) {
   if (!items || items.length === 0) return (
     <div className="h-full min-h-[260px] flex items-center justify-center">

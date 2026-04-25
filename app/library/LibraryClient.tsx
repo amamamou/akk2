@@ -16,12 +16,12 @@ import type { Playlist } from "./components/PlaylistModal";
 const categories = ["All", "Yoga", "Meditation", "Lobby", "Retail"];
 
 const library: AudioItem[] = [
-  { id: "a1", title: "Morning Flow", duration: "60m", durationMinutes: 60, category: "Yoga", usageCount: 24, spacesCount: 3, lastPlayed: "today", isScheduled: true, color: "purple" },
-  { id: "a2", title: "Deep Focus", duration: "120m", durationMinutes: 120, category: "Meditation", usageCount: 18, spacesCount: 2, lastPlayed: "2 days ago", isScheduled: true, color: "blue" },
-  { id: "a3", title: "Lobby Ambience Loop", duration: "180m", durationMinutes: 180, category: "Lobby", usageCount: 5, spacesCount: 1, lastPlayed: undefined, isScheduled: false, color: "amber" },
-  { id: "a4", title: "Upbeat Playlist", duration: "120m", durationMinutes: 120, category: "Retail", usageCount: 12, spacesCount: 2, lastPlayed: "yesterday", isScheduled: true, color: "orange" },
-  { id: "a5", title: "Nature Walk", duration: "45m", durationMinutes: 45, category: "Meditation", usageCount: 3, spacesCount: 1, lastPlayed: "1 week ago", isScheduled: false, color: "green" },
-  { id: "a6", title: "Evening Rest", duration: "90m", durationMinutes: 90, category: "Yoga", usageCount: 14, spacesCount: 2, lastPlayed: "3 days ago", isScheduled: true, color: "indigo" },
+  { id: "a1", title: "Morning Flow", duration: "60m", durationMinutes: 60, category: "Yoga", usageCount: 24, spacesCount: 3, lastPlayed: "today", isScheduled: true, color: "purple", size: 4 * 1024 * 1024 },
+  { id: "a2", title: "Deep Focus", duration: "120m", durationMinutes: 120, category: "Meditation", usageCount: 18, spacesCount: 2, lastPlayed: "2 days ago", isScheduled: true, color: "blue", size: 3 * 1024 * 1024 },
+  { id: "a3", title: "Lobby Ambience Loop", duration: "180m", durationMinutes: 180, category: "Lobby", usageCount: 5, spacesCount: 1, lastPlayed: undefined, isScheduled: false, color: "amber", size: 6 * 1024 * 1024 },
+  { id: "a4", title: "Upbeat Playlist", duration: "120m", durationMinutes: 120, category: "Retail", usageCount: 12, spacesCount: 2, lastPlayed: "yesterday", isScheduled: true, color: "orange", size: 5 * 1024 * 1024 },
+  { id: "a5", title: "Nature Walk", duration: "45m", durationMinutes: 45, category: "Meditation", usageCount: 3, spacesCount: 1, lastPlayed: "1 week ago", isScheduled: false, color: "green", size: 2 * 1024 * 1024 },
+  { id: "a6", title: "Evening Rest", duration: "90m", durationMinutes: 90, category: "Yoga", usageCount: 14, spacesCount: 2, lastPlayed: "3 days ago", isScheduled: true, color: "indigo", size: 3 * 1024 * 1024 },
 ];
 
 // Mock sample playlists - playback programs
@@ -83,9 +83,7 @@ export default function LibraryClient() {
     });
   }, [query, activeCategory]);
 
-  const totalCount = library.length;
-  const filteredCount = filteredLibrary.length;
-  const showingAll = totalCount === filteredCount;
+  
 
   const handleAudioAction = (action: "play" | "edit" | "delete" | "addToPlaylist", audioId: string) => {
     const audio = library.find((a) => a.id === audioId);
@@ -374,7 +372,18 @@ export default function LibraryClient() {
         description={`This will permanently delete "${selectedAudioForDelete?.title}". This action cannot be undone.`}
         confirmLabel="Delete"
         onConfirm={() => {
-          console.log("[v0] Deleted audio:", selectedAudioForDelete?.id);
+          try {
+            const raw = localStorage.getItem("aa_audios");
+            if (raw) {
+              const parsed = JSON.parse(raw) as AudioItem[];
+              const updated = parsed.filter((a) => a.id !== selectedAudioForDelete?.id);
+              localStorage.setItem("aa_audios", JSON.stringify(updated));
+            }
+          } catch {
+            /* ignore */
+          }
+          setDeleteOpen(false);
+          setSelectedAudioForDelete(null);
         }}
       />
     </div>

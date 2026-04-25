@@ -192,12 +192,17 @@ export default function AudioTriageBar(props: Props) {
                     const isSelected = customDate === c.date;
                     const isToday = new Date().toISOString().slice(0,10) === c.date;
                     const isFuture = c.date ? (new Date(c.date) > today) : false;
+                    // Use a custom purple for the selected date (#A473FF). Use inline style to avoid Tailwind purging
                     const baseClass = cn("h-9 flex items-center justify-center rounded text-sm ",
-                      isSelected ? 'bg-gray-900 text-white' : isToday ? 'bg-gray-100 text-gray-800' : 'text-gray-700 hover:bg-gray-50'
+                      isSelected ? 'text-white' : isToday ? 'bg-gray-100 text-gray-800' : 'text-gray-700 hover:bg-gray-50'
                     );
                     // If future, render disabled style
                     if (isFuture) {
                       return (<button key={i} aria-disabled={true} disabled className={cn("h-9 flex items-center justify-center rounded text-sm text-gray-300 cursor-not-allowed bg-white")}>{c.day}</button>);
+                    }
+                    // When selected, apply inline background color #A473FF
+                    if (isSelected) {
+                      return (<button key={i} onClick={(e)=>{ e.stopPropagation(); setCustomDate(c.date ?? null); setDatePickerOpen(false); setDateFilterType('custom'); }} className={baseClass} style={{ background: '#A473FF' }}>{c.day}</button>);
                     }
                     return (<button key={i} onClick={(e)=>{ e.stopPropagation(); setCustomDate(c.date ?? null); setDatePickerOpen(false); setDateFilterType('custom'); }} className={baseClass}>{c.day}</button>);
                   })}</div>
@@ -218,35 +223,40 @@ export default function AudioTriageBar(props: Props) {
             {props.playlistFilter && (<div className="px-2 py-1 rounded-full bg-gray-100 text-xs text-gray-800">Playlist: {props.playlistFilter}</div>)}
             {props.creatorFilter && (<div className="px-2 py-1 rounded-full bg-gray-100 text-xs text-gray-800">Creator: {props.creatorFilter}</div>)}
           </div>
-          <button
-            onClick={() => {
-              // reset all filter state we have access to
-              setDateFilterType('all');
-              setCustomDate(null);
-              setDatePickerOpen(false);
-              // singer (if caller provided setters)
-              (props as Partial<Props>).setSingerFilter?.(null);
-              (props as Partial<Props>).setSingerQuery?.('');
-              (props as Partial<Props>).setSingerOpen?.(false);
-              // playlist
-              (props as Partial<Props>).setPlaylistFilter?.(null);
-              (props as Partial<Props>).setPlaylistQuery?.('');
-              (props as Partial<Props>).setPlaylistOpen?.(false);
-              (props as Partial<Props>).setActiveCategory?.('All');
-              // creator
-              (props as Partial<Props>).setCreatorFilter?.(null);
-              (props as Partial<Props>).setCreatorQuery?.('');
-              (props as Partial<Props>).setCreatorOpen?.(false);
-              // sort defaults
-              setSortBy('added');
-              setSortDir('desc');
-              setSortOpen(false);
-            }}
-            className="text-sm text-gray-500 hover:text-gray-700 inline-flex items-center gap-2"
-          >
-            <RefreshCw size={14} className="text-gray-500" />
-            Reset filters
-          </button>
+              {
+                // show the reset action only when there are active filters
+                (dateFilterType !== 'all' || customDate !== null || !!props.singerFilter || !!props.playlistFilter || !!props.creatorFilter) && (
+                  <button
+                    onClick={() => {
+                      // reset all filter state we have access to
+                      setDateFilterType('all');
+                      setCustomDate(null);
+                      setDatePickerOpen(false);
+                      // singer (if caller provided setters)
+                      (props as Partial<Props>).setSingerFilter?.(null);
+                      (props as Partial<Props>).setSingerQuery?.('');
+                      (props as Partial<Props>).setSingerOpen?.(false);
+                      // playlist
+                      (props as Partial<Props>).setPlaylistFilter?.(null);
+                      (props as Partial<Props>).setPlaylistQuery?.('');
+                      (props as Partial<Props>).setPlaylistOpen?.(false);
+                      (props as Partial<Props>).setActiveCategory?.('All');
+                      // creator
+                      (props as Partial<Props>).setCreatorFilter?.(null);
+                      (props as Partial<Props>).setCreatorQuery?.('');
+                      (props as Partial<Props>).setCreatorOpen?.(false);
+                      // sort defaults
+                      setSortBy('added');
+                      setSortDir('desc');
+                      setSortOpen(false);
+                    }}
+                    className="text-sm text-gray-500 hover:text-gray-700 inline-flex items-center gap-2"
+                  >
+                    <RefreshCw size={14} className="text-gray-500" />
+                    Reset filters
+                  </button>
+                )
+              }
         </div>
       </div>
     </div>

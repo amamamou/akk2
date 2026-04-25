@@ -26,7 +26,15 @@ export default function AudioToolbar(p: Props) {
           <div className="flex items-center gap-3 w-full max-w-md">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={16} />
-              <input ref={inputRef} aria-label="Search audio" value={p.query} onChange={(e) => p.setQuery(e.target.value)} placeholder="Search by title, playlist, artist, creator." className="w-full pl-9 pr-10 py-2 text-sm rounded-md bg-[#F3F4F6]" />
+              <input
+                ref={inputRef}
+                aria-label="Search audio"
+                value={p.query}
+                onChange={(e) => p.setQuery(e.target.value)}
+                placeholder="Search by title, playlist, artist, creator."
+                className="w-full pl-9 pr-10 py-2 text-sm rounded-md bg-[#F3F4F6]"
+                suppressHydrationWarning
+              />
               {p.query && (
                 <button
                   onClick={() => { p.setQuery(''); inputRef.current?.focus(); }}

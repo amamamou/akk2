@@ -22,6 +22,8 @@ export default function PlaylistDetailPanel({
     id: `${playlist.id}-t${i + 1}`,
     title: `${playlist.title} — Track ${i + 1}`,
     duration: 180 + i * 10,
+    // sample size in bytes (3.2MB + i*0.2MB)
+    size: Math.round((3.2 + i * 0.2) * 1024 * 1024),
   }));
 
   return (
@@ -70,7 +72,7 @@ export default function PlaylistDetailPanel({
                   </div>
                   <div>
                     <div className="text-sm text-gray-900">{t.title}</div>
-                    <div className="text-xs text-gray-500">{Math.floor(t.duration / 60)}:{String(t.duration % 60).padStart(2, '0')}</div>
+                    <div className="text-xs text-gray-500">{Math.floor(t.duration / 60)}:{String(t.duration % 60).padStart(2, '0')} {typeof (t as unknown as { size?: number }).size === 'number' ? `• ${(((t as unknown as { size?: number }).size ?? 0) / 1024 / 1024).toFixed(1)}MB` : ''}</div>
                   </div>
                 </div>
                 <div className="text-sm text-gray-500">{idx + 1}</div>

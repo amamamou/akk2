@@ -6,6 +6,7 @@ import EditAudioModal from "../components/EditAudioModal";
 import ViewAudioModal from "../components/ViewAudioModal";
 // Grid view removed — list view only
 import UploadModal from "../components/UploadModal";
+import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import type { AudioItem } from "../components/AudioTile";
 import AudioTriageBar from "../components/AudioTriageBar";
 import AudioToolbar from "../components/AudioToolbar";
@@ -36,8 +37,8 @@ export default function LibraryAudioClient() {
 
   // Column visibility (like Strapi's list view): persisted in localStorage
   const [colsOpen, setColsOpen] = useState(false);
-  const [visibleCols, setVisibleCols] = useState<{ duration: boolean; added: boolean; modified: boolean; addedBy: boolean }>(
-    { duration: true, added: false, modified: false, addedBy: false }
+  const [visibleCols, setVisibleCols] = useState<{ duration: boolean; added: boolean; modified: boolean; addedBy: boolean; size: boolean }>(
+    { duration: true, added: false, modified: false, addedBy: false, size: false }
   );
 
   useEffect(() => {
@@ -90,6 +91,24 @@ export default function LibraryAudioClient() {
 
     window.addEventListener("storage", handler);
     return () => window.removeEventListener("storage", handler);
+  }, []);
+
+  // persist audios to localStorage so uploaded items survive reloads
+  useEffect(() => {
+    try {
+      localStorage.setItem('aa_audios', JSON.stringify(audios));
+    } catch {}
+  }, [audios]);
+
+  // load persisted audios on mount
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('aa_audios');
+      if (raw) {
+        const parsed = JSON.parse(raw) as AudioItem[];
+        if (Array.isArray(parsed) && parsed.length > 0) startTransition(() => setAudios(parsed));
+      }
+    } catch {}
   }, []);
 
   // Selected item for list view (used to apply sidebar-like active styling)
@@ -262,7 +281,11 @@ export default function LibraryAudioClient() {
     }
 
     if (action === "delete") {
-      setAudios((s) => s.filter((a) => a.id !== audioId));
+      const item = audios.find((a) => a.id === audioId) ?? null;
+      if (item) {
+        setSelectedAudioForDelete(item);
+        setDeleteOpen(true);
+      }
       return;
     }
 
@@ -272,6 +295,8 @@ export default function LibraryAudioClient() {
   // Edit modal state
   const [editing, setEditing] = useState<AudioItem | null>(null);
   const [viewing, setViewing] = useState<AudioItem | null>(null);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [selectedAudioForDelete, setSelectedAudioForDelete] = useState<AudioItem | null>(null);
 
   const saveEdit = (v: { id: string; title: string; singer?: string }) => {
     setAudios((s) => s.map((a) => (a.id === v.id ? { ...a, title: v.title, singer: v.singer ?? a.singer } : a)));
@@ -362,7 +387,30 @@ export default function LibraryAudioClient() {
         totalPages={totalPages}
       />
 
-      <UploadModal open={uploadOpen} onClose={() => setUploadOpen(false)} onUpload={(files) => console.log("[v0] Files uploaded:", files)} />
+      <UploadModal
+        open={uploadOpen}
+        onClose={() => setUploadOpen(false)}
+        onUpload={(files) => {
+          // files: UploadFile[] from the uploader — map to AudioItem and add to state
+          const mapped = files.map((f) => ({
+            id: f.id,
+            title: f.title ?? f.name,
+            duration: "0:00",
+            durationMinutes: 0,
+            category: "",
+            usageCount: 0,
+            spacesCount: 0,
+            lastPlayed: undefined,
+            isScheduled: false,
+            singer: f.artist ?? undefined,
+            color: f.color ?? undefined,
+            // include size for display
+            size: f.size,
+            url: (f as unknown as { previewUrl?: string }).previewUrl ?? undefined,
+          } as unknown as AudioItem));
+          startTransition(() => setAudios((prev) => [...mapped, ...prev]));
+        }}
+      />
       {/* Edit modal */}
       {editing && (
         <EditAudioModal open={true} initial={{ id: editing.id, title: editing.title, singer: editing.singer }} onClose={() => setEditing(null)} onSave={saveEdit} />
@@ -370,6 +418,27 @@ export default function LibraryAudioClient() {
       {viewing && (
         <ViewAudioModal open={true} item={viewing} onClose={() => setViewing(null)} />
       )}
+      <ConfirmDialog
+        open={deleteOpen}
+        title="Delete Audio"
+        description={`This will permanently delete "${selectedAudioForDelete?.title}". This action cannot be undone.`}
+        confirmLabel="Delete"
+        cancelLabel="Cancel"
+        onCancel={() => { setDeleteOpen(false); }}
+        onConfirm={() => {
+          try {
+            const raw = localStorage.getItem('aa_audios');
+            if (raw) {
+              const parsed = JSON.parse(raw) as AudioItem[];
+              const updated = parsed.filter((a) => a.id !== selectedAudioForDelete?.id);
+              localStorage.setItem('aa_audios', JSON.stringify(updated));
+            }
+          } catch {}
+          setDeleteOpen(false);
+          setSelectedAudioForDelete(null);
+          setAudios((s) => s.filter((a) => a.id !== selectedAudioForDelete?.id));
+        }}
+      />
     </div>
   );
 }
