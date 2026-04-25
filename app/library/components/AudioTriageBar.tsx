@@ -96,8 +96,8 @@ export default function AudioTriageBar(props: Props) {
   // - Right: status (Showing X) and a soft "Reset filters" action
 
   return (
-    <div className="px-8 py-3 bg-white border-b border-gray-100">
-      <div className="flex items-center gap-4">
+    <div className="px-4 sm:px-8 py-3 bg-white border-b border-gray-100">
+      <div className="flex flex-wrap items-center gap-3">
         {/* Sort segmented control */}
         <div className="flex items-center gap-2" ref={sortRef}>
           <div className="inline-flex rounded-md shadow-sm bg-white border border-gray-100">
@@ -144,7 +144,7 @@ export default function AudioTriageBar(props: Props) {
         </div>
 
         {/* Date filter dropdown */}
-        <div className="relative" ref={dateRef}>
+  <div className="relative" ref={dateRef}>
           <button
             onClick={() => setDatePickerOpen(!datePickerOpen)}
             className="inline-flex items-center gap-3 px-3 py-1 border border-gray-100 rounded-md bg-white text-sm text-gray-700 hover:bg-gray-50 shadow-sm"
@@ -210,7 +210,7 @@ export default function AudioTriageBar(props: Props) {
         </div>
 
         {/* Right: status and reset */}
-        <div className="ml-auto flex items-center gap-3">
+  <div className="ml-auto flex items-center gap-3">
           {/* Active filter badges */}
           <div className="flex items-center gap-2">
             {dateFilterType !== 'all' && (<div className="px-2 py-1 rounded-full bg-gray-100 text-xs text-gray-800">{dateFilterType === 'last7' ? '7d' : dateFilterType === 'last30' ? '30d' : 'Custom'}</div>)}

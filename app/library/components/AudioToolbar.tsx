@@ -21,8 +21,8 @@ export default function AudioToolbar(p: Props) {
   const inputRef = useRef<HTMLInputElement | null>(null);
   return (
     <div className="border-gray-100 bg-white">
-      <div className="px-8 py-3">
-        <div className="flex items-center justify-between gap-4">
+      <div className="px-4 sm:px-8 py-3">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div className="flex items-center gap-3 w-full max-w-md">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={16} />
@@ -44,7 +44,7 @@ export default function AudioToolbar(p: Props) {
 
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-3">
-              <div className="hidden sm:flex items-center gap-4 text-sm text-gray-600">
+              <div className="hidden md:flex items-center gap-4 text-sm text-gray-600">
                 <div>Showing <span className="text-gray-900 font-medium">{Math.min((p.page - 1) * p.perPage + 1, p.filteredCount || 1)}</span>–<span className="text-gray-900 font-medium">{Math.min(p.page * p.perPage, p.filteredCount)}</span> of <span className="text-gray-900 font-medium">{p.filteredCount}</span></div>
                 <label className="flex items-center gap-2">
                   <span className="text-xs text-gray-500">Per page</span>
