@@ -20,12 +20,14 @@ export default function PlaylistCard({
   onEdit,
   onDelete,
   onClick,
+  onPlay,
 }: {
   playlist: Playlist;
   // onEdit called when renaming: (id, newTitle)
   onEdit?: (playlistId: string, newTitle: string) => void;
   onDelete?: (playlistId: string) => void;
   onClick?: (playlistId: string) => void;
+  onPlay?: (playlistId: string) => void;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -57,7 +59,9 @@ export default function PlaylistCard({
       <div
         onClick={(e) => {
           e.stopPropagation();
-          onClick?.(playlist.id);
+          // prefer onPlay if provided for backwards compatibility with callers
+          if (onPlay) onPlay(playlist.id);
+          else onClick?.(playlist.id);
         }}
         role="button"
         tabIndex={0}

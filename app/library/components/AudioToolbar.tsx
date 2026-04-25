@@ -1,7 +1,7 @@
 "use client";
 
-import React from "react";
-import { Search, ChevronLeft, ChevronRight } from "lucide-react";
+import React, { useRef } from "react";
+import { Search, ChevronLeft, ChevronRight, X } from "lucide-react";
 import { cn } from "@/utils/cn";
 
 interface Props {
@@ -18,6 +18,7 @@ interface Props {
 }
 
 export default function AudioToolbar(p: Props) {
+  const inputRef = useRef<HTMLInputElement | null>(null);
   return (
     <div className="border-gray-100 bg-white">
       <div className="px-8 py-3">
@@ -25,10 +26,20 @@ export default function AudioToolbar(p: Props) {
           <div className="flex items-center gap-3 w-full max-w-md">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={16} />
-              <input aria-label="Search audio" value={p.query} onChange={(e) => p.setQuery(e.target.value)} placeholder="Search by title, playlist, artist, creator." className="w-full pl-9 pr-3 py-2 text-sm rounded-md bg-[#F3F4F6]" />
+              <input ref={inputRef} aria-label="Search audio" value={p.query} onChange={(e) => p.setQuery(e.target.value)} placeholder="Search by title, playlist, artist, creator." className="w-full pl-9 pr-10 py-2 text-sm rounded-md bg-[#F3F4F6]" />
+              {p.query && (
+                <button
+                  onClick={() => { p.setQuery(''); inputRef.current?.focus(); }}
+                  title="Clear search"
+                  aria-label="Clear search"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 p-1 rounded hover:bg-gray-100"
+                >
+                  <X size={14} />
+                </button>
+              )}
             </div>
 
-            <div className="text-sm text-gray-600 whitespace-nowrap">{p.query ? `${p.filteredCount} of ${p.totalCount}` : ''}</div>
+            <div className="text-sm text-gray-600 whitespace-nowrap"></div>
           </div>
 
           <div className="flex items-center gap-3">

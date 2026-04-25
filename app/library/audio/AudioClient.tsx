@@ -1,16 +1,18 @@
 "use client";
 
 import React, { startTransition, useEffect, useMemo, useState } from "react";
-import { Plus, FileAudio, Edit, Trash, Eye, List } from "lucide-react";
-import AudioVisual from "../components/AudioVisual";
+// icons are used in child components
 import EditAudioModal from "../components/EditAudioModal";
 import ViewAudioModal from "../components/ViewAudioModal";
 // Grid view removed — list view only
 import UploadModal from "../components/UploadModal";
 import type { AudioItem } from "../components/AudioTile";
-import { cn } from "@/utils/cn";
 import AudioTriageBar from "../components/AudioTriageBar";
 import AudioToolbar from "../components/AudioToolbar";
+import AudioHeader from "./components/AudioHeader";
+import AudioList from "./components/AudioList";
+import { filterLibrary } from "@/lib/audioFilters";
+import { sortAndFilterByDate, paginate } from "@/lib/audioSortPaginate";
 
 const initialLibrary: AudioItem[] = [
   { id: "a1", title: "Morning Flow", duration: "60m", durationMinutes: 60, category: "Yoga", usageCount: 24, spacesCount: 3, lastPlayed: "today", isScheduled: true, singer: "Lila Blue" },
@@ -94,73 +96,7 @@ export default function LibraryAudioClient() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   // enhanced search: support tokens and fielded queries like `artist:Name`, `playlist:Name`, `title:Name`, `creator:Name`
-  const filteredLibrary = useMemo(() => {
-    const normalizedQuery = query.trim();
-    const tokens = normalizedQuery ? normalizedQuery.split(/\s+/).filter(Boolean) : [];
-
-    // build a map from audio id -> playlist titles for quick matching
-    const audioToPlaylists: Record<string, string[]> = {};
-    for (const pl of playlists) {
-      const maybeIds = pl.trackIds ?? pl.tracks ?? pl.items ?? [];
-      if (Array.isArray(maybeIds)) {
-        for (const id of maybeIds) {
-          const key = String(id);
-          audioToPlaylists[key] = audioToPlaylists[key] ?? [];
-          audioToPlaylists[key].push(pl.title ?? `Playlist ${pl.id}`);
-        }
-      }
-    }
-
-    return audios.filter((item: AudioItem) => {
-      // playlist filter
-      if (activeCategory !== "All" && activeCategory.startsWith("pl:")) {
-        const pid = activeCategory.replace("pl:", "");
-        const pl = playlists.find((p) => String(p.id) === pid);
-        if (pl) {
-          const maybeIds = pl.trackIds ?? pl.tracks ?? pl.items ?? [];
-          let ids: string[] = [];
-          if (Array.isArray(maybeIds) && maybeIds.every((x) => typeof x === "string")) {
-            ids = maybeIds as string[];
-          }
-          if (ids.length > 0) return ids.includes(item.id);
-          if (pl.title && item.category !== pl.title) return false;
-        }
-      } else if (activeCategory !== "All" && item.category !== activeCategory) {
-        return false;
-      }
-
-      if (tokens.length === 0) return true;
-
-      // For each token, support field:value syntax
-      return tokens.every((tok) => {
-        const colon = tok.indexOf(":");
-        if (colon > 0) {
-          const key = tok.slice(0, colon).toLowerCase();
-          const val = tok.slice(colon + 1).toLowerCase();
-          if (key === 'artist' || key === 'singer' || key === 'a') {
-            return (item.singer ?? '').toLowerCase().includes(val);
-          }
-          if (key === 'title' || key === 't') {
-            return (item.title ?? '').toLowerCase().includes(val);
-          }
-          if (key === 'playlist' || key === 'pl' || key === 'p') {
-            const pls = audioToPlaylists[item.id] ?? [];
-            return pls.some((pt) => pt.toLowerCase().includes(val));
-          }
-          if (key === 'creator' || key === 'addedby' || key === 'creator' || key === 'c') {
-            return (String(item.addedBy ?? '')).toLowerCase().includes(val);
-          }
-          // unknown field — fallback to general match
-          const haystack = `${item.title} ${item.category} ${item.duration} ${item.singer ?? ''} ${item.addedBy ?? ''} ${(audioToPlaylists[item.id] ?? []).join(' ')}`.toLowerCase();
-          return haystack.includes(tok.toLowerCase());
-        }
-
-        // general token: check across multiple fields
-        const hay = `${item.title} ${item.category} ${item.duration} ${item.singer ?? ''} ${item.addedBy ?? ''} ${(audioToPlaylists[item.id] ?? []).join(' ')}`.toLowerCase();
-        return hay.includes(tok.toLowerCase());
-      });
-    });
-  }, [query, activeCategory, playlists, audios]);
+  const filteredLibrary = useMemo(() => filterLibrary(audios, query, activeCategory, playlists), [audios, query, activeCategory, playlists]);
 
   const totalCount = audios.length;
   const filteredCount = filteredLibrary.length;
@@ -173,7 +109,7 @@ export default function LibraryAudioClient() {
   // Minimal triage — highly usable essentials only
   const [sortBy, setSortBy] = useState<'added' | 'title' | 'duration'>('added');
   const [sortDir, setSortDir] = useState<'desc' | 'asc'>('desc');
-  const [dateFilterType, setDateFilterType] = useState<'all' | 'last7'>('all');
+  const [dateFilterType, setDateFilterType] = useState<'all' | 'last7' | 'last30' | 'custom'>('all');
   // custom date selection
   const [customDate, setCustomDate] = useState<string | null>(null);
   // artist filter (compact searchable popover)
@@ -292,58 +228,7 @@ export default function LibraryAudioClient() {
   const totalPages = Math.max(1, Math.ceil(filteredCount / perPage));
 
 
-  const sortedLibrary = useMemo(() => {
-    // apply date filtering (based on addedAt) then sorting
-    const arr = filteredLibrary.slice().filter((t) => {
-      // apply singer filter if active
-      if (singerFilter) {
-        if (!t.singer) return false;
-        if (t.singer.toLowerCase() !== singerFilter.toLowerCase()) return false;
-      }
-      if (dateFilterType === 'all') return true;
-      const raw = t.addedAt ?? null;
-      if (!raw) return false;
-      const ts = Date.parse(raw);
-      if (Number.isNaN(ts)) return false;
-      // only 'last7' is supported in the minimal triage
-      if (dateFilterType === 'last7') return cutoff ? ts >= cutoff - 7 * 24 * 3600 * 1000 : true;
-      return true;
-    });
-
-    // apply customDate if provided (include items added on or after the selected day)
-    let filteredByDate = arr;
-    if (customDate) {
-      const dayStart = Date.parse(customDate + 'T00:00:00');
-      const dayEnd = Date.parse(customDate + 'T23:59:59');
-      filteredByDate = arr.filter((t) => {
-        const raw = t.addedAt ?? null;
-        if (!raw) return false;
-        const ts = Date.parse(raw);
-        if (Number.isNaN(ts)) return false;
-        return ts >= dayStart && ts <= dayEnd;
-      });
-    }
-
-    const cmp = (a: AudioItem, b: AudioItem) => {
-      const dir = sortDir === 'asc' ? 1 : -1;
-      switch (sortBy) {
-        case 'added': {
-          const aa = a.addedAt ? Date.parse(a.addedAt) : 0;
-          const bb = b.addedAt ? Date.parse(b.addedAt) : 0;
-          return (aa - bb) * dir;
-        }
-        case 'duration':
-          return ((a.durationMinutes ?? 0) - (b.durationMinutes ?? 0)) * dir;
-        case 'title':
-          return a.title.localeCompare(b.title) * dir;
-        default:
-          return 0;
-      }
-    };
-
-    filteredByDate.sort(cmp);
-    return filteredByDate;
-  }, [filteredLibrary, sortBy, sortDir, dateFilterType, cutoff, customDate, singerFilter]);
+  const sortedLibrary = useMemo(() => sortAndFilterByDate(filteredLibrary, sortBy, sortDir, dateFilterType, cutoff, customDate, singerFilter), [filteredLibrary, sortBy, sortDir, dateFilterType, cutoff, customDate, singerFilter]);
   // compute unique singers for the singer filter popover
   const singerOptions = useMemo(() => {
     const s = Array.from(new Set(audios.map((a) => a.singer).filter(Boolean).map((x) => String(x))));
@@ -364,10 +249,7 @@ export default function LibraryAudioClient() {
   }, [audios]);
 
 
-  const paginatedLibrary = useMemo(() => {
-    const start = (page - 1) * perPage;
-    return sortedLibrary.slice(start, start + perPage);
-  }, [sortedLibrary, page, perPage]);
+  const paginatedLibrary = useMemo(() => paginate(sortedLibrary, page, perPage), [sortedLibrary, page, perPage]);
 
   // singer is now stored on each audio item as `singer`.
 
@@ -400,200 +282,73 @@ export default function LibraryAudioClient() {
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-white">
-      {/* Header */}
-      <div className="sticky top-0 z-10 bg-white border-gray-200">
-        <div className="px-8 py-6 flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-semibold text-gray-900">All Audio</h1>
-            <p className="mt-1 text-sm text-gray-500">Browse and manage your complete audio library</p>
-          </div>
+      <AudioHeader
+        colsOpen={colsOpen}
+        setColsOpen={setColsOpen}
+        visibleCols={visibleCols}
+        toggleCol={toggleCol}
+        setUploadOpen={setUploadOpen}
+      />
 
-          <div className="flex items-center gap-3">
-            <div className="relative">
-              <button
-                type="button"
-                onClick={() => setColsOpen((s) => !s)}
-                className="inline-flex items-center gap-2 rounded-md bg-white text-gray-700 px-3 py-2 text-sm font-medium border border-gray-200 hover:bg-gray-50"
-              >
-                <List size={16} />
-                <span className="hidden sm:inline">Columns</span>
-              </button>
+      <AudioTriageBar
+        sortBy={sortBy}
+        sortDir={sortDir}
+        sortOpen={sortOpen}
+        setSortOpen={setSortOpen}
+        setSortBy={setSortBy}
+        setSortDir={setSortDir}
 
-              {colsOpen && (
-                <div className="absolute right-0 mt-2 w-48 bg-white border border-gray-200 rounded-md shadow-lg p-3 z-50">
-                  <div className="flex flex-col gap-2 text-sm text-gray-700">
-                    <label className="flex items-center gap-2">
-                      <input type="checkbox" checked={visibleCols.duration} onChange={() => toggleCol("duration")} />
-                      <span>Duration</span>
-                    </label>
-                    <label className="flex items-center gap-2">
-                      <input type="checkbox" checked={visibleCols.added} onChange={() => toggleCol("added")} />
-                      <span>Added</span>
-                    </label>
-                    <label className="flex items-center gap-2">
-                      <input type="checkbox" checked={visibleCols.modified} onChange={() => toggleCol("modified")} />
-                      <span>Modified</span>
-                    </label>
-                    <label className="flex items-center gap-2">
-                      <input type="checkbox" checked={visibleCols.addedBy} onChange={() => toggleCol("addedBy")} />
-                      <span>Added by</span>
-                    </label>
-                  </div>
-                </div>
-              )}
-            </div>
+        singerFilter={singerFilter}
+        singerOpen={singerOpen}
+        singerQuery={singerQuery}
+        singerOptions={singerOptions}
+        setSingerFilter={setSingerFilter}
+        setSingerOpen={setSingerOpen}
+        setSingerQuery={setSingerQuery}
 
-            <button
-              type="button"
-              onClick={() => setUploadOpen(true)}
-              className="inline-flex items-center gap-2 rounded-md bg-[#F3F4F6] text-gray-900 px-4 py-2 text-sm font-medium hover:bg-[#E7E7E7]"
-            >
-              <Plus size={16} />
-              <span>New audio</span>
-            </button>
-          </div>
-        </div>
+        datePickerOpen={datePickerOpen}
+        customDate={customDate}
+        dateFilterType={dateFilterType}
+        calendarMonth={calendarMonth}
+        setCalendarMonth={setCalendarMonth}
+        setDatePickerOpen={setDatePickerOpen}
+        setCustomDate={setCustomDate}
+        setDateFilterType={setDateFilterType}
+        monthDays={monthDays}
+        formatDateLabel={formatDateLabel}
 
-        {/* Compact triage bar (extracted) */}
-        <AudioTriageBar
-          sortBy={sortBy}
-          sortDir={sortDir}
-          sortOpen={sortOpen}
-          setSortOpen={setSortOpen}
-          setSortBy={setSortBy}
-          setSortDir={setSortDir}
+        playlistFilter={playlistFilter}
+        playlistOpen={playlistOpen}
+        playlistQuery={playlistQuery}
+        playlistOptions={playlistOptions}
+        setPlaylistFilter={setPlaylistFilter}
+        setPlaylistOpen={setPlaylistOpen}
+        setPlaylistQuery={setPlaylistQuery}
+        setActiveCategory={setActiveCategory}
 
-          singerFilter={singerFilter}
-          singerOpen={singerOpen}
-          singerQuery={singerQuery}
-          singerOptions={singerOptions}
-          setSingerFilter={setSingerFilter}
-          setSingerOpen={setSingerOpen}
-          setSingerQuery={setSingerQuery}
+        creatorFilter={creatorFilter}
+        creatorOpen={creatorOpen}
+        creatorQuery={creatorQuery}
+        creatorOptions={creatorOptions}
+        setCreatorFilter={setCreatorFilter}
+        setCreatorOpen={setCreatorOpen}
+        setCreatorQuery={setCreatorQuery}
+      />
 
-          datePickerOpen={datePickerOpen}
-          customDate={customDate}
-          dateFilterType={dateFilterType}
-          calendarMonth={calendarMonth}
-          setCalendarMonth={setCalendarMonth}
-          setDatePickerOpen={setDatePickerOpen}
-          setCustomDate={setCustomDate}
-          setDateFilterType={setDateFilterType}
-          monthDays={monthDays}
-          formatDateLabel={formatDateLabel}
-
-          playlistFilter={playlistFilter}
-          playlistOpen={playlistOpen}
-          playlistQuery={playlistQuery}
-          playlistOptions={playlistOptions}
-          setPlaylistFilter={setPlaylistFilter}
-          setPlaylistOpen={setPlaylistOpen}
-          setPlaylistQuery={setPlaylistQuery}
-          setActiveCategory={setActiveCategory}
-
-          creatorFilter={creatorFilter}
-          creatorOpen={creatorOpen}
-          creatorQuery={creatorQuery}
-          creatorOptions={creatorOptions}
-          setCreatorFilter={setCreatorFilter}
-          setCreatorOpen={setCreatorOpen}
-          setCreatorQuery={setCreatorQuery}
-        />
-  </div>
-
-      {/* Content */}
       <div className="flex-1 overflow-auto bg-white">
         <div className="px-6 py-6">
-          {filteredLibrary.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-16">
-              <FileAudio size={48} className="text-gray-300" />
-              <h2 className="mt-6 text-lg font-semibold">No audio found</h2>
-            </div>
-          ) : (
-            <div className="space-y-2">
-                    {paginatedLibrary.map((t: AudioItem) => {
-                    const isSelected = selectedId === t.id;
-                    return (
-                      <div
-                        key={t.id}
-                        role="button"
-                        tabIndex={0}
-      
-                        aria-pressed={isSelected}
-                        onClick={() => setSelectedId((s) => (s === t.id ? null : t.id))}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter" || e.key === " ") {
-                            e.preventDefault();
-                            setSelectedId((s) => (s === t.id ? null : t.id));
-                          }
-                        }}
-                        className={cn(
-                          "group grid grid-cols-[48px_1fr_96px] gap-4 items-center p-3 rounded-lg border border-gray-100 bg-white transition-all duration-150",
-                          "transform hover:shadow-lg hover:-translate-y-0.5",
-                          isSelected ? "bg-gray-50" : "hover:bg-gray-50",
-                          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-blue-400"
-                        )}
-                      >
-                        <div className={cn(
-                          "flex items-center justify-center rounded-lg w-12 h-12 bg-transparent",
-                          "group-hover:scale-105 transition-transform"
-                        )}>
-                          <AudioVisual size={36} color="#A473FF" />
-                        </div>
-
-                        <div className="min-w-0 relative">
-                          <div className="text-sm font-medium text-gray-900 truncate">{t.title}</div>
-                          <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-xs text-gray-500 pointer-events-none">{t.singer ?? "Unknown Artist"}</div>
-                        </div>
-
-                        <div className="flex items-center justify-end gap-4">
-                          {visibleCols.duration && <div className="text-right text-sm text-gray-500">{t.duration}</div>}
-                          {visibleCols.added && <div className="text-right text-sm text-gray-500">{t.addedAt ?? "-"}</div>}
-                          {visibleCols.modified && <div className="text-right text-sm text-gray-500">{t.modifiedAt ?? "-"}</div>}
-                          {visibleCols.addedBy && (
-                            <div className="flex items-center gap-2">
-                              <div className="h-6 w-6 rounded-lg bg-gray-100 flex items-center justify-center text-xs font-semibold text-gray-700">
-                                {(t.addedBy ?? "U").toString().split(" ").map((s)=>s.charAt(0)).slice(0,2).join("")}
-                              </div>
-                              <div className="text-sm text-gray-600">{t.addedBy ?? "Unknown"}</div>
-                            </div>
-                          )}
-
-                          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setViewing(t);
-                              }}
-                              title="View"
-                              className="p-1.5 rounded hover:bg-gray-100 text-gray-600 hover:text-gray-800 transition-colors"
-                            >
-                              <Eye size={16} />
-                            </button>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleAudioAction("edit", t.id);
-                              }}
-                              title="Edit"
-                              className="p-1.5 rounded hover:bg-gray-100 text-gray-500 hover:text-gray-800 transition-colors"
-                            >
-                              <Edit size={16} />
-                            </button>
-                            <button onClick={(e) => { e.stopPropagation(); handleAudioAction("delete", t.id); }} title="Delete" className="p-1.5 rounded text-gray-500 hover:bg-gray-100 hover:text-gray-800 transition-colors">
-                              <Trash size={16} />
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-            </div>
-          )}
+          <AudioList
+            items={paginatedLibrary}
+            selectedId={selectedId}
+            setSelectedId={(id) => setSelectedId(id)}
+            onView={(it) => setViewing(it)}
+            onEdit={(id) => handleAudioAction("edit", id)}
+            onDelete={(id) => handleAudioAction("delete", id)}
+            visibleCols={visibleCols}
+          />
         </div>
       </div>
 
-      {/* Toolbar (extracted) */}
       <AudioToolbar
         query={query}
         setQuery={setQuery}

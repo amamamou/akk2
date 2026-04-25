@@ -20,6 +20,7 @@ export type AudioItem = {
   addedAt?: string;
   modifiedAt?: string;
   addedBy?: string;
+  color?: string;
   // optional metadata
 };
 
