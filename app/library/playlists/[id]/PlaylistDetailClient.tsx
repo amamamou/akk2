@@ -2,7 +2,8 @@
 
 import React, { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { Music, Clock, List, Edit, Trash, Upload } from "lucide-react";
+import { Music, Plus, Edit, Trash, Check } from "lucide-react";
+import { cn } from "@/utils/cn";
 import UploadModal from "../../components/UploadModal";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import type { Playlist } from "../../components/PlaylistModal";
@@ -81,9 +82,9 @@ export default function PlaylistDetailClient({ playlistId }: { playlistId: strin
 
   if (!playlist) return null;
 
-  // per request: show the literal title (may be `undefined`) prefixed with "Playlist"
-  const displayTitle = `Playlist ${String(playlist.title)}`;
-  const displayDescription = playlist.description ?? "A curated playlist";
+  // display the playlist title cleanly
+  const displayTitle = playlist.title ?? "Untitled playlist";
+  const hasChanges = (name.trim() !== (playlist.title ?? "")) || (description.trim() !== (playlist.description ?? ""));
 
   // static gradient map for cover (avoid Tailwind purge on dynamic strings)
   const gradientMap: Record<string, string> = {
@@ -101,39 +102,30 @@ export default function PlaylistDetailClient({ playlistId }: { playlistId: strin
     size: Math.round((2.8 + i * 0.3) * 1024 * 1024),
   }));
 
+  // derive artists count: prefer playlist.artistCount, otherwise estimate from tracks
+  const maybeArtistCount = (playlist as unknown as { artistCount?: number }).artistCount;
+  const artistsCount = typeof maybeArtistCount === 'number' ? maybeArtistCount : Math.max(1, Math.min(6, Math.round((playlist.trackCount ?? tracks.length) / 3)));
+
   return (
     <div className="min-h-screen overflow-auto">
       {/* Hero (no page background) */}
       <section className="w-full">
-  <div className="w-full h-[26vh] md:h-[32vh] lg:h-[36vh] flex items-start pt-6">
-          <div className="max-w-8xl mx-auto w-full px-6">
-            {/* admin toolbar */}
-                <div className="mb-4 flex items-center justify-between">
-              <div className="text-sm text-gray-500">Library / Playlists / <span className="text-gray-700 font-medium">{playlist.title}</span></div>
-              <div className="flex items-center gap-3">
-                <button onClick={() => {
-                    setIsEditing(true);
-                    setName(playlist.title ?? "");
-                    setDescription(playlist.description ?? "");
-                  }} className="inline-flex items-center justify-center gap-2 px-3 py-1 rounded-md text-sm font-medium text-gray-700 bg-white border border-gray-200 hover:bg-gray-50 transition focus:outline-none focus:ring-2 focus:ring-emerald-100 min-w-[104px]">
-                  <Edit size={14} />
-                  <span className="hidden sm:inline">Edit</span>
-                </button>
-
-                <button onClick={() => setDeleteOpen(true)} className="inline-flex items-center justify-center gap-2 px-3 py-1 rounded-md text-sm font-medium text-red-600 bg-white border border-red-100 hover:bg-gray-50 transition focus:outline-none focus:ring-2 focus:ring-red-100 min-w-[104px]">
-                  <Trash size={14} />
-                  <span className="hidden sm:inline">Delete</span>
-                </button>
-
-                <button onClick={() => setUploadOpen(true)} className="inline-flex items-center justify-center gap-2 px-3 py-1 rounded-md text-sm font-medium text-emerald-800 bg-white border border-emerald-100 hover:bg-emerald-50 transition focus:outline-none focus:ring-2 focus:ring-emerald-100 min-w-[104px]">
-                  <Upload size={14} />
-                  <span className="hidden sm:inline">Add audio</span>
-                </button>
-              </div>
+  <div className="w-full  px-8 py-6 flex items-center">
+          <div className="max-w-8xl mx-auto w-full ">
+            <div className="mb-4 flex items-center justify-end">
+              <button
+                type="button"
+                onClick={() => setUploadOpen(true)}
+                className="inline-flex items-center gap-2 rounded-md bg-[#F3F4F6] text-gray-900 px-4 py-2 text-sm font-medium hover:bg-[#E7E7E7]"
+              >
+                <Plus size={16} />
+                <span>New audio</span>
+              </button>
             </div>
+            {/* compact header (no breadcrumb / actions) */}
 
             <div className="flex flex-col md:flex-row items-start gap-6">
-              <div className={`flex-shrink-0 w-36 h-36 md:w-44 md:h-44 rounded-md overflow-hidden ${playlist.cover ? 'bg-black/5' : `bg-gradient-to-br ${coverGradient}`} shadow-sm flex items-center justify-center`}>
+              <div className={`flex-shrink-0 w-28 h-28 md:w-36 md:h-36 rounded-md overflow-hidden ${playlist.cover ? 'bg-black/5' : `bg-gradient-to-br ${coverGradient}`} shadow-sm flex items-center justify-center`}>
                 {playlist.cover ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={playlist.cover} alt={displayTitle} className="w-full h-full object-cover" />
@@ -142,58 +134,121 @@ export default function PlaylistDetailClient({ playlistId }: { playlistId: strin
                 )}
               </div>
 
-              <div className="flex-1 text-gray-900">
-                <div className="text-sm uppercase tracking-wider text-gray-500">Playlist</div>
-                {isEditing ? (
-                  <div className="mt-1">
-                    <input
-                      ref={titleRef}
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      onBlur={() => saveChanges()}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") saveChanges();
-                        if (e.key === "Escape") {
-                          setIsEditing(false);
-                          setName(playlist.title ?? "");
-                          setDescription(playlist.description ?? "");
-                        }
-                      }}
-                      className="w-full mt-1 text-2xl md:text-3xl font-semibold rounded-md border px-2 py-1 focus:outline-none focus:ring-1 focus:ring-gray-300"
-                    />
-                    <textarea
-                      ref={descRef}
-                      value={description}
-                      onChange={(e) => setDescription(e.target.value)}
-                      onBlur={() => saveChanges()}
-                      className="w-full mt-2 text-sm text-gray-700 max-w-2xl rounded-md border px-2 py-1 focus:outline-none focus:ring-1 focus:ring-gray-300"
-                      rows={2}
-                    />
-                  </div>
-                ) : (
-                  <>
-                    <h1 className="mt-1 text-2xl md:text-3xl font-semibold">{displayTitle}</h1>
-                    <p className="mt-1 text-sm text-gray-700 max-w-2xl">{displayDescription}</p>
-                  </>
-                )}
+              <div className="flex-1">
+                <div className="flex items-start justify-between gap-6">
+                  <div className="min-w-0">
+                    {isEditing ? (
+                      <div className="mt-2 p-4 bg-white rounded-lg border border-gray-100 shadow-sm">
+                        <label className="text-xs text-gray-500">Title</label>
+                        <input
+                          ref={titleRef}
+                          value={name}
+                          onChange={(e) => setName(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") saveChanges();
+                            if (e.key === "Escape") {
+                              setIsEditing(false);
+                              setName(playlist.title ?? "");
+                              setDescription(playlist.description ?? "");
+                            }
+                          }}
+                          className="w-full mt-1 text-2xl md:text-3xl font-semibold text-gray-900 bg-transparent border-0 focus:outline-none focus:ring-0"
+                        />
 
-                <div className="mt-4 flex flex-wrap items-center gap-3">
-                  <div className="inline-flex items-center gap-2 text-sm text-gray-700 px-3 py-1 rounded-md bg-gray-100">
-                    <Clock size={14} /> {playlist.totalDuration}
+                        <label className="mt-3 text-xs text-gray-500">Description</label>
+                        <textarea
+                          ref={descRef}
+                          value={description}
+                          onChange={(e) => setDescription(e.target.value)}
+                          className="w-full mt-1 text-sm text-gray-600 bg-transparent border-0 focus:outline-none focus:ring-0"
+                          rows={3}
+                        />
+
+                        <div className="mt-4 border-t border-gray-200 px-6 py-4">
+                          <div className="flex items-center justify-end gap-3">
+                            <button
+                              onClick={() => {
+                                setIsEditing(false);
+                                setName(playlist.title ?? "");
+                                setDescription(playlist.description ?? "");
+                              }}
+                              className="px-3 py-1 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-md hover:bg-gray-50 transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-blue-400"
+                            >
+                              Cancel
+                            </button>
+
+                            <button
+                              onClick={() => {
+                                if (hasChanges) saveChanges();
+                              }}
+                              disabled={!hasChanges}
+                              className={cn(
+                                "px-3 py-1 text-sm font-medium rounded-md transition-all duration-150 flex items-center justify-center gap-2",
+                                hasChanges
+                                  ? "bg-[#A473FF] text-white hover:bg-[#7A42FF] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-blue-400"
+                                  : "bg-gray-200 text-gray-500 cursor-not-allowed"
+                              )}
+                            >
+                              {hasChanges ? (
+                                <>
+                                  <Check className="h-4 w-4 inline-block mr-1" />
+                                  <span>Save</span>
+                                </>
+                              ) : (
+                                "Save"
+                              )}
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="flex items-center gap-3">
+                          <h1 className="text-2xl md:text-3xl font-semibold text-gray-900 truncate">{displayTitle}</h1>
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={() => {
+                                setIsEditing(true);
+                                setName(playlist.title ?? "");
+                                setDescription(playlist.description ?? "");
+                              }}
+                              title="Edit playlist"
+                              className="p-1 rounded-md text-gray-600 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-200"
+                            >
+                              <Edit size={16} />
+                            </button>
+                            <button
+                              onClick={() => setDeleteOpen(true)}
+                              title="Delete playlist"
+                              className="p-1 rounded-md text-rose-600 hover:bg-rose-50 focus:outline-none focus:ring-2 focus:ring-rose-100"
+                            >
+                              <Trash size={16} />
+                            </button>
+                          </div>
+                        </div>
+                        {playlist.description ? (
+                          <p className="mt-1 text-sm text-gray-500 max-w-3xl">{playlist.description}</p>
+                        ) : null}
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                {/* Minimal inline stats: only Duration and Tracks */}
+                <div className="mt-4 flex items-center gap-6 text-sm text-gray-600">
+                  <div className="flex items-baseline gap-3">
+                    <span className="text-xs text-gray-500">Duration</span>
+                    <span className="text-base font-semibold text-gray-900">{playlist.totalDuration}</span>
                   </div>
 
-                  <div className="inline-flex items-center gap-2 text-sm text-gray-700 px-3 py-1 rounded-md bg-gray-100">
-                    <List size={14} /> {playlist.trackCount} {playlist.trackCount === 1 ? 'track' : 'tracks'}
+                  <div className="flex items-baseline gap-3">
+                    <span className="text-xs text-gray-500">Tracks</span>
+                    <span className="text-base font-semibold text-gray-900">{playlist.trackCount}</span>
                   </div>
 
-                  <div className="inline-flex items-center gap-2 text-sm text-gray-700 px-3 py-1 rounded-md bg-gray-100">
-                    <span>Spaces</span>
-                    <span className="font-medium">{playlist.spacesCount ?? 0}</span>
-                  </div>
-
-                  <div className="inline-flex items-center gap-2 text-sm text-gray-700 px-3 py-1 rounded-md bg-gray-100">
-                    <span>Last modified</span>
-                    <span className="font-medium">{playlist.lastModified ?? 'now'}</span>
+                  <div className="flex items-baseline gap-3">
+                    <span className="text-xs text-gray-500">Artists</span>
+                    <span className="text-base font-semibold text-gray-900">{artistsCount}</span>
                   </div>
                 </div>
               </div>
