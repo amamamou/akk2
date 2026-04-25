@@ -15,6 +15,7 @@ interface Props {
   setPerPage: (n:number)=>void;
   perPageOptions: number[];
   totalPages: number;
+  placeholder?: string;
 }
 
 export default function AudioToolbar(p: Props) {
@@ -31,7 +32,7 @@ export default function AudioToolbar(p: Props) {
                 aria-label="Search audio"
                 value={p.query}
                 onChange={(e) => p.setQuery(e.target.value)}
-                placeholder="Search by title, playlist, artist, creator."
+                placeholder={p.placeholder ?? "Search by title, playlist, artist, creator."}
                 className="w-full pl-9 pr-10 py-2 text-sm rounded-md bg-[#F3F4F6]"
                 suppressHydrationWarning
               />

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
-import { Upload, X, Trash2, Edit3, User, Play, Pause, Check } from "lucide-react";
+import { Upload, X, Trash, Edit3, User, Play, Pause, Check } from "lucide-react";
 // AudioVisual removed — use a neutral inline waveform glyph instead
 import { cn } from "@/utils/cn";
 
@@ -405,7 +405,7 @@ export default function UploadModal({
                                   className="inline-flex items-center gap-2 px-3 py-1 text-sm font-normal text-red-600 hover:bg-red-50 rounded"
                                   aria-label={`Remove ${f.title || f.name}`}
                                 >
-                                  <Trash2 size={14} /> Remove
+                                  <Trash size={14} /> Remove
                                 </button>
                               </div>
                             )}

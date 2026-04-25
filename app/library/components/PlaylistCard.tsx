@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
-import { Music, MoreVertical, Edit2, Trash2 } from "lucide-react";
+import { Music, MoreVertical, Edit2, Trash } from "lucide-react";
 import { cn } from "@/utils/cn";
 import type { Playlist } from "./PlaylistModal";
 
@@ -124,7 +124,7 @@ export default function PlaylistCard({
                   }}
                   className="w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
                 >
-                  <Trash2 size={14} />
+                  <Trash size={14} />
                   Delete
                 </button>
               </div>

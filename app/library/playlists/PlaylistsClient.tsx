@@ -7,6 +7,8 @@ import PlaylistCard from "../components/PlaylistCard";
 import PlaylistModal from "../components/PlaylistModal";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import type { Playlist } from "../components/PlaylistModal";
+import AudioToolbar from "../components/AudioToolbar";
+import { useMemo } from "react";
 
 // Mock sample playlists
 const samplePlaylists: Playlist[] = [
@@ -167,6 +169,27 @@ export default function LibraryPlaylistsClient() {
   const [selectedPlaylistForDelete, setSelectedPlaylistForDelete] = useState<Playlist | null>(null);
   const router = useRouter();
 
+  // Pagination (match AudioClient behavior)
+  const [page, setPage] = useState<number>(1);
+  const [perPage, setPerPage] = useState<number>(10);
+  const perPageOptions = [5, 10, 20, 50];
+  const filteredCount = playlists.length;
+  const totalPages = Math.max(1, Math.ceil(filteredCount / perPage));
+
+  // clamp page if playlists change
+  useEffect(() => {
+    if (page > totalPages) {
+      // schedule an update to avoid synchronous setState inside effect
+  Promise.resolve().then(() => setPage(totalPages));
+    }
+    // only run when totalPages changes or page changes
+  }, [page, totalPages]);
+
+  const paginatedPlaylists = useMemo(() => {
+    const start = (page - 1) * perPage;
+    return playlists.slice(start, start + perPage);
+  }, [playlists, page, perPage]);
+
   const handlePlaylistClick = (playlistId: string) => {
     router.push(`/library/playlists/${playlistId}`);
   };
@@ -199,7 +222,8 @@ export default function LibraryPlaylistsClient() {
       {/* Content */}
       <div className="flex-1 overflow-auto bg-white">
         <div className="px-6 py-6">
-          {playlists.length === 0 ? (
+          
+          {paginatedPlaylists.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16">
               <div className="text-center space-y-4 max-w-sm">
                 <div className="inline-flex items-center justify-center w-14 h-14 rounded-lg bg-gray-100">
@@ -220,11 +244,8 @@ export default function LibraryPlaylistsClient() {
             </div>
           ) : (
             <div className="space-y-4">
-              <div className="text-xs text-gray-500 font-medium uppercase tracking-wide">
-                {playlists.length} {playlists.length === 1 ? "playlist" : "playlists"}
-              </div>
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-                {playlists.map((playlist) => (
+                {paginatedPlaylists.map((playlist) => (
                   <PlaylistCard
                     key={playlist.id}
                     playlist={playlist}
@@ -245,6 +266,20 @@ export default function LibraryPlaylistsClient() {
           )}
         </div>
       </div>
+
+      <AudioToolbar
+        query={""}
+        setQuery={() => {}}
+        filteredCount={filteredCount}
+        totalCount={playlists.length}
+        page={page}
+        setPage={(n) => setPage(n)}
+        perPage={perPage}
+        setPerPage={(n) => { setPerPage(n); }}
+        perPageOptions={perPageOptions}
+        totalPages={totalPages}
+        placeholder={"Search by title, track."}
+      />
 
       {/* Create playlist modal */}
       <PlaylistModal
