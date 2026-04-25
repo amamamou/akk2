@@ -65,16 +65,6 @@ interface NavItem {
   icon: React.ComponentType<{ className?: string }>;
   submenu?: { name: string; href: string }[];
 }
-// Small color tokens kept local here for readability; consider moving into tailwind.config.cjs
-const COLORS = {
-  hoverBg: "#F3F4F6",
-  activeBg: "#E7E7E7",
-  pressedBg: "#F3F4F6",
-  borderLight: "#E5E7EB",
-  bgHover: "#FAFAFA",
-  textMuted: "#9CA3AF",
-};
-
 export default function Sidebar() {
   const pathname = usePathname() || "/";
   const router = useRouter();

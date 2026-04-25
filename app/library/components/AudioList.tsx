@@ -17,15 +17,28 @@ function AudioListRow({
 
   return (
     <div
+      role="button"
+      tabIndex={0}
       onClick={() => setSelected((s) => !s)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          setSelected((s) => !s);
+        }
+      }}
       className={cn(
-        "group relative flex items-center gap-4 rounded-lg border border-gray-200 bg-white px-4 py-3 hover:shadow-md hover:border-gray-300 transition-all duration-200",
-        selected ? "bg-[#F5F5F5]" : ""
+        "group relative flex items-center gap-4 rounded-lg border border-gray-200 bg-white px-4 py-3 transition-all duration-200",
+        "transform hover:shadow-lg hover:-translate-y-0.5",
+        selected ? "bg-gray-50" : "hover:bg-gray-50",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-blue-400"
       )}
     >
       {/* Icon + Title */}
-      <div className="w-9 h-9 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0 group-hover:bg-gray-200 transition-colors">
-        <FileAudio size={18} className={cn("text-gray-600 group-hover:text-gray-700", selected ? "text-gray-900" : "")} />
+      <div className={cn(
+        "w-9 h-9 flex items-center justify-center rounded-lg transition-all duration-150 flex-shrink-0 bg-transparent",
+        "group-hover:scale-105"
+      )}>
+        <FileAudio size={18} className={cn("text-gray-600 group-hover:text-gray-800")} />
       </div>
       <div className="min-w-0 flex-1">
         <div className="text-sm font-medium text-gray-900 truncate" title={audio.title}>

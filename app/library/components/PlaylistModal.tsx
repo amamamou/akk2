@@ -250,7 +250,7 @@ export default function PlaylistModal({
               className={cn(
                 "px-4 py-2 rounded-md text-sm font-medium transition-colors flex items-center gap-2",
                 newPlaylistName.trim()
-                  ? "bg-[#7318FF] text-white hover:bg-[#5e12d9] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#7318FF]/40"
+                  ? "bg-[#A473FF] text-white hover:bg-[#7A42FF] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#7318FF]/40"
                   : "bg-gray-200 text-gray-500 cursor-not-allowed"
               )}
             >

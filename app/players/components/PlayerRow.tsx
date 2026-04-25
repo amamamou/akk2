@@ -1,8 +1,7 @@
 "use client";
 import React, { useEffect, useRef, useState } from "react";
-import { Speaker, Wifi, WifiOff, MoreHorizontal, Pencil, Trash, X } from "lucide-react";
+import { Speaker, MoreHorizontal, Pencil, Trash } from "lucide-react";
 import NowPlaying from "./NowPlaying";
-import NextEvent from "./NextEvent";
 import PlayerActions from "./PlayerActions";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import { useRouter } from "next/navigation";
@@ -168,9 +167,9 @@ export default function PlayerRow({ player, onPlayPause, onSkip, onRename, onDel
               <button 
                 aria-label="Delete" 
                 onClick={() => { setMenuOpen(false); setConfirmOpen(true); }} 
-                className="group w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-red-50 hover:text-red-600 cursor-pointer transition-colors"
+                className="group w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 cursor-pointer transition-colors"
               >
-                <Trash size={16} className="text-gray-500 group-hover:text-red-600" />
+                <Trash size={16} className="text-gray-500" />
                 <span>Delete</span>
               </button>
             </div>

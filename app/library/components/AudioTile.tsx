@@ -14,6 +14,13 @@ export type AudioItem = {
   spacesCount: number;
   lastPlayed?: string;
   isScheduled: boolean;
+  singer?: string;
+  // optional metadata
+  playlistId?: string;
+  addedAt?: string;
+  modifiedAt?: string;
+  addedBy?: string;
+  // optional metadata
 };
 
 export default function AudioTile({
@@ -28,17 +35,35 @@ export default function AudioTile({
 
   return (
     <div
+      role="button"
+      tabIndex={0}
       onClick={() => setSelected((s) => !s)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          setSelected((s) => !s);
+        }
+      }}
       className={cn(
-        "group relative rounded-lg border border-gray-200 bg-white hover:shadow-md hover:border-gray-300 transition-all duration-200 cursor-pointer overflow-hidden p-4",
-        selected ? "bg-[#F5F5F5]" : ""
+        "group relative rounded-lg border border-gray-200 bg-white transition-all duration-200 cursor-pointer overflow-hidden p-4",
+        "transform hover:shadow-lg hover:-translate-y-0.5",
+        selected ? "bg-gray-50" : "hover:bg-gray-50",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-blue-400"
       )}
     >
       <div className="flex items-start justify-between gap-3">
         {/* Icon and content */}
         <div className="flex items-start gap-3 min-w-0 flex-1">
-          <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0 group-hover:bg-[#F5F5F5] transition-colors">
-            <FileAudio size={20} className={cn("text-gray-600 group-hover:text-gray-700", selected ? "text-gray-900" : "")} />
+          <div
+            className={cn(
+              "w-10 h-10 flex items-center justify-center rounded-lg transition-all duration-150 flex-shrink-0",
+              selected ? "bg-gray-200" : "bg-gray-100 group-hover:bg-gray-200"
+            )}
+          >
+            <FileAudio
+              size={20}
+              className={cn("text-gray-600 group-hover:text-gray-800")}
+            />
           </div>
           <div className="min-w-0 flex-1">
             <h3 className="text-sm font-medium text-gray-900 truncate" title={audio.title}>

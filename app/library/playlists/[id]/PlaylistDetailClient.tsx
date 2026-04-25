@@ -119,7 +119,7 @@ export default function PlaylistDetailClient({ playlistId }: { playlistId: strin
                   <span className="hidden sm:inline">Edit</span>
                 </button>
 
-                <button onClick={() => setDeleteOpen(true)} className="inline-flex items-center justify-center gap-2 px-3 py-1 rounded-md text-sm font-medium text-red-600 bg-white border border-red-100 hover:bg-red-50 transition focus:outline-none focus:ring-2 focus:ring-red-100 min-w-[104px]">
+                <button onClick={() => setDeleteOpen(true)} className="inline-flex items-center justify-center gap-2 px-3 py-1 rounded-md text-sm font-medium text-red-600 bg-white border border-red-100 hover:bg-gray-50 transition focus:outline-none focus:ring-2 focus:ring-red-100 min-w-[104px]">
                   <Trash size={14} />
                   <span className="hidden sm:inline">Delete</span>
                 </button>
