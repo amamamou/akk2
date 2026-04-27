@@ -3,6 +3,10 @@ import React from "react";
 
 interface NowPlayingProps {
   evt: { id: string; title: string; duration?: number } | null;
+  playingProgress?: number;
+  playlistLength?: number;
+  onEmptyClick?: () => void;
+  isPlaying?: boolean;
 }
 
 export default function NowPlaying({ evt }: NowPlayingProps) {

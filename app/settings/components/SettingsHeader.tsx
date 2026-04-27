@@ -75,18 +75,20 @@ export default function SettingsHeader({
           <div className="flex items-center gap-2">
             {dirty && (
               <>
-                <button
-                  onClick={onCancel}
-                  className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-                >
-                  <X size={16} /> Cancel
-                </button>
-                <button
-                  onClick={onSave}
-                  className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-[#7318FF] rounded-lg hover:bg-[#5e12d9] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#7318FF]/40"
-                >
-                  <Check size={16} /> Save changes
-                </button>
+                <div className="flex items-center justify-end gap-3">
+          <button
+            onClick={onCancel}
+            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-md hover:bg-gray-50 transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-blue-400"
+          >
+            <X size={16} /> Cancel
+          </button>
+          <button
+            onClick={onSave}
+            className={"px-4 py-2 text-sm font-medium rounded-md transition-all duration-150 flex items-center justify-center gap-2 bg-[#A473FF] text-white hover:bg-[#7A42FF] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-blue-400"}
+          >
+            <Check size={16} /> Save changes
+          </button>
+        </div>
               </>
             )}
           </div>

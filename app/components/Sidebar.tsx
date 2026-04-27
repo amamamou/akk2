@@ -391,19 +391,23 @@ export default function Sidebar() {
             </div>
           ) : (
             <>
-              <div className="relative h-5 w-5 overflow-hidden rounded-sm flex-shrink-0">
-                <Image
-                  src="/akousticarts.webp"
-                  alt="Akoustic Arts"
-                  width={24}
-                  height={24}
-                  className="object-contain"
-                  priority
-                />
-              </div>
-              <span className="text-sm font-semibold tracking-tight truncate">
-                Akoustic Arts
-              </span>
+                  <div className="flex items-center gap-3 min-w-0">
+                  <div className="relative h-8 w-8 overflow-hidden rounded-lg flex-shrink-0 bg-gradient-to-br from-gray-100 to-gray-50 flex items-center justify-center">
+                    <Image
+                      src="/akousticarts.webp"
+                      alt="Akoustic Arts"
+                      width={32}
+                      height={32}
+                      className="object-contain"
+                      priority
+                    />
+                  </div>
+
+                  <div className="flex flex-col min-w-0">
+                    <span className="text-sm font-semibold tracking-tight truncate text-gray-900">Akoustic Arts</span>
+                    <span className="text-[11px] text-gray-500 truncate">Studio playback</span>
+                  </div>
+                </div>
             </>
           )}
         </div>

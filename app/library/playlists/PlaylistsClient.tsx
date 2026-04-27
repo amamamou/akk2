@@ -49,37 +49,27 @@ const samplePlaylists: Playlist[] = [
 
 export default function LibraryPlaylistsClient() {
   const [playlistModalOpen, setPlaylistModalOpen] = useState(false);
+  const PLAYLISTS_STORAGE_KEY = "aa_playlists";
+
+  // Server-safe initial value to avoid hydration mismatch
   const [playlists, setPlaylists] = useState<Playlist[]>(samplePlaylists);
+
+  // On client mount, load persisted playlists (if any). Use a microtask to avoid sync setState in effect.
+  useEffect(() => {
+    try {
+      if (typeof window === "undefined") return;
+      const raw = window.localStorage.getItem(PLAYLISTS_STORAGE_KEY);
+      if (raw !== null) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) Promise.resolve().then(() => setPlaylists(parsed));
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
 
   // ref to keep the latest playlists for event handler comparisons
   const playlistsRef = useRef<Playlist[]>(playlists);
-
-  const PLAYLISTS_STORAGE_KEY = "aa_playlists";
-
-  // load playlists from localStorage (persisted) if available
-  useEffect(() => {
-    // run in next tick to avoid setState during render/effect sync warnings
-    const t = setTimeout(() => {
-      try {
-        if (typeof window === "undefined") return;
-        const raw = window.localStorage.getItem(PLAYLISTS_STORAGE_KEY);
-        console.debug?.("[playlists] load from localStorage:", PLAYLISTS_STORAGE_KEY, raw);
-        if (raw) {
-          const parsed = JSON.parse(raw) as Playlist[];
-          console.debug?.("[playlists] parsed on load:", parsed);
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            setPlaylists(parsed);
-            return;
-          }
-        }
-        // fallback to sample playlists
-        setPlaylists(samplePlaylists);
-      } catch {
-        /* ignore */
-      }
-    }, 0);
-    return () => clearTimeout(t);
-  }, []);
 
   // persist playlists to localStorage on change and notify other parts of the app
   useEffect(() => {
@@ -87,6 +77,8 @@ export default function LibraryPlaylistsClient() {
       if (typeof window === "undefined") return;
       const nextJson = JSON.stringify(playlists);
       const existing = window.localStorage.getItem(PLAYLISTS_STORAGE_KEY);
+      // If storage is empty and we're still at the built-in sample playlists, don't write them.
+      if (existing === null && playlists === samplePlaylists) return;
       console.debug?.("[playlists] persist check", { key: PLAYLISTS_STORAGE_KEY, existing, nextJson });
       // only write/dispatch if the stored value actually differs
       if (existing !== nextJson) {

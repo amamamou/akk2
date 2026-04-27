@@ -4,6 +4,7 @@ import React from "react";
 import {
   LineChart,
   Line,
+  Area,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -37,36 +38,39 @@ const heatmapData = [
 
 export default function AnalyticsClient() {
   return (
-    <div className="flex-1 overflow-auto bg-gray-50/30 p-8 flex flex-col gap-6">
-      <div className="flex items-center justify-between border-b border-gray-200 pb-4">
-        <div>
-          <h1 className="text-2xl font-semibold text-gray-900">Analytics</h1>
-          <p className="text-sm text-gray-500 mt-1">
-            Playback verification and listening metrics
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <select className="border border-gray-300 rounded-md text-sm px-3 py-1.5 bg-white text-gray-700 outline-none focus:ring-1 focus:ring-gray-400">
-            <option>Today</option>
-            <option>Last 7 Days</option>
-            <option>This Month</option>
-          </select>
+    <div className="flex-1 flex flex-col overflow-hidden bg-white">
+      {/* Header */}
+      <div className="sticky top-0 z-10 bg-white border-b border-gray-200">
+        <div className="px-8 py-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-2xl font-semibold text-gray-900">Analytics</h1>
+              <p className="text-sm text-gray-500 mt-1">Playback verification and listening metrics</p>
+            </div>
+            <div className="flex gap-2">
+              <select className="border border-gray-300 rounded-md text-sm px-3 py-1.5 bg-white text-gray-700 outline-none focus:ring-1 focus:ring-gray-400">
+                <option>Today</option>
+                <option>Last 7 Days</option>
+                <option>This Month</option>
+              </select>
+            </div>
+          </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      {/* Content */}
+      <div className="flex-1 overflow-auto bg-white">
+        <div className="px-6 py-6 space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         {[
-          { title: "Total Broadcasts", value: "180", icon: PlayCircle },
-          { title: "Listening Time", value: "324h", icon: Clock },
-          { title: "Success Rate", value: "98.5%", icon: CheckCircle },
-          { title: "Failed Plays", value: "3", icon: AlertCircle },
+          { title: "Total Broadcasts", value: "180", icon: PlayCircle, bg: "#E6D2FF", fg: "#6B21A8" },
+          { title: "Listening Time", value: "324h", icon: Clock, bg: "#E6E9FF", fg: "#374151" },
+          { title: "Success Rate", value: "98.5%", icon: CheckCircle, bg: "#ECFDF5", fg: "#059669" },
+          { title: "Failed Plays", value: "3", icon: AlertCircle, bg: "#FFF1F2", fg: "#DC2626" },
         ].map((stat, i) => (
-          <div
-            key={i}
-            className="bg-white border border-gray-200 rounded-lg p-5 flex items-center gap-4 shadow-sm"
-          >
-            <div className="p-3 bg-gray-100 rounded-full text-gray-700">
-              <stat.icon size={24} />
+          <div key={i} className="bg-white border border-gray-200 rounded-lg p-5 flex items-center gap-4 shadow-sm">
+            <div className="w-12 h-12 rounded-md flex items-center justify-center" style={{ backgroundColor: stat.bg }}>
+              <stat.icon size={20} style={{ color: stat.fg }} />
             </div>
             <div>
               <p className="text-sm font-medium text-gray-500">{stat.title}</p>
@@ -74,9 +78,9 @@ export default function AnalyticsClient() {
             </div>
           </div>
         ))}
-      </div>
+          </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-2">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-2">
         <div className="bg-white border border-gray-200 rounded-lg shadow-sm p-6">
           <h3 className="text-lg font-medium text-gray-900 mb-6">
             Player Activity Timeline
@@ -118,9 +122,9 @@ export default function AnalyticsClient() {
                 <Line
                   type="monotone"
                   dataKey="broadcasts"
-                  stroke="#374151"
+                  stroke="#A473FF"
                   strokeWidth={3}
-                  dot={{ fill: "#374151", r: 4 }}
+                  dot={{ fill: "#A473FF", r: 4 }}
                   activeDot={{ r: 6 }}
                 />
               </LineChart>
@@ -128,10 +132,21 @@ export default function AnalyticsClient() {
           </div>
         </div>
 
-        <div className="bg-white border border-gray-200 rounded-lg shadow-sm p-6">
+        <div className="bg-white  border border-gray-200 rounded-lg shadow-sm p-6">
           <h3 className="text-lg font-medium text-gray-900 mb-6">
             Broadcasts by Location
           </h3>
+          <div className="mb-4 flex items-center justify-start gap-6">
+            <div className="flex items-center gap-2 text-sm text-gray-600">
+              <span className="w-3 h-3 rounded-sm" style={{ backgroundColor: '#86EFAC' }} />
+              <span>Successful</span>
+            </div>
+            <div className="flex items-center gap-2 text-sm text-gray-600">
+              <span className="w-3 h-3 rounded-sm" style={{ backgroundColor: '#F87171' }} />
+              <span>Failed</span>
+            </div>
+          </div>
+
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart
@@ -163,20 +178,16 @@ export default function AnalyticsClient() {
                     border: "1px solid #E5E7EB",
                   }}
                 />
-                <Legend
-                  iconType="circle"
-                  wrapperStyle={{ paddingTop: "20px" }}
-                />
                 <Bar
                   dataKey="total"
                   name="Successful"
-                  fill="#4B5563"
+                  fill="#86EFAC" /* emerald-300 */
                   radius={[4, 4, 0, 0]}
                 />
                 <Bar
                   dataKey="failed"
                   name="Failed"
-                  fill="#D1D5DB"
+                  fill="#F87171" /* red-400 - clearer professional red */
                   radius={[4, 4, 0, 0]}
                 />
               </BarChart>
@@ -185,13 +196,11 @@ export default function AnalyticsClient() {
         </div>
       </div>
 
-      <div className="bg-white border border-gray-200 rounded-lg shadow-sm">
-        <div className="px-6 py-4 border-b border-gray-200">
-          <h3 className="text-lg font-medium text-gray-900">
-            Playback Verification Log
-          </h3>
-        </div>
-        <div className="divide-y divide-gray-200">
+          <div className="bg-white border border-gray-200 rounded-lg shadow-sm">
+            <div className="px-6 py-4 border-b border-gray-200">
+              <h3 className="text-lg font-medium text-gray-900">Playback Verification Log</h3>
+            </div>
+            <div className="divide-y divide-gray-200">
           {[
             {
               id: "log1",
@@ -233,38 +242,53 @@ export default function AnalyticsClient() {
               <div className="flex items-center gap-4">
                 <div
                   className={cn(
-                    "p-2 rounded-full",
-                    log.status === "Failed"
-                      ? "bg-gray-200 text-gray-500"
-                      : "bg-gray-100 text-gray-700",
+                    "p-2 rounded-md flex items-center justify-center",
+                    log.status === "Completed"
+                      ? "bg-green-50 text-green-600"
+                      : log.status === "Playing"
+                        ? "bg-blue-50 text-blue-600"
+                        : log.status === "Failed"
+                          ? "bg-red-50 text-red-600"
+                          : "bg-gray-100 text-gray-700",
                   )}
                 >
                   <log.icon size={18} />
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-gray-900">
-                    {log.file}
-                  </p>
+                  <p className="text-sm font-medium text-gray-900">{log.file}</p>
                   <p className="text-xs text-gray-500">{log.location}</p>
                 </div>
               </div>
-              <div className="flex items-center gap-6">
+
+              <div className="flex items-center gap-4">
                 <span className="text-sm text-gray-500">{log.time}</span>
-                <span
-                  className={cn(
-                    "px-2.5 py-1 text-xs font-medium rounded-full border",
-                    log.status === "Completed"
-                      ? "bg-gray-100 text-gray-700 border-gray-200"
-                      : log.status === "Playing"
-                        ? "bg-gray-800 text-white border-gray-800"
-                        : "bg-gray-50 text-gray-500 border-gray-200",
-                  )}
-                >
-                  {log.status}
-                </span>
+                {/* badge with small icon + label (display 'Successful' for Completed) */}
+                {(() => {
+                  const label = log.status === "Completed" ? "Successful" : log.status;
+                  const BadgeIcon = log.status === "Completed" ? CheckCircle : log.status === "Playing" ? PlayCircle : log.status === "Failed" ? AlertCircle : null;
+                  return (
+                    <span
+                      className={cn(
+                        "px-3 py-1 text-xs font-semibold rounded-md border inline-flex items-center justify-center gap-2",
+                        log.status === "Completed"
+                          ? "bg-green-50 text-green-700 border-green-100"
+                          : log.status === "Playing"
+                            ? "bg-blue-50 text-blue-700 border-blue-100"
+                            : log.status === "Failed"
+                              ? "bg-red-50 text-red-700 border-red-100"
+                              : "bg-gray-50 text-gray-600 border-gray-100",
+                      )}
+                    >
+                      {BadgeIcon ? <BadgeIcon size={12} /> : null}
+                      <span className="leading-none">{label}</span>
+                    </span>
+                  );
+                })()}
               </div>
             </div>
           ))}
+            </div>
+          </div>
         </div>
       </div>
     </div>

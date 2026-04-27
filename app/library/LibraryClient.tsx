@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import { Search, Plus, FileAudio, Music } from "lucide-react";
 import { cn } from "../../utils/cn";
 import AudioGrid from "./components/AudioGrid";
@@ -66,7 +66,42 @@ export default function LibraryClient() {
   const [selectedAudioForPlaylist, setSelectedAudioForPlaylist] = useState<AudioItem | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [selectedAudioForDelete, setSelectedAudioForDelete] = useState<AudioItem | null>(null);
+  const PLAYLISTS_STORAGE_KEY = "aa_playlists";
+
+  // Server-safe initial value to avoid hydration mismatch
   const [playlists, setPlaylists] = useState<Playlist[]>(samplePlaylists);
+
+  // On client mount, load persisted playlists (if any). We accept empty arrays as valid data.
+  useEffect(() => {
+    try {
+      if (typeof window === "undefined") return;
+      const raw = window.localStorage.getItem(PLAYLISTS_STORAGE_KEY);
+      if (raw !== null) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) Promise.resolve().then(() => setPlaylists(parsed));
+      }
+    } catch {
+      // ignore malformed data
+    }
+  }, []);
+
+  // Persist playlists to localStorage whenever they change so other views / tabs see updates.
+  // Important: don't seed storage with samplePlaylists automatically when storage is empty.
+  useEffect(() => {
+    try {
+      if (typeof window === "undefined") return;
+      const nextJson = JSON.stringify(playlists);
+      const existing = window.localStorage.getItem(PLAYLISTS_STORAGE_KEY);
+      // If storage is empty and we're still at the built-in sample playlists, don't write them.
+      if (existing === null && playlists === samplePlaylists) return;
+      if (existing !== nextJson) {
+        window.localStorage.setItem(PLAYLISTS_STORAGE_KEY, nextJson);
+        window.dispatchEvent(new CustomEvent("aa:playlists-updated", { detail: { count: playlists.length } }));
+      }
+    } catch {
+      // ignore
+    }
+  }, [playlists]);
 
   const filteredLibrary = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();

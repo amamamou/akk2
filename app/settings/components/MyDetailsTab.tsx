@@ -2,6 +2,7 @@
 
 import React, { useRef, useState } from "react";
 import NextImage from "next/image";
+import { UploadCloud, Edit2, Trash, Camera } from "lucide-react";
 
 type Country = {
   name: string;
@@ -64,6 +65,8 @@ export default function MyDetailsTab({
   const [photoError, setPhotoError] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  const initials = `${(firstName || "").trim().charAt(0)}${(lastName || "").trim().charAt(0)}`.toUpperCase();
 
   async function validateAndSetFile(f: File | null) {
     setPhotoError(null);
@@ -134,66 +137,103 @@ export default function MyDetailsTab({
             <label className="block text-sm font-medium text-gray-900 mb-3">
               Profile photo
             </label>
+
             <input
               ref={fileInputRef}
               type="file"
               accept="image/*"
               onChange={handleFileChange}
               className="hidden"
+              aria-hidden
             />
+
             <div
               onDrop={handleDrop}
               onDragOver={handleDragOver}
               onDragEnter={handleDragEnter}
               onDragLeave={handleDragLeave}
-              className={`flex items-center gap-6 p-4 rounded-lg border text-sm transition-colors ${
-                isDragging
-                  ? "border-gray-900 bg-gray-50"
-                  : "border-gray-200 bg-gray-50/70"
+              className={`flex items-center gap-4 p-4 rounded-lg transition-colors ${
+                isDragging ? "border border-gray-300 bg-gray-50" : "border border-gray-200 bg-white"
               }`}
+              role="group"
+              aria-label="Profile photo upload"
             >
-              <div className="flex items-center justify-center h-16 w-16 rounded-full bg-gray-200 overflow-hidden">
-                {avatar ? (
-                  <NextImage
-                    src={avatar}
-                    alt="Profile preview"
-                    width={64}
-                    height={64}
-                    className="object-cover"
-                  />
-                ) : (
-                  <span className="text-gray-500 text-xs">64x64</span>
-                )}
-              </div>
-
-              <div className="flex-1">
-                <p className="text-gray-700">
-                  <button
-                    type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    className="text-gray-900 font-medium hover:underline"
-                  >
-                    Click to upload
-                  </button>{" "}
-                  or drag and drop
-                </p>
-                <p className="text-xs text-gray-500 mt-1">
-                  PNG, JPG, GIF up to 800x400px.
-                </p>
-                {photoError && (
-                  <p className="mt-1 text-xs text-red-500">{photoError}</p>
-                )}
-              </div>
-
-              {avatar && (
+              <div className="flex-shrink-0">
                 <button
                   type="button"
-                  onClick={removePhoto}
-                  className="text-xs text-gray-500 hover:text-gray-900"
+                  onClick={() => fileInputRef.current?.click()}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      fileInputRef.current?.click();
+                    }
+                  }}
+                  className="relative group h-24 w-24 rounded-full bg-gray-50 flex items-center justify-center overflow-hidden focus:outline-none focus:ring-2 focus:ring-gray-300 focus:ring-offset-2"
+                  aria-label={avatar ? "Change profile photo" : "Upload profile photo"}
                 >
-                  Remove
+                  {avatar ? (
+                    <NextImage src={avatar} alt="Profile preview" width={96} height={96} className="object-cover" />
+                  ) : (
+                    <div
+                      className="h-full w-full flex items-center justify-center bg-gray-100 text-gray-500 text-sm font-medium"
+                      aria-hidden
+                      title={initials || "Profile"}
+                    >
+                      {initials || ""}
+                    </div>
+                  )}
+                  {/* subtle camera affordance on hover/focus */}
+                  <span className="pointer-events-none absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 group-focus:opacity-100 transition-opacity">
+                    <span className="bg-white/80 p-1 rounded-full">
+                      <Camera size={16} className="text-gray-500" />
+                    </span>
+                  </span>
                 </button>
-              )}
+              </div>
+
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-3">
+                  {!avatar ? (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        className="inline-flex items-center gap-2 px-2 py-1 rounded-md bg-white text-sm text-gray-700 border border-gray-200 hover:bg-gray-50 focus:outline-none focus:ring-1 focus:ring-gray-200"
+                        aria-label="Upload photo"
+                      >
+                        <UploadCloud size={14} className="text-gray-500" />
+                        <span className="text-sm text-gray-700">Upload</span>
+                      </button>
+                      <span className="text-sm text-gray-500">Drag & drop or click to upload</span>
+                    </>
+                  ) : (
+                    <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => fileInputRef.current?.click()}
+                          className="inline-flex items-center gap-2 text-sm text-gray-700 px-3 py-1 rounded-md border border-gray-200 bg-white hover:bg-gray-50"
+                        >
+                          <Edit2 size={14} className="text-gray-500" />
+                          <span>Replace</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={removePhoto}
+                          className="inline-flex items-center gap-2 text-sm text-gray-600 px-3 py-1 rounded-md border border-gray-200 bg-white hover:bg-gray-50"
+                        >
+                          <Trash size={14} className="text-gray-400" />
+                          <span>Remove</span>
+                        </button>
+                      </div>
+                      <div className="text-sm text-gray-400">Click Replace to change photo</div>
+                    </div>
+                  )}
+                </div>
+
+                <p className="text-xs text-gray-400 mt-2">PNG, JPG, GIF — recommended 400×400px. Max 2MB.</p>
+                {photoError && <p className="mt-2 text-xs text-red-600">{photoError}</p>}
+              </div>
             </div>
           </div>
 
