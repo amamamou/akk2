@@ -6,8 +6,8 @@ import Sidebar from "../components/Sidebar"
 export default function SidebarWrapper() {
   const pathname = usePathname()
 
-  // Hide the sidebar only on the /login route
-  if (pathname === "/login") return null
+  // Hide the sidebar on auth entry pages
+  if (pathname === "/login" || pathname === "/create-account") return null
 
   return <Sidebar />
 }

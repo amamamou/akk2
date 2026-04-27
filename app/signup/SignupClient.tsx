@@ -155,7 +155,7 @@ export default function SignupClient() {
               <p className="text-center text-sm text-gray-400">
                 Already have an account? {" "}
                 <a
-                  href="/login"
+                  href="/create-account"
                   className="text-gray-900 hover:underline"
                 >
                   Log in
