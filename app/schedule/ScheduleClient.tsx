@@ -6,6 +6,8 @@ import { DndProvider } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
 import { Search, ChevronRight, ChevronDown, ChevronUp, Plus, Music } from "lucide-react";
 import DraggableAudioCard from "./components/DraggableAudioCard";
+import DraggablePlaylistCard from "./components/DraggablePlaylistCard";
+import type { Playlist } from "../library/components/PlaylistModal";
 import CalendarCell from "./components/CalendarCell";
 import ScheduleToolbar from "./components/ScheduleToolbar";
 import { cn } from "../../utils/cn";
@@ -143,12 +145,17 @@ export default function SchedulePage() {
   const [selectedDay, setSelectedDay] = useState<string | "all">("all");
   // Audio drawer states
   const [audioQuery, setAudioQuery] = useState("");
-  const [audioType, setAudioType] = useState<string | "all">("all");
-  const [audioSort, setAudioSort] = useState<string>("newest");
+  // default to first available type so we don't show an "All types" option
+  const _availableAudioTypes = [...new Set(initialAudioLibrary.map((a) => a.type))];
+  const _defaultAudioType = _availableAudioTypes[0] ?? "all";
+  const [audioType, setAudioType] = useState<string | "all">(_defaultAudioType);
+  // remove "Newest" option; default to title sorting
+  const [audioSort, setAudioSort] = useState<string>("title");
   const [drawerCollapsed, setDrawerCollapsed] = useState(false);
   const [drawerHeight, setDrawerHeight] = useState<number>(160);
   const audioElRef = useRef<HTMLAudioElement | null>(null);
   const [previewId, setPreviewId] = useState<string | null>(null);
+  const [playlists, setPlaylists] = useState<Playlist[]>([]);
 
   const persistEvents = useCallback((next: ScheduleEvent[]) => {
     try {
@@ -183,6 +190,33 @@ export default function SchedulePage() {
     }
   }, []);
 
+  // Load playlists from the same key used by PlaylistsClient and keep in sync
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const PLAYLISTS_STORAGE_KEY = "aa_playlists";
+    const load = () => {
+      try {
+        const raw = window.localStorage.getItem(PLAYLISTS_STORAGE_KEY);
+        if (!raw) {
+          setPlaylists([]);
+          return;
+        }
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) setPlaylists(parsed);
+      } catch (err) {
+        console.error("Failed to load playlists for schedule", err);
+      }
+    };
+    load();
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === PLAYLISTS_STORAGE_KEY) load();
+    };
+    const handleCustom = () => load();
+    window.addEventListener("storage", handleStorage);
+    window.addEventListener("aa:playlists-updated", handleCustom as EventListener);
+    return () => { window.removeEventListener("storage", handleStorage); window.removeEventListener("aa:playlists-updated", handleCustom as EventListener); };
+  }, []);
+
   // resize helpers
   const resizingRef = useRef<{ startY: number; startH: number } | null>(null);
 
@@ -205,10 +239,56 @@ export default function SchedulePage() {
     });
   };
 
-  // Clicking events no longer opens an inspector panel.
-  const handleEventClick = () => {
-    // noop - inspector removed per design
+  // Helper: parse totalDuration like "180m" -> number minutes
+  const parseDuration = (s: string | undefined) => {
+    if (!s) return null;
+    const m = s.match(/(\d+)/);
+    if (!m) return null;
+    return parseInt(m[1], 10);
   };
+
+  const addMinutesToTime = (timeStr: string, minutesToAdd: number) => {
+    const [hh, mm] = timeStr.split(":").map((x) => parseInt(x, 10));
+    if (Number.isNaN(hh) || Number.isNaN(mm)) return timeStr;
+    const total = hh * 60 + mm + minutesToAdd;
+    const capped = Math.max(0, Math.min(23 * 60 + 59, total));
+    const nh = Math.floor(capped / 60).toString().padStart(2, "0");
+    const nm = (capped % 60).toString().padStart(2, "0");
+    return `${nh}:${nm}`;
+  };
+
+  const handleDropPlaylist = (item: { playlistId: string; title: string; trackCount: number; totalDuration: string }, roomId: string, day: string, time: string) => {
+    // Schedule each track sequentially starting at `time` using totalDuration / trackCount
+    const total = parseDuration(item.totalDuration) ?? null;
+    const trackCount = Math.max(1, item.trackCount || 1);
+    const perTrack = total ? Math.max(1, Math.round(total / trackCount)) : 60;
+
+    setEvents((prev) => {
+      const newEvents: ScheduleEvent[] = [];
+      let currentTime = time;
+      for (let i = 0; i < trackCount; i++) {
+        const e: ScheduleEvent = {
+          id: `e-${Date.now()}-${i}-${Math.random().toString(36).slice(2,6)}`,
+          audioId: `${item.playlistId}-t${i}`,
+          title: `${item.title} — Track ${i + 1}`,
+          duration: perTrack,
+          roomId,
+          day,
+          time: currentTime,
+        };
+        newEvents.push(e);
+        // advance time by perTrack minutes
+        currentTime = addMinutesToTime(currentTime, perTrack);
+      }
+
+      const next = [...prev, ...newEvents];
+      persistEvents(next);
+      return next;
+    });
+  };
+
+  // Clicking events no longer opens an inspector panel.
+  // (inspector removed per design)
 
   const toggleRoom = (roomId: string) => {
     setCollapsedRooms((prev) => ({ ...prev, [roomId]: !prev[roomId] }));
@@ -473,17 +553,17 @@ export default function SchedulePage() {
                                   const cellEvents = events.filter(e => e.roomId === room.id && e.day === day.short && e.title.toLowerCase().includes(query.toLowerCase()));
                                   return (
                                     <div key={`${room.id}-${day.short}`} className="flex-1 min-w-[140px] border-l border-gray-200">
-                                      <CalendarCell
-                                        roomId={room.id}
-                                        day={day.short}
-                                        time="09:00"
-                                        events={cellEvents}
-                                        onDropEvent={handleDropEvent}
-                                        onEventClick={handleEventClick}
-                                        onEventDelete={requestDeleteEvent}
-                                        compact={compact}
-                                      />
-                                    </div>
+                                          <CalendarCell
+                                            roomId={room.id}
+                                            day={day.short}
+                                            time="09:00"
+                                            events={cellEvents}
+                                            onDropEvent={handleDropEvent}
+                                            onDropPlaylist={handleDropPlaylist}
+                                            onEventDelete={requestDeleteEvent}
+                                            compact={compact}
+                                          />
+                                        </div>
                                   );
                                 })
                               )}
@@ -518,18 +598,7 @@ export default function SchedulePage() {
                         />
                       </div>
 
-                      <select value={audioType} onChange={(e) => setAudioType(e.target.value)} className="text-sm px-3 py-1.5 rounded-md bg-gray-50 border border-transparent">
-                        <option value="all">All types</option>
-                        {[...new Set(initialAudioLibrary.map(a => a.type))].map(t => (
-                          <option key={t} value={t}>{t}</option>
-                        ))}
-                      </select>
 
-                      <select value={audioSort} onChange={(e) => setAudioSort(e.target.value)} className="text-sm px-3 py-1.5 rounded-md bg-gray-50 border border-transparent">
-                        <option value="newest">Newest</option>
-                        <option value="title">Title</option>
-                        <option value="duration">Duration</option>
-                      </select>
 
                       <div className="ml-2 flex items-center gap-2">
                         <button onClick={() => setDrawerCollapsed(true)} aria-label="Collapse audio drawer" title="Collapse" className="p-2 rounded-md text-gray-500 hover:text-gray-700 cursor-pointer">
@@ -548,21 +617,43 @@ export default function SchedulePage() {
               </div>
 
               <div className="flex-1 overflow-auto py-3 px-3" style={{ height: drawerCollapsed ? 0 : undefined }}>
-                <div className="flex gap-3 items-start flex-wrap">
-                  {(() => {
-                    const q = audioQuery.trim().toLowerCase();
-                    let list = initialAudioLibrary.filter(a => {
-                      if (audioType !== 'all' && a.type !== audioType) return false;
-                      if (q && !a.title.toLowerCase().includes(q)) return false;
-                      return true;
-                    });
-                    if (audioSort === 'title') list = [...list].sort((x,y) => x.title.localeCompare(y.title));
-                    if (audioSort === 'duration') list = [...list].sort((x,y) => x.duration - y.duration);
-                    // newest keeps original order
-                    return list.map(audio => (
-                      <DraggableAudioCard key={audio.id} audio={audio} onPreview={handlePreview} isPreviewing={previewId === audio.id} />
-                    ));
-                  })()}
+                <div className="space-y-3">
+                  {playlists.length > 0 && (
+                    <div>
+                      <div className="flex items-center justify-between px-1 mb-2">
+                        <div className="text-xs font-semibold text-gray-700">Playlists</div>
+                        <div className="text-xs text-gray-400">Drag to schedule</div>
+                      </div>
+                      <div className="flex gap-3 items-start overflow-x-auto py-1 px-1">
+                        {playlists.map((pl) => (
+                          <DraggablePlaylistCard key={pl.id} playlist={pl} />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <div>
+                    <div className="flex items-center justify-between px-1 mb-2">
+                      <div className="text-xs font-semibold text-gray-700">Tracks</div>
+                      <div className="text-xs text-gray-400">Drag to schedule</div>
+                    </div>
+
+                    <div className="flex gap-3 items-start flex-wrap">
+                    {(() => {
+                      const q = audioQuery.trim().toLowerCase();
+                      let list = initialAudioLibrary.filter(a => {
+                        if (audioType !== 'all' && a.type !== audioType) return false;
+                        if (q && !a.title.toLowerCase().includes(q)) return false;
+                        return true;
+                      });
+                      if (audioSort === 'title') list = [...list].sort((x,y) => x.title.localeCompare(y.title));
+                      if (audioSort === 'duration') list = [...list].sort((x,y) => x.duration - y.duration);
+                      // newest keeps original order
+                      return list.map(audio => (
+                        <DraggableAudioCard key={audio.id} audio={audio} onPreview={handlePreview} isPreviewing={previewId === audio.id} />
+                      ));
+                    })()}
+                  </div>
                 </div>
               </div>
               {/* resize handle */}
@@ -591,6 +682,7 @@ export default function SchedulePage() {
         onCancel={cancelDeleteEvent}
         onConfirm={confirmDeleteEvent}
       />
+      </div>
     </DndProvider>
   );
 }

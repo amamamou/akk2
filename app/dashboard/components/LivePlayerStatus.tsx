@@ -2,8 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
-import { Activity, Wifi, WifiOff } from "lucide-react";
-import NowPlaying from "../../players/components/NowPlaying";
+import { Wifi, WifiOff, Cast } from "lucide-react";
 
 const PLAYERS_STORAGE_KEY = "akou.players";
 
@@ -144,16 +143,13 @@ export default function LivePlayerStatus({ players }: { players: PlayerStatus[] 
 
 	return (
 		<div className="bg-white border border-gray-200 rounded-lg shadow-sm">
-			<div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
-				<div className="flex items-center gap-2">
-					<Activity size={18} className="text-gray-700" />
-					<h2 className="text-lg font-semibold text-gray-900">Live Player Status</h2>
-				</div>
+			<div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
+				<h2 className="text-base font-semibold text-gray-900">Live Player Status</h2>
 				<Link href="/players" className="text-sm text-gray-600 hover:text-gray-900 font-medium">
 					View All →
 				</Link>
 			</div>
-			<div className="p-6 space-y-4">
+			<div className="p-4 space-y-3">
 				{displayPlayers.length === 0 && (
 					<p className="text-sm text-gray-500">
 						No players yet. Create your first player from the Players page to see
@@ -161,48 +157,52 @@ export default function LivePlayerStatus({ players }: { players: PlayerStatus[] 
 					</p>
 				)}
 				{displayPlayers.map((player, i) => (
-					<div
-						key={i}
-						className="flex items-center gap-4 p-4 bg-gray-50/50 border border-gray-100 rounded-lg hover:border-gray-200 transition-colors"
-					>
+					<div key={i} className="flex items-center gap-4 p-3 rounded-md hover:bg-gray-50 transition-colors">
+						<div className="flex items-center gap-3 w-60 min-w-0">
+							<div className="flex items-center justify-center h-8 w-8 rounded-md">
+								<Cast size={16} className="text-[#A473FF]" />
+							</div>
+							<div className="min-w-0">
+								<div className="text-sm font-medium text-gray-900 truncate">{player.name}</div>
+								<div className="text-xs text-gray-400 truncate">{player.player}</div>
+							</div>
+						</div>
+
 						<div className="flex-1">
-							<div className="flex items-center justify-between mb-2">
-								<div>
-									<h4 className="font-medium text-gray-900">{player.name}</h4>
-									<p className="text-xs text-gray-500">{player.player}</p>
+							{/* compact inline progress */}
+							<div className="flex items-center gap-3">
+								<div className="flex-1">
+									<div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+										<div
+											className="h-1.5 bg-[#A473FF]"
+											style={{ width: `${Math.min(100, Math.max(0, (player.progress ?? 0) / ((player.duration && player.duration > 0 ? player.duration : 180)) * 100))}%` }}
+										/>
+									</div>
 								</div>
-								<div className="flex items-center gap-3">
-									{player.status === "online" ? (
-										<span className="inline-flex items-center gap-2 px-2 py-0.5 rounded-full text-xs bg-emerald-100 text-emerald-700" aria-label="Online">
-											<Wifi size={12} className="text-emerald-600" aria-hidden />
-											<span>Online</span>
-										</span>
-									) : (
-										<span className="inline-flex items-center gap-2 px-2 py-0.5 rounded-full text-xs bg-gray-100 text-gray-600" aria-label="Offline">
-											<WifiOff size={12} className="text-gray-500" aria-hidden />
-											<span>Offline</span>
-										</span>
-									)}
+								<div className="text-xs text-gray-400 w-20 text-right">
+									{(() => {
+										const d = player.duration && player.duration > 0 ? player.duration : 180;
+										const s = Math.max(0, Math.floor(player.progress ?? 0));
+										const m = Math.floor(s / 60);
+										const ss = s % 60;
+										const md = Math.floor(d / 60);
+										const ssd = d % 60;
+										return `${m}:${ss.toString().padStart(2, "0")} / ${md}:${ssd.toString().padStart(2, "0")}`;
+									})()}
 								</div>
 							</div>
-							<NowPlaying
-									evt={
-										player.status === "online" && player.current
-											? {
-													id: String(i),
-													title: player.current,
-													duration:
-														player.duration && player.duration > 0
-															? player.duration
-															: 180,
-											}
-										: null
-									}
-									playingProgress={player.progress ?? 0}
-									playlistLength={0}
-									onEmptyClick={() => {}}
-									isPlaying={player.status === "online"}
-							/>
+						</div>
+
+						<div className="flex items-center gap-2">
+							{player.status === "online" ? (
+								<span className="inline-flex items-center gap-2 px-2 py-0.5 rounded-full text-xs bg-emerald-100 text-emerald-700" aria-label="Online">
+									<Wifi size={12} className="text-emerald-600" aria-hidden />
+								</span>
+							) : (
+								<span className="inline-flex items-center gap-2 px-2 py-0.5 rounded-full text-xs bg-gray-100 text-gray-600" aria-label="Offline">
+									<WifiOff size={12} className="text-gray-500" aria-hidden />
+								</span>
+							)}
 						</div>
 					</div>
 				))}

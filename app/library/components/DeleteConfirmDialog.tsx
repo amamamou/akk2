@@ -2,7 +2,6 @@
 
 import React from "react";
 import { AlertTriangle, X } from "lucide-react";
-import { cn } from "@/utils/cn";
 
 export default function DeleteConfirmDialog({
   open,

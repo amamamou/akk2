@@ -1,5 +1,3 @@
-import { Calendar, Speaker, Clock, Music2 } from "lucide-react";
-
 export const upcomingBroadcasts = [
 	{ time: "14:00", title: "Deep Focus", location: "Yoga Studio", duration: "120m", status: "scheduled" },
 	{ time: "15:00", title: "Lobby Ambience", location: "Lobby", duration: "180m", status: "scheduled" },
@@ -13,11 +11,12 @@ export const recentActivity = [
 	{ time: "2h ago", action: "Schedule updated", detail: "Added 3 new broadcasts for tomorrow", type: "update" },
 ];
 
+
 export const quickStats = [
-	{ label: "Active players", value: "3 / 4", icon: Speaker, trend: "+1 today" },
-	{ label: "Today’s broadcasts", value: "12", icon: Calendar, trend: "6 done" },
-	{ label: "Listening time", value: "8.5 h", icon: Clock, trend: "+2.3 h vs yesterday" },
-	{ label: "Library items", value: "24", icon: Music2, trend: "+2 this week" },
+	{ label: "Active players", value: "3 / 4", icon: "Cast", trend: "+1 today" },
+	{ label: "Today’s broadcasts", value: "12", icon: "Calendar", trend: "6 done" },
+	{ label: "Listening time", value: "8.5 h", icon: "Clock", trend: "+2.3 h vs yesterday" },
+	{ label: "Library items", value: "24", icon: "Music2", trend: "+2 this week" },
 ];
 
 export const playerStatus = [

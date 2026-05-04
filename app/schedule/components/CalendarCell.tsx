@@ -6,8 +6,9 @@ import { cn } from "../../../utils/cn";
 import EventCard from "./EventCard";
 
 type AudioItem = { id: string; title: string; duration: number; type: string };
+type PlaylistDrop = { playlistId: string; title: string; trackCount: number; totalDuration: string };
 type ScheduleEvent = { id: string; audioId: string; title: string; duration: number; roomId: string; day: string; time: string };
-const ITEM_TYPES = { AUDIO: "audio" };
+const ITEM_TYPES = { AUDIO: "audio", PLAYLIST: "playlist" };
 
 export default function CalendarCell({
   roomId,
@@ -15,7 +16,7 @@ export default function CalendarCell({
   time,
   events,
   onDropEvent,
-  onEventClick,
+  onDropPlaylist,
   onEventDelete,
   compact,
 }: {
@@ -24,15 +25,23 @@ export default function CalendarCell({
   time: string;
   events: ScheduleEvent[];
   onDropEvent: (item: AudioItem, roomId: string, day: string, time: string) => void;
-  onEventClick?: (evt: ScheduleEvent) => void;
+  onDropPlaylist?: (item: PlaylistDrop, roomId: string, day: string, time: string) => void;
   onEventDelete?: (evt: ScheduleEvent) => void;
   compact?: boolean;
 }) {
 	// When dropping into this cell, use the cell's own time slot so
 	// broadcasts line up visually with the grid.
   const [{ isOver }, dropRef] = useDrop(() => ({
-    accept: ITEM_TYPES.AUDIO,
-    drop: (item: AudioItem) => onDropEvent(item, roomId, day, time),
+    accept: [ITEM_TYPES.AUDIO, ITEM_TYPES.PLAYLIST],
+    drop: (item: AudioItem | PlaylistDrop) => {
+      // Detect playlist drops by presence of playlistId/trackCount
+      const maybe = item as PlaylistDrop;
+      if (maybe && typeof maybe.trackCount === 'number' && typeof maybe.playlistId === 'string') {
+        onDropPlaylist?.(maybe, roomId, day, time);
+        return;
+      }
+      onDropEvent(item as AudioItem, roomId, day, time);
+    },
     collect: (monitor) => ({ isOver: !!monitor.isOver() }),
   }));
 

@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -12,6 +13,7 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [currentView, setCurrentView] = useState<"login" | "register" | "forgot">("login")
+  const router = useRouter()
 
   return (
     <div className="min-h-screen flex font-sans">
@@ -102,7 +104,7 @@ export default function LoginPage() {
           </div>
 
           <div className="mt-4">
-            <Button className="w-full h-12 text-sm font-medium text-white hover:opacity-90 rounded-lg shadow-none" style={{ backgroundColor: "#A473FF" }}>
+            <Button onClick={() => router.push('/dashboard')} className="w-full h-12 text-sm font-medium text-white hover:opacity-90 rounded-lg shadow-none" style={{ backgroundColor: "#A473FF" }}>
               {currentView === "login" && "Log In"}
               {currentView === "register" && "Create Account"}
               {currentView === "forgot" && "Send Reset Link"}
