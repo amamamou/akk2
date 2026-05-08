@@ -1,687 +1,250 @@
 "use client";
-import React, { useState, useEffect, useRef, useCallback } from "react";
-import { useSearchParams } from "next/navigation";
-import { useDrop } from "react-dnd";
+import React, { useState, useEffect } from "react";
 import { DndProvider } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
-import { Search, ChevronRight, ChevronDown, ChevronUp, Plus, Music } from "lucide-react";
-import DraggableAudioCard from "./components/DraggableAudioCard";
-import DraggablePlaylistCard from "./components/DraggablePlaylistCard";
-import type { Playlist } from "../library/components/PlaylistModal";
-import CalendarCell from "./components/CalendarCell";
+import { AlertCircle, Loader } from "lucide-react";
 import ScheduleToolbar from "./components/ScheduleToolbar";
-import { cn } from "../../utils/cn";
+import CalendarCell from "./components/CalendarCell";
+import SongPickerModal from "./components/SongPickerModal";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
+import { getApiClient } from "@/lib/api-client";
 
-// Types
 type AudioItem = { id: string; title: string; duration: number; type: string; url?: string };
 type ScheduleEvent = { id: string; audioId: string; title: string; duration: number; roomId: string; day: string; time: string };
 
-const PLAYERS_STORAGE_KEY = "akou.players";
-const SCHEDULE_STORAGE_KEY = "akou.scheduleEvents";
-
-// Mock Data
-// Rooms are now derived at runtime from real players stored under PLAYERS_STORAGE_KEY
-// (see rooms state in the component below).
-
 const weekDays = [
-  { short: "Mon", full: "Monday", date: "24" },
-  { short: "Tue", full: "Tuesday", date: "25" },
-  { short: "Wed", full: "Wednesday", date: "26" },
-  { short: "Thu", full: "Thursday", date: "27" },
-  { short: "Fri", full: "Friday", date: "28" },
-  { short: "Sat", full: "Saturday", date: "29" },
-  { short: "Sun", full: "Sunday", date: "30" },
+  { short: "Mon", full: "Monday", date: "01" },
+  { short: "Tue", full: "Tuesday", date: "02" },
+  { short: "Wed", full: "Wednesday", date: "03" },
+  { short: "Thu", full: "Thursday", date: "04" },
+  { short: "Fri", full: "Friday", date: "05" },
+  { short: "Sat", full: "Saturday", date: "06" },
+  { short: "Sun", full: "Sunday", date: "07" },
 ];
 
-const initialAudioLibrary: AudioItem[] = [
-  { id: "a1", title: "Morning Flow", duration: 60, type: "Yoga" },
-  { id: "a2", title: "Deep Focus", duration: 120, type: "Meditation" },
-  { id: "a3", title: "Lobby Ambience Loop", duration: 180, type: "Lobby" },
-  { id: "a4", title: "Nature Walk", duration: 60, type: "Meditation" },
-  { id: "a5", title: "Upbeat Playlist", duration: 90, type: "Retail" },
-  { id: "a6", title: "Evening Rest", duration: 60, type: "Yoga" },
-];
+const shortDays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
-const initialEvents: ScheduleEvent[] = [];
+function buildDateForDayAndTime(day: string, time: string) {
+  const [hours, minutes] = time.split(":").map(Number);
+  const dayIndex = shortDays.indexOf(day);
+  const date = new Date();
+  const current = date.getDay();
+  const diff = dayIndex === -1 ? 0 : (dayIndex - current + 7) % 7;
+  date.setDate(date.getDate() + diff);
+  date.setHours(hours || 0, minutes || 0, 0, 0);
+  return date;
+}
 
-export default function SchedulePage() {
-  const searchParams = useSearchParams();
-  const roomIdFromUrl = searchParams.get("roomId");
+function shortDayFromDate(date: Date) {
+  return shortDays[date.getDay()] || "Mon";
+}
 
-  const [events, setEvents] = useState<ScheduleEvent[]>(initialEvents);
-  const [pendingDeleteEvent, setPendingDeleteEvent] =
-    useState<ScheduleEvent | null>(null);
+export default function ScheduleClientPage() {
+  const apiClient = getApiClient();
+  const [events, setEvents] = useState<ScheduleEvent[]>([]);
+  const [audio, setAudio] = useState<AudioItem[]>([]);
   const [rooms, setRooms] = useState<{ id: string; name: string }[]>([]);
-  // currentWeek kept for future use (display controls)
-  const [selectedRoom, setSelectedRoom] = useState<string | "all">(
-    roomIdFromUrl || "all",
-  );
-
-  // Load real players from the same storage used by PlayersClient and
-  // build a de-duplicated rooms list from them. Also listen to storage
-  // events so other tabs updating players are reflected here without reload.
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-
-    const loadRoomsFromStorage = () => {
-      try {
-        const raw = window.localStorage.getItem(PLAYERS_STORAGE_KEY);
-        if (!raw) {
-          setRooms([]);
-          return;
-        }
-
-        const parsed: unknown = JSON.parse(raw);
-        if (!Array.isArray(parsed)) {
-          setRooms([]);
-          return;
-        }
-
-        type StoredPlayer = {
-          id?: string;
-          roomId?: string;
-          roomName?: string;
-          playerName?: string;
-        };
-
-        // Build one schedule row per *player* (using the player id),
-        // so all players show up even if some share the same roomId label.
-        const map: Record<string, { id: string; name: string }> = {};
-        for (const player of parsed as StoredPlayer[]) {
-          const id = player.id ?? player.roomId;
-          const name =
-            player.roomName ??
-            player.playerName ??
-            player.roomId ??
-            "Unnamed room";
-          if (!id) continue;
-          map[id] = { id, name };
-        }
-
-        setRooms(Object.values(map));
-      } catch (err) {
-        console.error("Failed to load players for schedule", err);
-      }
-    };
-
-    // Initial load for when you navigate to the schedule page.
-    loadRoomsFromStorage();
-
-    // Keep in sync if players are edited in another tab.
-    const handleStorage = (event: StorageEvent) => {
-      if (event.key === PLAYERS_STORAGE_KEY) {
-        loadRoomsFromStorage();
-      }
-    };
-
-    // And also in the same tab when PlayersClient updates its state.
-    const handlePlayersUpdated = () => {
-      loadRoomsFromStorage();
-    };
-
-    window.addEventListener("storage", handleStorage);
-    window.addEventListener("akou:players-updated", handlePlayersUpdated);
-    return () => {
-      window.removeEventListener("storage", handleStorage);
-      window.removeEventListener("akou:players-updated", handlePlayersUpdated);
-    };
-  }, []);
-
-  // Keep selected room in sync with the URL param and gently scroll it into view.
-  useEffect(() => {
-    if (!roomIdFromUrl) return;
-    setSelectedRoom(roomIdFromUrl);
-    const el = document.getElementById(roomIdFromUrl);
-    if (el) {
-      el.scrollIntoView({ behavior: "smooth", block: "start" });
-    }
-  }, [roomIdFromUrl]);
-  const [view] = useState<"timeline" | "list" | "day">("timeline");
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [selectedRoom, setSelectedRoom] = useState<string>("all");
+  const [selectedDay, setSelectedDay] = useState<string>("all");
   const [query, setQuery] = useState("");
-  const [compact] = useState(false);
-  const [collapsedRooms, setCollapsedRooms] = useState<Record<string, boolean>>({});
-  // Filters for Focus Mode
-  const [selectedDay, setSelectedDay] = useState<string | "all">("all");
-  // Audio drawer states
   const [audioQuery, setAudioQuery] = useState("");
-  // default to first available type so we don't show an "All types" option
-  const _availableAudioTypes = [...new Set(initialAudioLibrary.map((a) => a.type))];
-  const _defaultAudioType = _availableAudioTypes[0] ?? "all";
-  const [audioType, setAudioType] = useState<string | "all">(_defaultAudioType);
-  // remove "Newest" option; default to title sorting
-  const [audioSort, setAudioSort] = useState<string>("title");
-  const [drawerCollapsed, setDrawerCollapsed] = useState(false);
-  const [drawerHeight, setDrawerHeight] = useState<number>(160);
-  const audioElRef = useRef<HTMLAudioElement | null>(null);
-  const [previewId, setPreviewId] = useState<string | null>(null);
-  const [playlists, setPlaylists] = useState<Playlist[]>([]);
+  const [pendingDeleteEvent, setPendingDeleteEvent] = useState<ScheduleEvent | null>(null);
+  const [songPickerOpen, setSongPickerOpen] = useState(false);
+  const [pickerCell, setPickerCell] = useState<{ roomId: string; day: string; time: string } | null>(null);
 
-  const persistEvents = useCallback((next: ScheduleEvent[]) => {
-    try {
-      if (typeof window !== "undefined") {
-        window.localStorage.setItem(SCHEDULE_STORAGE_KEY, JSON.stringify(next));
-        window.dispatchEvent(
-          new CustomEvent("akou:schedule-updated", {
-            detail: { count: next.length },
-          }),
-        );
-      }
-    } catch (err) {
-      console.error("Failed to persist schedule events", err);
-    }
-  }, []);
-
-  // Load any previously saved schedule events on mount so the
-  // calendar (and dashboard) can reflect "real" upcoming items.
   useEffect(() => {
-    if (typeof window === "undefined") return;
-
-    try {
-      const raw = window.localStorage.getItem(SCHEDULE_STORAGE_KEY);
-      if (!raw) return;
-
-      const parsed: unknown = JSON.parse(raw);
-      if (!Array.isArray(parsed)) return;
-
-      setEvents(parsed as ScheduleEvent[]);
-    } catch (err) {
-      console.error("Failed to read schedule events from storage", err);
-    }
-  }, []);
-
-  // Load playlists from the same key used by PlaylistsClient and keep in sync
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const PLAYLISTS_STORAGE_KEY = "aa_playlists";
-    const load = () => {
+    const loadData = async () => {
       try {
-        const raw = window.localStorage.getItem(PLAYLISTS_STORAGE_KEY);
-        if (!raw) {
-          setPlaylists([]);
-          return;
-        }
-        const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed)) setPlaylists(parsed);
-      } catch (err) {
-        console.error("Failed to load playlists for schedule", err);
+        setIsLoading(true);
+        const ftp = await Promise.all([
+          apiClient.listPlayers(),
+          apiClient.listMedia(),
+          apiClient.listSchedules(),
+        ]);
+
+        setRooms(ftp[0].players.map(p => ({
+          id: p.id,
+          name: p.roomName || p.playerName || "Unnamed",
+        })));
+
+        setAudio(ftp[1].media.map(m => ({
+          id: m.id,
+          title: m.title,
+          duration: m.durationMinutes || 0,
+          type: m.category || "Audio",
+          url: m.url,
+        })));
+
+        setEvents(ftp[2].schedules.map(s => {
+          const sd = new Date(s.startsAt);
+          return {
+            id: s.id,
+            audioId: s.mediaId,
+            title: s.title,
+            duration: 60,
+            roomId: s.playerId,
+            day: shortDayFromDate(sd),
+            time: sd.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false }),
+          };
+        }));
+      } catch (err: any) {
+        setError(err?.response?.data?.error || "Failed to load");
+      } finally {
+        setIsLoading(false);
       }
     };
-    load();
-    const handleStorage = (e: StorageEvent) => {
-      if (e.key === PLAYLISTS_STORAGE_KEY) load();
-    };
-    const handleCustom = () => load();
-    window.addEventListener("storage", handleStorage);
-    window.addEventListener("aa:playlists-updated", handleCustom as EventListener);
-    return () => { window.removeEventListener("storage", handleStorage); window.removeEventListener("aa:playlists-updated", handleCustom as EventListener); };
-  }, []);
+    loadData();
+  }, [apiClient]);
 
-  // resize helpers
-  const resizingRef = useRef<{ startY: number; startH: number } | null>(null);
+  const handleDropEvent = async (item: AudioItem, roomId: string, day: string, time: string) => {
+    try {
+      const start = buildDateForDayAndTime(day, time);
+      const end = new Date(start);
+      end.setMinutes(end.getMinutes() + item.duration);
 
-  const handleDropEvent = (item: AudioItem, roomId: string, day: string, time: string) => {
-    setEvents((prev) => {
-      const next: ScheduleEvent[] = [
+      const res = await apiClient.createSchedule({
+        playerId: roomId,
+        mediaId: item.id,
+        startTime: start.toISOString(),
+        endTime: end.toISOString(),
+        recurrence: "ONCE",
+      });
+
+      setEvents(prev => [...prev, {
+        id: res.schedule.id,
+        audioId: item.id,
+        title: item.title,
+        duration: item.duration,
+        roomId, day, time,
+      }]);
+    } catch (err: any) {
+      const status = err?.response?.status;
+      const body = err?.response?.data;
+      if (status === 409 || body?.code === 'TIME_CONFLICT') {
+        setError('This time slot is already taken!');
+      } else {
+        setError(body?.error || body?.detail || err?.message || 'Failed to create schedule');
+      }
+    }
+  };
+
+  const handleSelectSong = async (item: AudioItem) => {
+    if (!pickerCell) return;
+    try {
+      const start = buildDateForDayAndTime(pickerCell.day, pickerCell.time);
+      const end = new Date(start);
+      end.setMinutes(end.getMinutes() + item.duration);
+
+      const res = await apiClient.createSchedule({
+        playerId: pickerCell.roomId,
+        mediaId: item.id,
+        startTime: start.toISOString(),
+        endTime: end.toISOString(),
+        recurrence: "ONCE",
+      });
+
+      setEvents((prev) => [
         ...prev,
         {
-          id: `e-${Date.now()}`,
+          id: res.schedule.id,
           audioId: item.id,
           title: item.title,
           duration: item.duration,
-          roomId,
-          day,
-          time,
+          roomId: pickerCell.roomId,
+          day: pickerCell.day,
+          time: pickerCell.time,
         },
-      ];
-      persistEvents(next);
-      return next;
-    });
-  };
-
-  // Helper: parse totalDuration like "180m" -> number minutes
-  const parseDuration = (s: string | undefined) => {
-    if (!s) return null;
-    const m = s.match(/(\d+)/);
-    if (!m) return null;
-    return parseInt(m[1], 10);
-  };
-
-  const addMinutesToTime = (timeStr: string, minutesToAdd: number) => {
-    const [hh, mm] = timeStr.split(":").map((x) => parseInt(x, 10));
-    if (Number.isNaN(hh) || Number.isNaN(mm)) return timeStr;
-    const total = hh * 60 + mm + minutesToAdd;
-    const capped = Math.max(0, Math.min(23 * 60 + 59, total));
-    const nh = Math.floor(capped / 60).toString().padStart(2, "0");
-    const nm = (capped % 60).toString().padStart(2, "0");
-    return `${nh}:${nm}`;
-  };
-
-  const handleDropPlaylist = (item: { playlistId: string; title: string; trackCount: number; totalDuration: string }, roomId: string, day: string, time: string) => {
-    // Schedule each track sequentially starting at `time` using totalDuration / trackCount
-    const total = parseDuration(item.totalDuration) ?? null;
-    const trackCount = Math.max(1, item.trackCount || 1);
-    const perTrack = total ? Math.max(1, Math.round(total / trackCount)) : 60;
-
-    setEvents((prev) => {
-      const newEvents: ScheduleEvent[] = [];
-      let currentTime = time;
-      for (let i = 0; i < trackCount; i++) {
-        const e: ScheduleEvent = {
-          id: `e-${Date.now()}-${i}-${Math.random().toString(36).slice(2,6)}`,
-          audioId: `${item.playlistId}-t${i}`,
-          title: `${item.title} — Track ${i + 1}`,
-          duration: perTrack,
-          roomId,
-          day,
-          time: currentTime,
-        };
-        newEvents.push(e);
-        // advance time by perTrack minutes
-        currentTime = addMinutesToTime(currentTime, perTrack);
+      ]);
+      setSongPickerOpen(false);
+      setPickerCell(null);
+    } catch (err: any) {
+      const status = err?.response?.status;
+      const body = err?.response?.data;
+      if (status === 409 || body?.code === 'TIME_CONFLICT') {
+        setError('This time slot is already taken!');
+      } else {
+        setError(body?.error || body?.detail || err?.message || 'Failed to create schedule');
       }
-
-      const next = [...prev, ...newEvents];
-      persistEvents(next);
-      return next;
-    });
-  };
-
-  // Clicking events no longer opens an inspector panel.
-  // (inspector removed per design)
-
-  const toggleRoom = (roomId: string) => {
-    setCollapsedRooms((prev) => ({ ...prev, [roomId]: !prev[roomId] }));
-  };
-
-  const handlePreview = useCallback((id: string) => {
-    const item = initialAudioLibrary.find(a => a.id === id);
-    if (!item) return;
-    // if no URL provided, just toggle previewId to show playing UI but don't attempt playback
-    if (!item.url) {
-      setPreviewId((p) => p === id ? null : id);
-      return;
     }
-    // For items with a url property (if present), toggle playback
-    const url = item.url;
-    if (!url) {
-      setPreviewId((p) => p === id ? null : id);
-      return;
-    }
-    if (!audioElRef.current) audioElRef.current = document.createElement('audio');
-    const el = audioElRef.current;
-    if (previewId === id) {
-      el.pause();
-      setPreviewId(null);
-    } else {
-      el.src = url;
-      el.play().catch(() => {});
-      setPreviewId(id);
-    }
-  }, [previewId]);
-
-  // resizing handlers
-  useEffect(() => {
-    const onMove = (e: MouseEvent) => {
-      if (!resizingRef.current) return;
-      const delta = resizingRef.current.startY - e.clientY;
-      const newH = Math.max(120, Math.min(600, resizingRef.current.startH + delta));
-      setDrawerHeight(newH);
-    };
-    const onUp = () => { resizingRef.current = null; document.body.style.userSelect = ''; };
-    window.addEventListener('mousemove', onMove);
-    window.addEventListener('mouseup', onUp);
-    return () => { window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); };
-  }, []);
-
-  // derive visible lists (apply filters inside the grid)
-  const roomsToShow = selectedRoom === "all" ? rooms : rooms.filter(r => r.id === selectedRoom);
-  const weekDaysToShow = selectedDay === "all" ? weekDays : weekDays.filter(d => d.short === selectedDay);
-
-  const requestDeleteEvent = (evt: ScheduleEvent) => {
-    setPendingDeleteEvent(evt);
   };
 
-  const cancelDeleteEvent = () => {
-    setPendingDeleteEvent(null);
-  };
-
-  const confirmDeleteEvent = () => {
+  const confirmDeleteEvent = async () => {
     if (!pendingDeleteEvent) return;
-    setEvents((prev) => {
-      const next = prev.filter((e) => e.id !== pendingDeleteEvent.id);
-      persistEvents(next);
-      return next;
-    });
-    setPendingDeleteEvent(null);
+    try {
+      await apiClient.deleteSchedule(pendingDeleteEvent.id);
+      setEvents(prev => prev.filter(e => e.id !== pendingDeleteEvent.id));
+      setPendingDeleteEvent(null);
+    } catch (err: any) {
+      setError(err?.response?.data?.error || "Failed to delete");
+    }
   };
 
-  // Collapsed-day drop target component so collapsed cells accept audio drops
-  function CollapsedDayCell({ roomId, dayShort, countForDay }: { roomId: string; dayShort: string; countForDay: number }) {
-    const [{ isOver }, dropRef] = useDrop(() => ({
-      accept: "audio",
-      // When a room is collapsed, we still want drops to land at sensible,
-      // varied times rather than everything at 09:00. Stagger each new
-      // event by 1 hour starting from 09:00 for that room/day.
-      drop: (item: AudioItem) => {
-        const indexForDay = countForDay;
-        const baseHour = 9; // 09:00
-        const hour = Math.min(baseHour + indexForDay, 21); // cap at 21:00
-        const timeForDrop = `${hour.toString().padStart(2, "0")}:00`;
-        handleDropEvent(item, roomId, dayShort, timeForDrop);
-      },
-      collect: (monitor) => ({ isOver: !!monitor.isOver() }),
-    }));
+  const roomsToShow = selectedRoom === "all" ? rooms : rooms.filter(r => r.id === selectedRoom);
 
-    const playlistLength = countForDay;
-
+  if (isLoading) {
     return (
-      <div
-        ref={(el) => (dropRef as unknown as (instance: HTMLDivElement | null) => void)(el)}
-        className={cn("flex-1 min-w-[140px] border-l border-gray-200 px-4 py-3 flex items-center justify-center group relative")}
-      >
-        {isOver && <div className="pointer-events-none absolute inset-0 border-2 border-dashed border-gray-300 bg-white/60 animate-fade z-40" />}
-        {countForDay === 0 ? (
-          <button aria-label="Quick create" className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-full bg-white border border-gray-100 text-gray-400 hover:bg-gray-50">
-            <Plus size={14} />
-          </button>
-        ) : (
-          <div className="inline-flex items-center justify-center">
-            {/* Playlist info */}
-            {playlistLength > 0 && (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  toggleRoom(roomId);
-                }}
-                className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-gray-600 border border-gray-200 rounded-md font-medium hover:bg-gray-50 cursor-pointer focus:outline-none focus:ring-2 focus:ring-gray-300"
-                aria-label="Expand room"
-              >
-                <Music size={12} className="text-gray-500 shrink-0" />
-                <span className="truncate">
-                  {playlistLength} {playlistLength === 1 ? "track" : "tracks"}
-                </span>
-              </button>
-            )}
-          </div>
-        )}
+      <div className="flex-1 flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <Loader className="h-8 w-8 animate-spin text-gray-400 mx-auto mb-3" />
+          <p className="text-sm text-gray-600">Loading schedule...</p>
+        </div>
       </div>
     );
   }
 
-  // filtering computed in roomsToShow / weekDaysToShow and applied inside the grid
-
   return (
     <DndProvider backend={HTML5Backend}>
-      <div className={cn("flex-1 flex flex-col overflow-hidden bg-white")}>
-        <ScheduleToolbar
-          query={query}
-          onQueryChange={setQuery}
-          selectedRoom={selectedRoom}
-          onChangeRoom={(r) => setSelectedRoom(r as string)}
-          selectedDay={selectedDay}
-          onChangeDay={(d) => setSelectedDay(d as string)}
-          rooms={rooms}
-          days={weekDays}
-        />
+      <div className="flex-1 flex flex-col overflow-hidden bg-white">
+        <ScheduleToolbar query={query} onQueryChange={setQuery} selectedRoom={selectedRoom} onChangeRoom={setSelectedRoom as any} selectedDay={selectedDay} onChangeDay={setSelectedDay as any} rooms={rooms} days={weekDays} />
 
-        <div className="flex-1 flex overflow-hidden">
-          {/* Main Calendar Area */}
-          <div className="flex-1 flex flex-col min-w-0">
-            <div className="flex-1 overflow-auto bg-white">
-              {rooms.length === 0 ? (
-                <div className="h-full flex items-center justify-center px-6 py-12">
-                  <div className="text-center max-w-md space-y-3">
-                    <h2 className="text-sm font-semibold text-gray-900">
-                      No players yet
-                    </h2>
-                    <p className="text-xs text-gray-500">
-                      To start scheduling audio, first create at least one player in the
-                      <span className="font-medium text-gray-700"> Players</span> page.
-                      Each player appears here as a row in the weekly schedule.
-                    </p>
-                    <div className="pt-2">
-                      <button
-                        type="button"
-                        onClick={() => (window.location.href = "/players")}
-                        className="inline-flex items-center px-3 py-1.5 rounded-md border border-gray-200 text-xs font-medium text-gray-700 bg-white hover:bg-gray-50 cursor-pointer"
-                      >
-                        Go to Players
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                  <div className="min-w-max">
-                    {/* List View */}
-                    {view === "list" && (
-                      <div className="p-4">
-                        <div className="space-y-2">
-                          {events.filter(e => e.title.toLowerCase().includes(query.toLowerCase())).map(evt => (
-                            <div key={evt.id} className="flex items-center justify-between bg-gray-50 border-transparent rounded-md p-3">
-                              <div className="flex items-center gap-4">
-                                <div className="text-sm font-medium text-gray-900">{evt.title}</div>
-                                <div className="text-xs text-gray-500">{evt.duration}m • {evt.day}</div>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <button
-                                  onClick={() => requestDeleteEvent(evt)}
-                                  className="text-red-500 p-1 rounded hover:bg-red-50"
-                                >
-                                  Delete
-                                </button>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
+        <div className="flex-1 overflow-auto">
+          {error && <div className="mx-4 my-2 p-2 bg-red-50 border border-red-200 rounded text-sm text-red-800 flex gap-2"><AlertCircle className="w-4 h-4 shrink-0 mt-0.5" /><span>{error}</span></div>}
 
-                    {/* Day View */}
-                    {view === "day" && (
-                      <div className="p-4">
-                        <div className="text-sm font-medium text-gray-700 mb-4">{weekDays[0].full}</div>
-                        <div className="grid grid-cols-1 gap-2">
-                          {rooms.flatMap(room => events.filter(e => e.roomId === room.id && e.day === weekDays[0].short)).map(evt => (
-                            <div key={evt.id} className="bg-gray-50 border-transparent rounded-md p-3 flex items-center justify-between hover:bg-gray-100">
-                              <div className="text-sm font-medium text-gray-900">{evt.title}</div>
-                              <div className="text-xs text-gray-500">{evt.duration}m • {evt.roomId}</div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {view === "timeline" && (
-                      <>
-                        <div className="flex sticky top-0 z-10 bg-white">
-                          <div className="w-40 flex-shrink-0 border-r border-gray-100 bg-white sticky left-0 z-20" />
-                          {weekDaysToShow.map((day) => (
-                            <div key={day.short} className="flex-1 min-w-[120px] border-l border-gray-200 py-4 px-6 text-center flex flex-col items-center justify-center">
-                              <button
-                                aria-label={`${day.full} ${day.date}`}
-                                onClick={() => setSelectedDay(selectedDay === day.short ? 'all' : day.short)}
-                                className="focus:outline-none"
-                              >
-                                <div className="text-xs font-semibold text-gray-800 uppercase tracking-wide">{day.short}</div>
-                                <div className="mt-2">
-                                  <div className={cn(
-                                    "inline-flex items-center justify-center h-8 min-w-[40px] px-3 text-gray-900 text-sm font-semibold rounded-md",
-                                    // subtle square chip hover only on the inner date element
-                                    "hover:bg-gray-50 cursor-pointer"
-                                  )}>
-                                    {day.date}
-                                  </div>
-                                </div>
-                                <div className="sr-only">{day.full}</div>
-                              </button>
-                            </div>
-                          ))}
-                        </div>
-
-                                        {roomsToShow.map((room) => {
-                                          const collapsed = !!collapsedRooms[room.id];
-                                          return (
-                                            <div
-                                              key={room.id}
-                                              id={room.id}
-                                              className={`flex border-b border-gray-200 bg-white`}
-                                            >
-                              <div className="w-40 flex-shrink-0 border-r border-gray-100 bg-transparent p-3 flex items-center justify-between sticky left-0 z-20">
-                                <div className="flex items-center gap-2">
-                                  <button onClick={() => toggleRoom(room.id)} className="p-1 rounded hover:bg-gray-100 text-gray-600" aria-label={collapsed ? "Expand room" : "Collapse room"}>
-                                    {collapsed ? <ChevronRight size={16} /> : <ChevronDown size={16} />}
-                                  </button>
-                                  <button onClick={() => setSelectedRoom(selectedRoom === room.id ? 'all' : room.id)} className="text-sm font-medium text-gray-900 text-left">
-                                    {room.name}
-                                  </button>
-                                </div>
-
-                              </div>
-
-                              {collapsed ? (
-                                // When a room is collapsed show a compact per-day count pill for each day
-                                weekDaysToShow.map((day) => {
-                                  const countForDay = events.filter(e => e.roomId === room.id && e.day === day.short).length;
-                                    return (
-                                      <CollapsedDayCell key={`${room.id}-collapsed-${day.short}`} roomId={room.id} dayShort={day.short} countForDay={countForDay} />
-                                    );
-                                  })
-                              ) : (
-                                weekDaysToShow.map((day) => {
-                                  const cellEvents = events.filter(e => e.roomId === room.id && e.day === day.short && e.title.toLowerCase().includes(query.toLowerCase()));
-                                  return (
-                                    <div key={`${room.id}-${day.short}`} className="flex-1 min-w-[140px] border-l border-gray-200">
-                                          <CalendarCell
-                                            roomId={room.id}
-                                            day={day.short}
-                                            time="09:00"
-                                            events={cellEvents}
-                                            onDropEvent={handleDropEvent}
-                                            onDropPlaylist={handleDropPlaylist}
-                                            onEventDelete={requestDeleteEvent}
-                                            compact={compact}
-                                          />
-                                        </div>
-                                  );
-                                })
-                              )}
-                            </div>
-                          );
-                        })}
-                      </>
-                    )}
-                  </div>
-              )}
+          {rooms.length === 0 ? (
+            <div className="flex items-center justify-center h-full">
+              <div className="text-center">
+                <h2 className="font-semibold text-gray-900">No players yet</h2>
+                <p className="text-sm text-gray-500 mt-1">Create a player in the Players page to get started</p>
+              </div>
             </div>
-
-            {/* Bottom Audio Drawer (sticky & visible) */}
-              <div className="sticky bottom-0 z-50 border-t border-gray-200 bg-white flex-shrink-0 flex flex-col shadow-lg" style={{ height: drawerCollapsed ? 50 : drawerHeight }}>
-              <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 bg-white">
-                <div>
-                  <h3 className="text-sm font-semibold text-gray-900">Audio Library</h3>
-                  {!drawerCollapsed && <div className="text-xs text-gray-500">Drag into schedule</div>}
-                </div>
-
-                <div className="flex items-center gap-2">
-                  {!drawerCollapsed ? (
-                    <>
-                      <div className="relative">
-                        <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
-                        <input
-                          type="text"
-                          value={audioQuery}
-                          onChange={(e) => setAudioQuery(e.target.value)}
-                          placeholder="Search audio..."
-                          className="pl-8 pr-3 py-1 text-sm rounded-md w-56 bg-gray-50 focus:outline-none"
+          ) : (
+            <div>
+              {roomsToShow.map(room => (
+                <div key={room.id} className="border-b">
+                  <div className="font-medium p-3 bg-gray-50 text-sm">{room.name}</div>
+                  <div className="grid grid-cols-7">
+                    {weekDays.map(day => {
+                      const cellEvents = events.filter(e => e.roomId === room.id && e.day === day.short && e.title.toLowerCase().includes(query.toLowerCase()));
+                      return (
+                        <CalendarCell
+                          key={`${room.id}-${day.short}`}
+                          roomId={room.id}
+                          day={day.short}
+                          time="09:00"
+                          events={cellEvents}
+                          onDropEvent={handleDropEvent}
+                          onDropPlaylist={() => {}}
+                          onEventDelete={setPendingDeleteEvent}
+                          compact={false}
+                          onQuickCreate={(r, d, t) => {
+                            setPickerCell({ roomId: r, day: d, time: t });
+                            setSongPickerOpen(true);
+                          }}
                         />
-                      </div>
-
-
-
-                      <div className="ml-2 flex items-center gap-2">
-                        <button onClick={() => setDrawerCollapsed(true)} aria-label="Collapse audio drawer" title="Collapse" className="p-2 rounded-md text-gray-500 hover:text-gray-700 cursor-pointer">
-                          <ChevronDown size={16} />
-                        </button>
-                      </div>
-                    </>
-                  ) : (
-                    <div className="ml-2">
-                      <button onClick={() => setDrawerCollapsed(false)} aria-label="Expand audio drawer" title="Expand" className="p-2 rounded-md text-gray-500 hover:text-gray-700 cursor-pointer">
-                        <ChevronUp size={16} />
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <div className="flex-1 overflow-auto py-3 px-3" style={{ height: drawerCollapsed ? 0 : undefined }}>
-                <div className="space-y-3">
-                  {playlists.length > 0 && (
-                    <div>
-                      <div className="flex items-center justify-between px-1 mb-2">
-                        <div className="text-xs font-semibold text-gray-700">Playlists</div>
-                        <div className="text-xs text-gray-400">Drag to schedule</div>
-                      </div>
-                      <div className="flex gap-3 items-start overflow-x-auto py-1 px-1">
-                        {playlists.map((pl) => (
-                          <DraggablePlaylistCard key={pl.id} playlist={pl} />
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  <div>
-                    <div className="flex items-center justify-between px-1 mb-2">
-                      <div className="text-xs font-semibold text-gray-700">Tracks</div>
-                      <div className="text-xs text-gray-400">Drag to schedule</div>
-                    </div>
-
-                    <div className="flex gap-3 items-start flex-wrap">
-                    {(() => {
-                      const q = audioQuery.trim().toLowerCase();
-                      let list = initialAudioLibrary.filter(a => {
-                        if (audioType !== 'all' && a.type !== audioType) return false;
-                        if (q && !a.title.toLowerCase().includes(q)) return false;
-                        return true;
-                      });
-                      if (audioSort === 'title') list = [...list].sort((x,y) => x.title.localeCompare(y.title));
-                      if (audioSort === 'duration') list = [...list].sort((x,y) => x.duration - y.duration);
-                      // newest keeps original order
-                      return list.map(audio => (
-                        <DraggableAudioCard key={audio.id} audio={audio} onPreview={handlePreview} isPreviewing={previewId === audio.id} />
-                      ));
-                    })()}
+                      );
+                    })}
                   </div>
                 </div>
-              </div>
-              {/* resize handle */}
-              <div
-                onMouseDown={(e) => { resizingRef.current = { startY: e.clientY, startH: drawerHeight }; document.body.style.userSelect = 'none'; }}
-                className="h-2 bg-transparent cursor-row-resize text-center"
-                title="Drag to resize"
-              />
+              ))}
             </div>
-          </div>
-
-          {/* Inspector Panel (right side) */}
-          {/* Inspector panel removed - event details modal no longer opens */}
+          )}
         </div>
-      </div>
-      <ConfirmDialog
-        open={!!pendingDeleteEvent}
-        title="Remove from schedule"
-        description={
-          pendingDeleteEvent
-            ? `This will remove “${pendingDeleteEvent.title}” from the schedule. The audio stays available in your library.`
-            : undefined
-        }
-        confirmLabel="Remove event"
-        cancelLabel="Keep event"
-        onCancel={cancelDeleteEvent}
-        onConfirm={confirmDeleteEvent}
-      />
+
+        <ConfirmDialog open={!!pendingDeleteEvent} title="Remove from schedule?" description={pendingDeleteEvent ? `Remove "${pendingDeleteEvent.title}"?` : undefined} confirmLabel="Remove" cancelLabel="Keep" onCancel={() => setPendingDeleteEvent(null)} onConfirm={confirmDeleteEvent} />
+
+        <SongPickerModal open={songPickerOpen} onClose={() => { setSongPickerOpen(false); setPickerCell(null); }} audio={audio} onSelect={handleSelectSong} />
       </div>
     </DndProvider>
   );

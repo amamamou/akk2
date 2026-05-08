@@ -76,10 +76,19 @@ export default function MyDetailsTab({
       return;
     }
 
+    // Enforce a sensible file size limit to avoid enormous data URIs
+    const MAX_BYTES = 2 * 1024 * 1024; // 2 MB recommended in UI
+    if (f.size > MAX_BYTES) {
+      setPhotoError("Image file is too large. Please use a file under 2MB.");
+      return;
+    }
+
     const reader = new FileReader();
     reader.onloadend = () => {
       const result = reader.result;
       if (typeof result === "string") {
+        // For now we keep the data URL in-memory so the UI shows the preview,
+        // but SettingsClient will avoid persisting full data URIs to localStorage.
         setAvatar(result);
         setDirty(true);
       }
@@ -172,7 +181,16 @@ export default function MyDetailsTab({
                   aria-label={avatar ? "Change profile photo" : "Upload profile photo"}
                 >
                   {avatar ? (
-                    <NextImage src={avatar} alt="Profile preview" width={96} height={96} className="object-cover" />
+                    <NextImage
+                      src={avatar}
+                      alt="Profile preview"
+                      width={96}
+                      height={96}
+                      // Prevent Next/Image aspect-ratio warnings by allowing the browser
+                      // to size the image and using contain for safe letterboxing.
+                      style={{ width: "auto", height: "auto", objectFit: "contain" }}
+                      className=""
+                    />
                   ) : (
                     <div
                       className="h-full w-full flex items-center justify-center bg-gray-100 text-gray-500 text-sm font-medium"

@@ -1,6 +1,7 @@
 /* eslint-disable react-hooks/set-state-in-effect */
 "use client";
 import React, { useCallback, useState, useEffect } from "react";
+import { useAuth } from "@/app/context/AuthContext";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
@@ -17,7 +18,6 @@ import {
 } from "lucide-react";
 import { cn } from "../../utils/cn";
 
-const USER_STORAGE_KEY = "akou.user";
 
 type StoredUserProfile = {
   firstName?: string;
@@ -75,31 +75,56 @@ export default function Sidebar() {
   const [userRole, setUserRole] = useState<string>("Update in Settings");
   const [userInitials, setUserInitials] = useState<string>("U");
   const [userAvatar, setUserAvatar] = useState<string | null>(null);
+  const { user, logout } = useAuth();
+
+  // Derive display fields from auth user when available so UI updates instantly
+  const displayName = user?.name || user?.email || userName;
+  const displayRole = (user as any)?.role || userRole;
+  const displayInitials = (() => {
+    if (user?.name) {
+      const parts = user.name.split(' ');
+      return ((parts[0]?.charAt(0) || '') + (parts[1]?.charAt(0) || '')).toUpperCase() || 'U';
+    }
+    return userInitials;
+  })();
+  const displayAvatar = userAvatar; // no avatar from AuthUser currently
 
   // Hydrate sidebar preferences from localStorage on the client only.
-  const applyUserProfile = useCallback((profile: StoredUserProfile) => {
-    const first = profile.firstName?.trim() ?? "";
-    const last = profile.lastName?.trim() ?? "";
-    const role = profile.role?.trim() ?? "";
-    const avatar =
-      profile.avatar && typeof profile.avatar === "string"
-        ? profile.avatar
-        : null;
+  const applyUserProfile = useCallback((profile: any) => {
+    // Accept multiple shapes: { name } or { firstName, lastName }
+    const avatar = profile?.avatar && typeof profile.avatar === "string" ? profile.avatar : null;
 
-    const fullName = first || last
-      ? [first, last].filter(Boolean).join(" ")
-      : "Your profile";
+    let fullName = "Your profile";
+    if (profile?.name && typeof profile.name === "string") {
+      fullName = profile.name;
+    } else {
+      const first = profile?.firstName?.trim() ?? "";
+      const last = profile?.lastName?.trim() ?? "";
+      if (first || last) fullName = [first, last].filter(Boolean).join(" ");
+    }
 
-    const initialsRaw = `${first.charAt(0)}${last.charAt(0)}`.trim();
-    const initials = initialsRaw || "U";
+    const nameParts = fullName.split(" ");
+    const initialsRaw = (nameParts[0]?.charAt(0) || "") + (nameParts[1]?.charAt(0) || "");
+    const initials = initialsRaw.trim() || "U";
 
     setUserName(fullName);
-    setUserRole(role || "Update in Settings");
+    setUserRole((profile?.role && profile.role.trim()) || "Update in Settings");
     setUserInitials(initials.toUpperCase());
     setUserAvatar(avatar);
   }, []);
 
   useEffect(() => {
+    // When auth user updates, reflect it in the sidebar UI
+    if (user) {
+      try {
+        applyUserProfile(user);
+      } catch {
+        // ignore
+      }
+    }
+  }, [user, applyUserProfile]);
+
+    useEffect(() => {
     if (typeof window === "undefined") return;
     try {
       const savedCollapsed = window.localStorage.getItem("akou.sidebar.collapsed");
@@ -110,18 +135,6 @@ export default function Sidebar() {
       const savedTheme = window.localStorage.getItem("akou.theme");
       if (savedTheme === "dark") {
         setTheme("dark");
-      }
-
-      const rawUser = window.localStorage.getItem(USER_STORAGE_KEY);
-      if (rawUser) {
-        try {
-          const parsed = JSON.parse(rawUser) as StoredUserProfile;
-          if (parsed && typeof parsed === "object") {
-            applyUserProfile(parsed);
-          }
-        } catch {
-          // ignore malformed user data
-        }
       }
     } catch {
       // noop – fall back to defaults
@@ -165,18 +178,16 @@ export default function Sidebar() {
           return;
         }
       } catch {
-        // fall through to storage reload
+        // ignore
       }
 
-      try {
-        const raw = window.localStorage.getItem(USER_STORAGE_KEY);
-        if (!raw) return;
-        const parsed = JSON.parse(raw) as StoredUserProfile;
-        if (parsed && typeof parsed === "object") {
-          applyUserProfile(parsed);
+      // If no detail provided, prefer the live auth user from context
+      if (user) {
+        try {
+          applyUserProfile(user as any);
+        } catch {
+          // ignore
         }
-      } catch {
-        // ignore
       }
     };
 
@@ -284,25 +295,25 @@ export default function Sidebar() {
           <div className="flex items-center justify-between gap-2 rounded-lg bg-gray-50 p-2.5 hover:bg-gray-100 transition-colors duration-150 cursor-default">
             <div className="flex items-center gap-2.5 min-w-0">
               <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-gray-200 to-gray-100 flex items-center justify-center text-xs font-semibold text-gray-700 shrink-0 overflow-hidden border border-gray-200">
-                {userAvatar ? (
+                {displayAvatar ? (
                   <Image
-                    src={userAvatar}
-                    alt={userName}
+                    src={displayAvatar}
+                    alt={displayName}
                     width={32}
                     height={32}
                     className="object-cover"
                     unoptimized
                   />
                 ) : (
-                  <span>{userInitials}</span>
+                  <span>{displayInitials}</span>
                 )}
               </div>
               <div className="min-w-0">
                 <p className="text-sm font-medium text-gray-900 truncate">
-                  {userName}
+                  {displayName}
                 </p>
                 <p className="text-xs text-gray-500 truncate">
-                  {userRole}
+                  {displayRole}
                 </p>
               </div>
             </div>
@@ -312,12 +323,20 @@ export default function Sidebar() {
                 const ok = confirm("Sign out?");
                 if (ok) {
                   try {
-                    localStorage.removeItem("akou.session");
-                    localStorage.removeItem("akou.sidebar.collapsed");
+                    logout();
                   } catch {
-                    // noop
+                    // fallback to selective removal
+                    try {
+                      const keys = [
+                        'akou_access_token','akou_tenant_id','akou_tenant_slug','akou_user','akou_user_email',
+                        'fastapi_token','fastapi_tenant_id','fastapi_tenant_slug','fastapi_user','fastapi_user_email'
+                      ];
+                      keys.forEach(k => localStorage.removeItem(k));
+                    } catch {
+                      // noop
+                    }
+                    router.push('/login');
                   }
-                  router.push("/");
                 }
               }}
               className={cn(
@@ -340,19 +359,19 @@ export default function Sidebar() {
           <div
             className="h-8 w-8 rounded-lg bg-gradient-to-br from-gray-200 to-gray-100 flex items-center justify-center text-xs font-semibold text-gray-700 overflow-hidden border border-gray-200 hover:from-gray-300 hover:to-gray-200 transition-all duration-150"
             aria-hidden="true"
-            title={userName}
+            title={displayName}
           >
-            {userAvatar ? (
+            {displayAvatar ? (
               <Image
-                src={userAvatar}
-                alt={userName}
+                src={displayAvatar}
+                alt={displayName}
                 width={32}
                 height={32}
                 className="object-cover"
                 unoptimized
               />
             ) : (
-              <span>{userInitials}</span>
+              <span>{displayInitials}</span>
             )}
           </div>
         </div>

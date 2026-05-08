@@ -19,6 +19,7 @@ export default function CalendarCell({
   onDropPlaylist,
   onEventDelete,
   compact,
+  onQuickCreate,
 }: {
   roomId: string;
   day: string;
@@ -28,6 +29,7 @@ export default function CalendarCell({
   onDropPlaylist?: (item: PlaylistDrop, roomId: string, day: string, time: string) => void;
   onEventDelete?: (evt: ScheduleEvent) => void;
   compact?: boolean;
+  onQuickCreate?: (roomId: string, day: string, time: string) => void;
 }) {
 	// When dropping into this cell, use the cell's own time slot so
 	// broadcasts line up visually with the grid.
@@ -60,7 +62,11 @@ export default function CalendarCell({
       {/* Empty state: quiet by default, show + on hover */}
       {events.length === 0 && (
         <div className="h-full flex items-center justify-center">
-          <button aria-label="Quick create" className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-full bg-white border border-gray-100 text-gray-400 hover:bg-gray-50">
+          <button
+            aria-label="Quick create"
+            onClick={() => onQuickCreate?.(roomId, day, time)}
+            className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-full bg-white border border-gray-100 text-gray-400 hover:bg-gray-50"
+          >
             <Plus size={14} />
           </button>
         </div>

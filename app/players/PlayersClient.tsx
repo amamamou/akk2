@@ -2,6 +2,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { getApiClient } from "@/lib/api-client";
 import { useRouter } from "next/navigation";
 import PlayersHeader from "./components/PlayersHeader";
 import PlayerRow from "./components/PlayerRow";
@@ -109,17 +110,65 @@ export default function PlayersClient() {
   useEffect(() => {
     if (typeof window === "undefined") return;
 
-    try {
-      const raw = window.localStorage.getItem(STORAGE_KEY);
-      if (!raw) return;
+    // Try loading players from API first; fall back to localStorage if offline
+    const apiClient = getApiClient();
+    let cancelled = false;
 
-      const parsed = JSON.parse(raw);
-      if (!Array.isArray(parsed)) return;
+    (async () => {
+      try {
+        const res = await apiClient.listPlayers();
+        if (cancelled) return;
+          if (res?.players && Array.isArray(res.players) && res.players.length > 0) {
+            // Map server PlayerInfo -> local PlayerType shape (best-effort)
+            // Use lastSeen to derive an accurate online/offline status instead
+            // of trusting any stale/hardcoded status values.
+            const mapped = res.players.map((p) => {
+              const lastSeenMs = p.lastSeen ? new Date(p.lastSeen).getTime() : 0;
+              const isOnline = lastSeenMs && (Date.now() - lastSeenMs <= 2 * 60 * 1000);
+              return ({
+                id: p.id,
+                roomId: p.roomId || p.id,
+                roomName: p.roomName || p.playerName || "",
+                playerName: p.playerName || p.roomName || "",
+                status: isOnline ? "online" : "offline",
+                playlist: p.playlist || [],
+                playlistIndex: p.playlistIndex || 0,
+                nowPlaying: p.nowPlaying || null,
+                isPlaying: p.isPlaying || false,
+                nextEvent: null,
+                playingProgress: p.playingProgress || 0,
+                // preserve raw lastSeen and macAddress for other flows
+                // @ts-ignore - extend shape locally
+                lastSeen: p.lastSeen,
+                // @ts-ignore
+                macAddress: p.macAddress || p.mac_address || "",
+              } as PlayerType);
+            });
 
-      setPlayers(parsed as PlayerType[]);
-    } catch (err) {
-      console.error("Failed to read players from storage", err);
-    }
+          setPlayers(mapped);
+          persistPlayers(mapped);
+          return;
+        }
+      } catch (err) {
+        // ignore and fall back to localStorage
+      }
+
+      try {
+        const raw = window.localStorage.getItem(STORAGE_KEY);
+        if (!raw) return;
+
+        const parsed = JSON.parse(raw);
+        if (!Array.isArray(parsed)) return;
+
+        setPlayers(parsed as PlayerType[]);
+      } catch (err) {
+        console.error("Failed to read players from storage", err);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   // Simulate playback progress for all playing players
@@ -150,14 +199,19 @@ export default function PlayersClient() {
     return () => clearInterval(t);
   }, []);
 
-  function handleAddPlayer() {
-    const id = `p-new-${Date.now()}`;
-    const newPlayer: PlayerType = {
-      id,
-      roomId: `room-${counter}`,
-      roomName: `Room ${counter}`,
-      playerName: `Player ${counter}`,
-      status: "online",
+  async function handleAddPlayer() {
+    const apiClient = getApiClient();
+    const localName = `Player ${counter}`;
+    setCounter((c) => c + 1);
+
+    // Optimistic local id while request is in-flight
+    const tempId = `p-new-${Date.now()}`;
+    const optimistic: PlayerType = {
+      id: tempId,
+      roomId: tempId,
+      roomName: localName,
+      playerName: localName,
+      status: "offline",
       playlist: [],
       playlistIndex: 0,
       nowPlaying: null,
@@ -165,14 +219,64 @@ export default function PlayersClient() {
       nextEvent: null,
       playingProgress: 0,
     };
-    setCounter((c) => c + 1);
+
     setPlayers((prev) => {
-      const next = [newPlayer, ...prev];
+      const next = [optimistic, ...prev];
       persistPlayers(next);
       return next;
     });
-    // set the new player into edit mode so name can be changed immediately
-    setEditingId(id);
+
+    setEditingId(tempId);
+
+    try {
+      // Backend PlayerCreate shape (akk2) expects { name, macAddress }
+      const created = await apiClient.createPlayer({ name: localName, macAddress: "" });
+      const p = created.player;
+      const mapped: PlayerType = {
+        id: p.id,
+        roomId: p.roomId || p.id,
+        roomName: p.roomName || p.playerName || localName,
+        playerName: p.playerName || p.roomName || localName,
+        status: p.status || "offline",
+        playlist: p.playlist || [],
+        playlistIndex: p.playlistIndex || 0,
+        nowPlaying: p.nowPlaying || null,
+        isPlaying: p.isPlaying || false,
+        nextEvent: null,
+        playingProgress: p.playingProgress || 0,
+      };
+
+      // Replace optimistic item if present, otherwise prepend
+      setPlayers((prev) => {
+        const replaced = prev.map((pl) => (pl.id === tempId ? mapped : pl));
+        const exists = replaced.some((pl) => pl.id === mapped.id);
+        const next = exists ? replaced : [mapped, ...prev.filter((pl) => pl.id !== tempId)];
+        persistPlayers(next);
+        return next;
+      });
+
+      // Fire a global event so other parts (dashboard/schedule) can refresh
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("akou:players-updated", { detail: { count: 1 } }));
+      }
+    } catch (err) {
+      console.error("Failed to create player", err);
+      // Show an error to the user (toast system may not be available in this project)
+      try {
+        const msg = (err as any)?.response?.data?.error || (err as any)?.message || "Failed to create player";
+        if (typeof window !== "undefined") window.alert(`Error creating player: ${msg}`);
+      } catch (e) {
+        // ignore
+      }
+
+      // On error, remove optimistic entry and clear editing state
+      setPlayers((prev) => {
+        const next = prev.filter((pl) => pl.id !== tempId);
+        persistPlayers(next);
+        return next;
+      });
+      setEditingId(null);
+    }
   }
 
   function togglePlay(playerId: string) {

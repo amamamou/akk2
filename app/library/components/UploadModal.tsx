@@ -4,6 +4,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { Upload, X, Trash, Edit3, User, Play, Pause, Check } from "lucide-react";
 // AudioVisual removed — use a neutral inline waveform glyph instead
 import { cn } from "@/utils/cn";
+import { getApiClient } from "@/lib/api-client";
 
 type UploadFile = {
   id: string;
@@ -36,6 +37,7 @@ export default function UploadModal({
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [playingId, setPlayingId] = useState<string | null>(null);
   const [playlists, setPlaylists] = useState<Array<{ id: string; name: string }>>([]);
+  const [isUploading, setIsUploading] = useState(false);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const titleRef = useRef<HTMLInputElement | null>(null);
   const [headerDuration, setHeaderDuration] = useState<number | null>(null);
@@ -76,8 +78,6 @@ export default function UploadModal({
     }));
     setFiles((prev) => [...prev, ...newFiles]);
     setSelectedId((s) => s ?? newFiles[0]?.id ?? null);
-    // start a simulated upload to show progress; the real uploader can replace this
-    simulateUpload(newFiles);
   };
 
   // MiniAudioPlayer removed — playback now handled inline per-file via InlineAudioButton
@@ -137,19 +137,66 @@ export default function UploadModal({
     return () => window.clearTimeout(t);
   }, [selectedId]);
 
-  const simulateUpload = (toUpload: UploadFile[]) => {
-    toUpload.forEach((f) => {
-      setFiles((prev) => prev.map((p) => (p.id === f.id ? { ...p, status: "uploading", progress: 0 } : p)));
-      let progress = 0;
-      const t = setInterval(() => {
-        progress += Math.random() * 25;
-        setFiles((prev) => prev.map((p) => (p.id === f.id ? { ...p, progress: Math.min(99, Math.round(progress)) } : p)));
-        if (progress >= 100) {
-          clearInterval(t);
-          setFiles((prev) => prev.map((p) => (p.id === f.id ? { ...p, progress: 100, status: "success" } : p)));
+  const uploadFiles = async () => {
+    const apiClient = getApiClient();
+    setIsUploading(true);
+
+    try {
+      const uploaded = [] as UploadFile[];
+
+      for (const file of files) {
+        const original = file.original;
+        if (!original) continue;
+
+        setFiles((prev) => prev.map((p) => (p.id === file.id ? { ...p, status: "uploading", progress: 0 } : p)));
+
+        const response = await apiClient.uploadMedia(
+          original,
+          file.title?.trim() || file.name,
+          Math.max(1, Math.round((file.size || 1) / (1024 * 1024))),
+          "Audio",
+          (progressPercent) => {
+            setFiles((prev) => prev.map((p) => (p.id === file.id ? { ...p, progress: progressPercent } : p)));
+          },
+        );
+
+        const completed: UploadFile = {
+          id: file.id,
+          name: file.name,
+          size: file.size,
+          status: "success",
+          progress: 100,
+          title: response.media.title,
+          artist: file.artist,
+          titleTouched: file.titleTouched,
+          artistTouched: file.artistTouched,
+          playlistId: file.playlistId,
+          color: file.color,
+          previewUrl: file.previewUrl,
+          original: file.original,
+          error: file.error,
+        };
+        uploaded.push(completed);
+        setFiles((prev) => prev.map((p) => (p.id === file.id ? completed : p)));
+      }
+
+      onUpload?.(uploaded.length > 0 ? uploaded : files);
+
+      files.forEach((f) => {
+        if (f.previewUrl) {
+          try {
+            URL.revokeObjectURL(f.previewUrl);
+          } catch {}
         }
-      }, 220);
-    });
+      });
+      setFiles([]);
+      onClose();
+    } catch (err) {
+      console.error("Upload failed", err);
+      setFiles((prev) => prev.map((p) => (p.status === "uploading" ? { ...p, status: "error", error: "Upload failed" } : p)));
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   const onDrop = (e: React.DragEvent) => {
@@ -175,20 +222,7 @@ export default function UploadModal({
     const fileToRetry = files.find((f) => f.id === id);
     if (!fileToRetry) return;
     setFiles((prev) => prev.map((f) => (f.id === id ? { ...f, status: "pending", error: undefined, progress: 0 } : f)));
-    simulateUpload([fileToRetry]);
-  };
-
-  const handleUpload = () => {
-    onUpload?.(files);
-    files.forEach((f) => {
-      if (f.previewUrl) {
-        try {
-          URL.revokeObjectURL(f.previewUrl);
-        } catch {}
-      }
-    });
-    setFiles([]);
-    onClose();
+    void uploadFiles();
   };
 
   if (!open) return null;
@@ -208,7 +242,7 @@ export default function UploadModal({
   <div className="p-3 space-y-3 overflow-auto" style={{ maxHeight: 'calc(80vh - 120px)' }}>
           {/* always-available hidden file input so Add files works after files are present */}
           <input ref={inputRef} type="file" multiple accept="audio/*" onChange={onPick} className="hidden" />
-          {files.length === 0 ? (
+            {files.length === 0 ? (
             <div
               onDragEnter={() => setDragActive(true)}
               onDragLeave={() => setDragActive(false)}
@@ -286,7 +320,12 @@ export default function UploadModal({
                         )}
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-normal truncate">{file.title || file.name}</p>
-                          <p className="text-xs text-gray-400">{(file.size / 1024 / 1024).toFixed(1)}MB • {file.status}</p>
+                              <p className="text-xs text-gray-400">{(file.size / 1024 / 1024).toFixed(1)}MB • {file.status}{file.progress !== undefined ? ` • ${file.progress}%` : ""}</p>
+                              {file.status === "uploading" && (
+                                <div className="mt-1 h-1.5 rounded-full bg-gray-100 overflow-hidden">
+                                  <div className="h-full bg-[#A473FF] transition-all" style={{ width: `${file.progress ?? 0}%` }} />
+                                </div>
+                              )}
                         </div>
                         {/* play controls removed from file row; use metadata header for playback */}
                       </button>
@@ -431,17 +470,19 @@ export default function UploadModal({
           </button>
           <button
             onClick={() => {
-              if (hasFiles) handleUpload();
+              if (hasFiles) void uploadFiles();
             }}
-            disabled={!hasFiles}
+            disabled={!hasFiles || isUploading}
             className={cn(
               "px-4 py-2 text-sm font-medium rounded-md transition-all duration-150 flex items-center justify-center gap-2",
-              hasFiles
+              hasFiles && !isUploading
                 ? "bg-[#A473FF] text-white hover:bg-[#7A42FF] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-blue-400"
                 : "bg-gray-200 text-gray-500 cursor-not-allowed"
             )}
           >
-            {hasFiles ? (
+            {isUploading ? (
+              "Uploading..."
+            ) : hasFiles ? (
               <>
                 <Check className="h-4 w-4 inline-block mr-1" />
                 Confirm upload ({files.length})

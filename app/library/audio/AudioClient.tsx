@@ -14,21 +14,14 @@ import AudioHeader from "./components/AudioHeader";
 import AudioList from "./components/AudioList";
 import { filterLibrary } from "@/lib/audioFilters";
 import { sortAndFilterByDate, paginate } from "@/lib/audioSortPaginate";
-
-const initialLibrary: AudioItem[] = [
-  { id: "a1", title: "Morning Flow", duration: "60m", durationMinutes: 60, category: "Yoga", usageCount: 24, spacesCount: 3, lastPlayed: "today", isScheduled: true, singer: "Lila Blue" },
-  { id: "a2", title: "Deep Focus", duration: "120m", durationMinutes: 120, category: "Meditation", usageCount: 18, spacesCount: 2, lastPlayed: "2 days ago", isScheduled: true, singer: "Deep Focusors" },
-  { id: "a3", title: "Lobby Ambience Loop", duration: "180m", durationMinutes: 180, category: "Lobby", usageCount: 5, spacesCount: 1, lastPlayed: undefined, isScheduled: false, singer: "Lobby Ensemble" },
-  { id: "a4", title: "Upbeat Playlist", duration: "120m", durationMinutes: 120, category: "Retail", usageCount: 12, spacesCount: 2, lastPlayed: "yesterday", isScheduled: true, singer: "Upbeat Co." },
-  { id: "a5", title: "Nature Walk", duration: "45m", durationMinutes: 45, category: "Meditation", usageCount: 3, spacesCount: 1, lastPlayed: "1 week ago", isScheduled: false, singer: "Nature Choir" },
-  { id: "a6", title: "Evening Rest", duration: "90m", durationMinutes: 90, category: "Yoga", usageCount: 14, spacesCount: 2, lastPlayed: "3 days ago", isScheduled: true, singer: "Evening Strings" },
-];
+import { getApiClient } from "@/lib/api-client";
 
 export default function LibraryAudioClient() {
+  const apiClient = getApiClient();
   const [query, setQuery] = useState("");
   const [activeCategory, setActiveCategory] = useState<string>("All");
   const [uploadOpen, setUploadOpen] = useState(false);
-  const [audios, setAudios] = useState<AudioItem[]>(initialLibrary);
+  const [audios, setAudios] = useState<AudioItem[]>([]);
 
   type Playlist = { id: string; title?: string; trackIds?: string[]; tracks?: string[]; items?: string[] };
   // Start with an empty playlists array so server and client initial render match.
@@ -89,27 +82,37 @@ export default function LibraryAudioClient() {
       }
     };
 
-    window.addEventListener("storage", handler);
-    return () => window.removeEventListener("storage", handler);
+    globalThis.addEventListener("storage", handler);
+    return () => globalThis.removeEventListener("storage", handler);
   }, []);
 
-  // persist audios to localStorage so uploaded items survive reloads
   useEffect(() => {
-    try {
-      localStorage.setItem('aa_audios', JSON.stringify(audios));
-    } catch {}
-  }, [audios]);
-
-  // load persisted audios on mount
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem('aa_audios');
-      if (raw) {
-        const parsed = JSON.parse(raw) as AudioItem[];
-        if (Array.isArray(parsed) && parsed.length > 0) startTransition(() => setAudios(parsed));
+    const loadMedia = async () => {
+      try {
+        const response = await apiClient.listMedia();
+        const mapped = response.media.map((item) => ({
+          id: item.id,
+          title: item.title,
+          duration: item.duration,
+          durationMinutes: item.durationMinutes,
+          category: item.category,
+          usageCount: 0,
+          spacesCount: 0,
+          lastPlayed: undefined,
+          isScheduled: false,
+          singer: undefined,
+          url: item.url,
+          size: item.fileSize,
+        }));
+        startTransition(() => setAudios(mapped));
+      } catch (err) {
+        console.error("Failed to load media library", err);
+        startTransition(() => setAudios([]));
       }
-    } catch {}
-  }, []);
+    };
+
+    loadMedia();
+  }, [apiClient]);
 
   // Selected item for list view (used to apply sidebar-like active styling)
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -250,7 +253,7 @@ export default function LibraryAudioClient() {
   const sortedLibrary = useMemo(() => sortAndFilterByDate(filteredLibrary, sortBy, sortDir, dateFilterType, cutoff, customDate, singerFilter), [filteredLibrary, sortBy, sortDir, dateFilterType, cutoff, customDate, singerFilter]);
   // compute unique singers for the singer filter popover
   const singerOptions = useMemo(() => {
-    const s = Array.from(new Set(audios.map((a) => a.singer).filter(Boolean).map((x) => String(x))));
+    const s = Array.from(new Set(audios.map((a) => a.singer).filter(Boolean).map(String)));
     s.sort((a, b) => a.localeCompare(b));
     return s;
   }, [audios]);
@@ -262,7 +265,7 @@ export default function LibraryAudioClient() {
   }, [playlists]);
 
   const creatorOptions = useMemo(() => {
-    const c = Array.from(new Set(audios.map((a) => a.addedBy).filter(Boolean).map((x) => String(x))));
+    const c = Array.from(new Set(audios.map((a) => a.addedBy).filter(Boolean).map(String)));
     c.sort((a, b) => a.localeCompare(b));
     return c;
   }, [audios]);
@@ -390,25 +393,26 @@ export default function LibraryAudioClient() {
       <UploadModal
         open={uploadOpen}
         onClose={() => setUploadOpen(false)}
-        onUpload={(files) => {
-          // files: UploadFile[] from the uploader — map to AudioItem and add to state
-          const mapped = files.map((f) => ({
-            id: f.id,
-            title: f.title ?? f.name,
-            duration: "0:00",
-            durationMinutes: 0,
-            category: "",
-            usageCount: 0,
-            spacesCount: 0,
-            lastPlayed: undefined,
-            isScheduled: false,
-            singer: f.artist ?? undefined,
-            color: f.color ?? undefined,
-            // include size for display
-            size: f.size,
-            url: (f as unknown as { previewUrl?: string }).previewUrl ?? undefined,
-          } as unknown as AudioItem));
-          startTransition(() => setAudios((prev) => [...mapped, ...prev]));
+        onUpload={async () => {
+          const refreshed = await apiClient.listMedia();
+          startTransition(() => {
+            setAudios(
+              refreshed.media.map((item) => ({
+                id: item.id,
+                title: item.title,
+                duration: item.duration,
+                durationMinutes: item.durationMinutes,
+                category: item.category,
+                usageCount: 0,
+                spacesCount: 0,
+                lastPlayed: undefined,
+                isScheduled: false,
+                singer: undefined,
+                url: item.url,
+                size: item.fileSize,
+              })),
+            );
+          });
         }}
       />
       {/* Edit modal */}
@@ -425,18 +429,35 @@ export default function LibraryAudioClient() {
         confirmLabel="Delete"
         cancelLabel="Cancel"
         onCancel={() => { setDeleteOpen(false); }}
-        onConfirm={() => {
+        onConfirm={async () => {
           try {
-            const raw = localStorage.getItem('aa_audios');
-            if (raw) {
-              const parsed = JSON.parse(raw) as AudioItem[];
-              const updated = parsed.filter((a) => a.id !== selectedAudioForDelete?.id);
-              localStorage.setItem('aa_audios', JSON.stringify(updated));
+            if (selectedAudioForDelete?.id) {
+              await apiClient.deleteMedia(selectedAudioForDelete.id);
+              const refreshed = await apiClient.listMedia();
+              startTransition(() => {
+                setAudios(
+                  refreshed.media.map((item) => ({
+                    id: item.id,
+                    title: item.title,
+                    duration: item.duration,
+                    durationMinutes: item.durationMinutes,
+                    category: item.category,
+                    usageCount: 0,
+                    spacesCount: 0,
+                    lastPlayed: undefined,
+                    isScheduled: false,
+                    singer: undefined,
+                    url: item.url,
+                    size: item.fileSize,
+                  })),
+                );
+              });
             }
-          } catch {}
+          } catch (err) {
+            console.error("Failed to delete audio", err);
+          }
           setDeleteOpen(false);
           setSelectedAudioForDelete(null);
-          setAudios((s) => s.filter((a) => a.id !== selectedAudioForDelete?.id));
         }}
       />
     </div>

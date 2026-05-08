@@ -10,52 +10,19 @@ import type { Playlist } from "../components/PlaylistModal";
 import AudioToolbar from "../components/AudioToolbar";
 import { useMemo } from "react";
 
-// Mock sample playlists
-const samplePlaylists: Playlist[] = [
-  {
-    id: "p1",
-    title: "Morning Yoga",
-    description: "Energizing flows to start your day",
-    trackCount: 3,
-    totalDuration: "180m",
-    usedInSchedule: true,
-    spacesCount: 2,
-    lastModified: "2 days ago",
-    coverColor: "indigo",
-  },
-  {
-    id: "p2",
-    title: "Evening Relaxation",
-    description: "Calm and soothing soundscapes",
-    trackCount: 5,
-    totalDuration: "300m",
-    usedInSchedule: true,
-    spacesCount: 3,
-    lastModified: "1 week ago",
-    coverColor: "blue",
-  },
-  {
-    id: "p3",
-    title: "Meditation Session",
-    description: "Deep meditation and mindfulness",
-    trackCount: 4,
-    totalDuration: "240m",
-    usedInSchedule: false,
-    spacesCount: 0,
-    lastModified: "3 days ago",
-    coverColor: "purple",
-  },
-];
+const backendSupportsPlaylists = false;
+const samplePlaylists: Playlist[] = [];
 
 export default function LibraryPlaylistsClient() {
   const [playlistModalOpen, setPlaylistModalOpen] = useState(false);
   const PLAYLISTS_STORAGE_KEY = "aa_playlists";
 
-  // Server-safe initial value to avoid hydration mismatch
-  const [playlists, setPlaylists] = useState<Playlist[]>(samplePlaylists);
+  // No backend playlist endpoint yet; keep this empty so the UI doesn't imply persistence.
+  const [playlists, setPlaylists] = useState<Playlist[]>([]);
 
   // On client mount, load persisted playlists (if any). Use a microtask to avoid sync setState in effect.
   useEffect(() => {
+    if (!backendSupportsPlaylists) return;
     try {
       if (typeof window === "undefined") return;
       const raw = window.localStorage.getItem(PLAYLISTS_STORAGE_KEY);
@@ -73,6 +40,7 @@ export default function LibraryPlaylistsClient() {
 
   // persist playlists to localStorage on change and notify other parts of the app
   useEffect(() => {
+    if (!backendSupportsPlaylists) return;
     try {
       if (typeof window === "undefined") return;
       const nextJson = JSON.stringify(playlists);
@@ -99,11 +67,13 @@ export default function LibraryPlaylistsClient() {
 
   // keep the ref in sync with the latest playlists (covers initial mount too)
   useEffect(() => {
+    if (!backendSupportsPlaylists) return;
     playlistsRef.current = playlists;
   }, [playlists]);
 
   // keep playlists in sync if updated in another tab or elsewhere in the app
   useEffect(() => {
+    if (!backendSupportsPlaylists) return;
     if (typeof window === "undefined") return;
 
 
@@ -197,12 +167,15 @@ export default function LibraryPlaylistsClient() {
               <p className="mt-1 text-sm text-gray-500">
                 Create and manage playback programs for your spaces
               </p>
+              <span className="mt-3 inline-flex items-center rounded-full bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-800">
+                Coming Soon
+              </span>
             </div>
 
             <button
               type="button"
-              onClick={() => setPlaylistModalOpen(true)}
-              className="inline-flex items-center gap-2 rounded-md bg-[#F3F4F6] text-gray-900 px-4 py-2 text-sm font-medium hover:bg-[#E7E7E7] transition-colors cursor-pointer"
+              disabled
+              className="inline-flex items-center gap-2 rounded-md bg-gray-100 text-gray-400 px-4 py-2 text-sm font-medium cursor-not-allowed"
             >
               <Plus size={16} />
               <span>New playlist</span>
@@ -221,17 +194,14 @@ export default function LibraryPlaylistsClient() {
                 <div className="inline-flex items-center justify-center w-14 h-14 rounded-lg bg-gray-100">
                   <Music size={28} className="text-gray-400" />
                 </div>
-                <h2 className="text-lg font-semibold text-gray-900">No playlists yet</h2>
+                <h2 className="text-lg font-semibold text-gray-900">Playlists coming soon</h2>
                 <p className="text-sm text-gray-600">
-                  Create your first playlist to organize and reuse audio content across your spaces.
+                  Playlists are not connected to a backend endpoint yet, so we are hiding dummy data until they are ready.
                 </p>
-                <button
-                  onClick={() => setPlaylistModalOpen(true)}
-                  className="inline-flex items-center gap-2 rounded-md bg-[#F3F4F6] text-gray-900 px-5 py-2.5 text-sm font-medium hover:bg-[#E7E7E7] transition-colors mt-4"
-                >
+                <div className="inline-flex items-center gap-2 rounded-md bg-gray-100 text-gray-400 px-5 py-2.5 text-sm font-medium mt-4">
                   <Plus size={16} />
                   Create playlist
-                </button>
+                </div>
               </div>
             </div>
           ) : (
