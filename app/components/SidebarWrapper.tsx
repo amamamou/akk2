@@ -9,5 +9,7 @@ export default function SidebarWrapper() {
   // Hide the sidebar on auth entry pages
   if (pathname === "/login" || pathname === "/create-account") return null
 
-  return <Sidebar />
+  const forceAdmin = pathname?.startsWith("/admin");
+
+  return <Sidebar forceAdmin={Boolean(forceAdmin)} />
 }

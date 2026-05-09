@@ -27,7 +27,14 @@ type StoredUserProfile = {
   avatar?: string | null;
 };
 
-const navigationGroups = [
+interface NavItem {
+  name: string;
+  href: string;
+  icon: React.ComponentType<{ className?: string }>;
+  submenu?: { name: string; href: string }[];
+}
+
+const navigationGroups: { label: string; items: NavItem[] }[] = [
   {
     label: "Main",
     items: [
@@ -59,13 +66,27 @@ const navigationGroups = [
   },
 ];
 
+// Admin-specific navigation (for users with admin role)
+const adminNavigation: { label: string; items: NavItem[] }[] = [
+  {
+    label: "Admin",
+    items: [
+      { name: "Dashboard", href: "/admin/dashboard", icon: LayoutDashboard },
+      { name: "Users", href: "/admin/users", icon: ListMusic },
+      { name: "Clients", href: "/admin/clients", icon: BarChart3 },
+      { name: "Players", href: "/admin/players", icon: Speaker },
+      { name: "Settings", href: "/admin/settings", icon: Settings },
+    ],
+  },
+];
+
 interface NavItem {
   name: string;
   href: string;
   icon: React.ComponentType<{ className?: string }>;
   submenu?: { name: string; href: string }[];
 }
-export default function Sidebar() {
+export default function Sidebar({ forceAdmin = false }: { forceAdmin?: boolean }) {
   const pathname = usePathname() || "/";
   const router = useRouter();
   const [collapsed, setCollapsed] = useState<boolean>(false);
@@ -127,6 +148,10 @@ export default function Sidebar() {
       // noop – fall back to defaults
     }
   }, [applyUserProfile]);
+
+  // Determine which navigation to show based on role or explicit force flag
+  const isAdmin = (userRole || "").toLowerCase().includes("admin");
+  const activeNavigationGroups = (forceAdmin || isAdmin) ? adminNavigation : navigationGroups;
 
   // Apply theme at the document level
   useEffect(() => {
@@ -197,7 +222,7 @@ export default function Sidebar() {
         role="navigation"
         aria-label="Main navigation"
       >
-        {navigationGroups.map((group) => (
+  {activeNavigationGroups.map((group) => (
           <div key={group.label} className="flex flex-col space-y-2">
             {!collapsed && (
               <div className="px-3 py-1">
