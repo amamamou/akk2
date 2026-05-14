@@ -1,6 +1,7 @@
 "use client";
 import React, { useEffect, useRef, useState } from "react";
 import { useAuth } from '@/app/context/AuthContext';
+import type { AuthUser } from '@/types/api';
 import { createPortal } from "react-dom";
 import PlayerActions from "./PlayerActions";
 import { 
@@ -157,6 +158,7 @@ export default function PlayerCard({
               <PortalMenu
                 triggerRef={menuTriggerRef}
                 menuRef={menuRef}
+                user={user}
                 onClose={() => setMenuOpen(false)}
                 onRename={() => { setMenuOpen(false); onRequestEdit?.(player.id); }}
                 onDelete={() => { setMenuOpen(false); setConfirmOpen(true); }}
@@ -197,12 +199,14 @@ export default function PlayerCard({
 function PortalMenu({
   triggerRef,
   menuRef,
+  user,
   onClose,
   onRename,
   onDelete,
 }: {
   triggerRef: React.RefObject<HTMLButtonElement | null>;
   menuRef: React.RefObject<HTMLDivElement | null>;
+  user: AuthUser | null;
   onClose: () => void;
   onRename: () => void;
   onDelete: () => void;
