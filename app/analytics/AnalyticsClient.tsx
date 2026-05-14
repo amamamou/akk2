@@ -2,6 +2,7 @@
 
 import React, { useRef, useState } from "react";
 import { useAuth } from '@/app/context/AuthContext';
+import { getApiClient } from '@/lib/api-client';
 import {
   LineChart,
   Line,
@@ -39,6 +40,7 @@ const heatmapData = [
 
 export default function AnalyticsClient() {
   const { user } = useAuth();
+  const apiClient = getApiClient();
   const fileRef = useRef<HTMLInputElement | null>(null);
   const [uploadResult, setUploadResult] = useState<string | null>(null);
 
@@ -49,8 +51,10 @@ export default function AnalyticsClient() {
     const fd = new FormData();
     fd.append('file', file);
     try {
-      const res = await fetch('/v1/analytics/upload-csv', { method: 'POST', body: fd });
-      const d = await res.json();
+      const res = await apiClient.getAxiosInstance().post('/analytics/upload-csv', fd, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      const d = res.data;
       if (d?.ok) {
         setUploadResult(`Inserted ${d.inserted} rows`);
       } else {

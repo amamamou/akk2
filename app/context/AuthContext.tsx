@@ -85,7 +85,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
           // object persisted at login time (localStorage 'akou_user').
           try {
             const axiosInst = apiClient.getAxiosInstance();
-            const resp = await axiosInst.get('/v1/auth/me');
+            const resp = await axiosInst.get('/auth/me');
             const body = resp?.data || resp;
 
             // Support { user, tenant } or flat user object
@@ -238,7 +238,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
       setUser(userData);
 
-      // Persist a lightweight user object so we can fall back if /v1/auth/me is
+      // Persist a lightweight user object so we can fall back if /auth/me is
       // not available immediately. Avoid storing tokens here (apiClient handles it).
       try {
         if (typeof window !== 'undefined') {
@@ -259,7 +259,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       // After token is available, prefer to fetch authoritative profile
       try {
         const axiosInst = apiClient.getAxiosInstance();
-        const resp = await axiosInst.get('/v1/auth/me');
+        const resp = await axiosInst.get('/auth/me');
         const body = resp?.data || resp;
 
         let profileUser: any = null;
@@ -286,7 +286,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
           } catch (e) { /* ignore */ }
         }
       } catch (err) {
-        // If /v1/auth/me is not present (404) or fails, we already have login response user cached above
+        // If /auth/me is not present (404) or fails, we already have login response user cached above
       }
 
       // Redirect to dashboard on successful login
