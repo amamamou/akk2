@@ -15,10 +15,10 @@ const clients = [
 
 const activities = [
   { id: 1, title: "New client registered", detail: "Harmony Wellness Spa", time: "5m ago", type: "client" },
-  { id: 2, title: "User created", detail: "john@example.com - Venue Manager", time: "12m ago", type: "user" },
   { id: 3, title: "Player connected", detail: "PLR-012-XYZ at Zen Yoga Studio", time: "28m ago", type: "player" },
   { id: 4, title: "Client updated", detail: "Retail Space Co - Added 3 new players", time: "1h ago", type: "client" },
-  { id: 5, title: "User role changed", detail: "alice@yogastudio.com - Admin → Super Admin", time: "2h ago", type: "user" },
+  { id: 2, title: "Listener created", detail: "john@example.com - Venue Manager", time: "12m ago", type: "user" },
+  { id: 5, title: "Listener role changed", detail: "alice@yogastudio.com - Admin → Super Admin", time: "2h ago", type: "user" },
 ];
 
 const alerts = [
@@ -66,7 +66,7 @@ export default function AdminDashboardPage() {
                       <th className="py-3 px-6">Type</th>
                       <th className="py-3 px-6">Status</th>
                       <th className="py-3 px-6">Players</th>
-                      <th className="py-3 px-6">Users</th>
+                        <th className="py-3 px-6">Listeners</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
@@ -142,7 +142,7 @@ export default function AdminDashboardPage() {
                     <div className="h-9 w-9 rounded-md bg-white border border-gray-100 flex items-center justify-center text-gray-700"> 
                       <UserPlus className="h-4 w-4" />
                     </div>
-                    Manage Users
+                    Manage Listeners
                   </a>
 
                   <a href="/admin/clients" className="flex items-center gap-4 rounded-lg bg-gray-50 hover:bg-gray-100 px-4 py-3 text-sm text-gray-800">

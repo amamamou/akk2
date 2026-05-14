@@ -1,5 +1,6 @@
 "use client";
 import React, { useEffect, useRef, useState } from "react";
+import { useAuth } from '@/app/context/AuthContext';
 import { createPortal } from "react-dom";
 import { Cast, MoreHorizontal, Pencil, Trash } from "lucide-react";
 import PlayerActions from "./PlayerActions";
@@ -29,6 +30,7 @@ export default function PlayerRow({ player, onPlayPause, onSkip, onRename, onDel
   const [name, setName] = useState(player.roomName);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  const { user } = useAuth();
   const [confirmOpen, setConfirmOpen] = useState(false);
   const menuRefDesktop = useRef<HTMLDivElement | null>(null);
   const menuRefMobile = useRef<HTMLDivElement | null>(null);
@@ -201,14 +203,16 @@ export default function PlayerRow({ player, onPlayPause, onSkip, onRename, onDel
                   <span>Rename</span>
                 </button>
                 <div className="h-px bg-gray-100" />
-                <button
-                  aria-label="Delete"
-                  onClick={() => { setMenuOpen(false); setMenuTarget(null); setConfirmOpen(true); }}
-                  className="group w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 cursor-pointer transition-colors"
-                >
-                  <Trash size={16} className="text-gray-500" />
-                  <span>Delete</span>
-                </button>
+                {user?.role === 'SUPER_ADMIN' && (
+                  <button
+                    aria-label="Delete"
+                    onClick={() => { setMenuOpen(false); setMenuTarget(null); setConfirmOpen(true); }}
+                    className="group w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 cursor-pointer transition-colors"
+                  >
+                    <Trash size={16} className="text-gray-500" />
+                    <span>Delete</span>
+                  </button>
+                )}
               </div>,
               document.body
             )}

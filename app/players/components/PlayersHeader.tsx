@@ -1,10 +1,12 @@
 "use client";
 
 import React from "react";
+import { useAuth } from '@/app/context/AuthContext';
 import { Plus } from "lucide-react";
 import ViewToggle from "./ViewToggle";
 
 export default function PlayersHeader({ view, onToggleView, onAdd }: { view: "list" | "grid"; onToggleView: (v: "list" | "grid") => void; onAdd: () => void }) {
+  const { user } = useAuth();
 
   return (
     <div className="sticky top-0 z-10 bg-white border-gray-200">
@@ -16,14 +18,16 @@ export default function PlayersHeader({ view, onToggleView, onAdd }: { view: "li
 
         <div className="flex items-center gap-3">
           <ViewToggle view={view} onChange={onToggleView} />
-          <button
-            type="button"
-            onClick={onAdd}
-            className="inline-flex items-center gap-2 rounded-md bg-[#F3F4F6] text-gray-900 px-4 py-2 text-sm font-medium hover:bg-[#E7E7E7]"
-          >
-            <Plus size={16} />
-            <span>Add player</span>
-          </button>
+          {user?.role === 'SUPER_ADMIN' && (
+            <button
+              type="button"
+              onClick={onAdd}
+              className="inline-flex items-center gap-2 rounded-md bg-[#F3F4F6] text-gray-900 px-4 py-2 text-sm font-medium hover:bg-[#E7E7E7]"
+            >
+              <Plus size={16} />
+              <span>Add player</span>
+            </button>
+          )}
         </div>
       </div>
     </div>

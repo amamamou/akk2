@@ -154,6 +154,7 @@ export interface AuthUser {
   name: string;
   tenantId: string;
   tenantSlug: string;
+  role?: string;
 }
 
 // ============ API Error Types ============

@@ -1,6 +1,7 @@
 "use client";
 
-import React from "react";
+import React, { useRef, useState } from "react";
+import { useAuth } from '@/app/context/AuthContext';
 import {
   LineChart,
   Line,
@@ -37,6 +38,30 @@ const heatmapData = [
 ];
 
 export default function AnalyticsClient() {
+  const { user } = useAuth();
+  const fileRef = useRef<HTMLInputElement | null>(null);
+  const [uploadResult, setUploadResult] = useState<string | null>(null);
+
+  async function onUploadFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = e.target.files;
+    if (!files || !files[0]) return;
+    const file = files[0];
+    const fd = new FormData();
+    fd.append('file', file);
+    try {
+      const res = await fetch('/v1/analytics/upload-csv', { method: 'POST', body: fd });
+      const d = await res.json();
+      if (d?.ok) {
+        setUploadResult(`Inserted ${d.inserted} rows`);
+      } else {
+        setUploadResult(`Upload failed: ${JSON.stringify(d)}`);
+      }
+    } catch (err: any) {
+      setUploadResult(`Upload error: ${err?.message || String(err)}`);
+    }
+    // reset input
+    if (fileRef.current) fileRef.current.value = '';
+  }
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-white">
       {/* Header */}
@@ -47,12 +72,19 @@ export default function AnalyticsClient() {
               <h1 className="text-2xl font-semibold text-gray-900">Analytics</h1>
               <p className="text-sm text-gray-500 mt-1">Playback verification and listening metrics</p>
             </div>
-            <div className="flex gap-2">
+            <div className="flex gap-2 items-center">
               <select className="border border-gray-300 rounded-md text-sm px-3 py-1.5 bg-white text-gray-700 outline-none focus:ring-1 focus:ring-gray-400">
                 <option>Today</option>
                 <option>Last 7 Days</option>
                 <option>This Month</option>
               </select>
+              {user?.role === 'SUPER_ADMIN' && (
+                <>
+                  <input ref={fileRef} type="file" accept=".csv" onChange={onUploadFile} className="hidden" />
+                  <button onClick={() => fileRef.current?.click()} className="inline-flex items-center gap-2 rounded-md bg-[#F3F4F6] text-gray-900 px-3 py-1.5 text-sm font-medium hover:bg-[#E7E7E7]">Upload CSV</button>
+                </>
+              )}
+              {uploadResult && <span className="text-sm text-gray-600 ml-3">{uploadResult}</span>}
             </div>
           </div>
         </div>

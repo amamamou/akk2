@@ -105,6 +105,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
                 name: profileUser.name || profileUser.email?.split('@')[0] || (userEmail?.split('@')[0] || ''),
                 tenantId: profileTenant?.id || tenantId || apiClient.getTenantId() || '',
                 tenantSlug: profileTenant?.slug || tenantSlug || apiClient.getTenantSlug() || '',
+                      role: (profileUser.role || 'MANAGER').toString().toUpperCase(),
               };
 
               setUser(userData);
@@ -232,6 +233,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         name: response.user.name,
         tenantId: response.tenant.id,
         tenantSlug: response.tenant.slug,
+        role: (response.user.role || 'MANAGER').toString().toUpperCase(),
       };
 
       setUser(userData);
@@ -270,13 +272,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
         }
 
         if (profileUser) {
-          const fetched: AuthUser = {
-            id: profileUser.id || userData.id,
-            email: profileUser.email || userData.email,
-            name: profileUser.name || userData.name,
-            tenantId: profileTenant?.id || userData.tenantId,
-            tenantSlug: profileTenant?.slug || userData.tenantSlug,
-          };
+        const fetched: AuthUser = {
+          id: profileUser.id || userData.id,
+          email: profileUser.email || userData.email,
+          name: profileUser.name || userData.name,
+          tenantId: profileTenant?.id || userData.tenantId,
+          tenantSlug: profileTenant?.slug || userData.tenantSlug,
+          role: (profileUser.role || userData.role || 'MANAGER').toString().toUpperCase(),
+        };
           setUser(fetched);
           try {
             if (typeof window !== 'undefined') window.localStorage.setItem('akou_user', JSON.stringify(fetched));

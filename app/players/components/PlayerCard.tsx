@@ -1,5 +1,6 @@
 "use client";
 import React, { useEffect, useRef, useState } from "react";
+import { useAuth } from '@/app/context/AuthContext';
 import { createPortal } from "react-dom";
 import PlayerActions from "./PlayerActions";
 import { 
@@ -38,6 +39,7 @@ export default function PlayerCard({
   onRequestEdit?: (id: string) => void;
 }) {
   const [isEditing, setIsEditing] = useState<boolean>(!!editing);
+  const { user } = useAuth();
   const [name, setName] = useState(player.roomName);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -280,14 +282,16 @@ function PortalMenu({
         <span>Rename</span>
       </button>
       <div className="h-px bg-gray-100" />
-      <button
-        aria-label="Delete"
-        onClick={() => { onClose(); onDelete(); }}
-        className="group w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 cursor-pointer transition-colors"
-      >
-        <Trash size={16} className="text-gray-500" />
-        <span>Delete</span>
-      </button>
+            {user?.role === 'SUPER_ADMIN' && (
+              <button
+                aria-label="Delete"
+                onClick={() => { onClose(); onDelete(); }}
+                className="group w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 cursor-pointer transition-colors"
+              >
+                <Trash size={16} className="text-gray-500" />
+                <span>Delete</span>
+              </button>
+            )}
     </div>
   );
 
