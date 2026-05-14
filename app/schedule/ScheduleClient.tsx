@@ -72,7 +72,7 @@ export default function ScheduleClientPage() {
         setAudio(ftp[1].media.map(m => ({
           id: m.id,
           title: m.title,
-          duration: m.durationMinutes || 0,
+          duration: m.durationMinutes && m.durationMinutes > 0 ? m.durationMinutes : 60,
           type: m.category || "Audio",
           url: m.url,
         })));
@@ -98,77 +98,91 @@ export default function ScheduleClientPage() {
     loadData();
   }, [apiClient]);
 
-  const handleDropEvent = async (item: AudioItem, roomId: string, day: string, time: string) => {
-    try {
-      const start = buildDateForDayAndTime(day, time);
-      const end = new Date(start);
-      end.setMinutes(end.getMinutes() + item.duration);
+   const handleDropEvent = async (item: AudioItem, roomId: string, day: string, time: string) => {
+     try {
+       const start = buildDateForDayAndTime(day, time);
+       const end = new Date(start);
+       const durationMinutes = Math.max(1, item.duration); // Ensure at least 1 minute
+       end.setMinutes(end.getMinutes() + durationMinutes);
 
-      const res = await apiClient.createSchedule({
-        playerId: roomId,
-        mediaId: item.id,
-        startTime: start.toISOString(),
-        endTime: end.toISOString(),
-        recurrence: "ONCE",
-      });
+       // Validate times before sending
+       if (start >= end) {
+         setError('Invalid time range - end time must be after start time');
+         return;
+       }
 
-      setEvents(prev => [...prev, {
-        id: res.schedule.id,
-        audioId: item.id,
-        title: item.title,
-        duration: item.duration,
-        roomId, day, time,
-      }]);
-    } catch (err: any) {
-      const status = err?.response?.status;
-      const body = err?.response?.data;
-      if (status === 409 || body?.code === 'TIME_CONFLICT') {
-        setError('This time slot is already taken!');
-      } else {
-        setError(body?.error || body?.detail || err?.message || 'Failed to create schedule');
-      }
-    }
-  };
+       const res = await apiClient.createSchedule({
+         playerId: roomId,
+         mediaId: item.id,
+         startTime: start.toISOString(),
+         endTime: end.toISOString(),
+         recurrence: "ONCE",
+       });
 
-  const handleSelectSong = async (item: AudioItem) => {
-    if (!pickerCell) return;
-    try {
-      const start = buildDateForDayAndTime(pickerCell.day, pickerCell.time);
-      const end = new Date(start);
-      end.setMinutes(end.getMinutes() + item.duration);
+       setEvents(prev => [...prev, {
+         id: res.schedule.id,
+         audioId: item.id,
+         title: item.title,
+         duration: item.duration,
+         roomId, day, time,
+       }]);
+     } catch (err: any) {
+       const status = err?.response?.status;
+       const body = err?.response?.data;
+       if (status === 409 || body?.code === 'TIME_CONFLICT') {
+         setError('This time slot is already taken!');
+       } else {
+         setError(body?.error || body?.detail || err?.message || 'Failed to create schedule');
+       }
+     }
+   };
 
-      const res = await apiClient.createSchedule({
-        playerId: pickerCell.roomId,
-        mediaId: item.id,
-        startTime: start.toISOString(),
-        endTime: end.toISOString(),
-        recurrence: "ONCE",
-      });
+   const handleSelectSong = async (item: AudioItem) => {
+     if (!pickerCell) return;
+     try {
+       const start = buildDateForDayAndTime(pickerCell.day, pickerCell.time);
+       const end = new Date(start);
+       const durationMinutes = Math.max(1, item.duration); // Ensure at least 1 minute
+       end.setMinutes(end.getMinutes() + durationMinutes);
 
-      setEvents((prev) => [
-        ...prev,
-        {
-          id: res.schedule.id,
-          audioId: item.id,
-          title: item.title,
-          duration: item.duration,
-          roomId: pickerCell.roomId,
-          day: pickerCell.day,
-          time: pickerCell.time,
-        },
-      ]);
-      setSongPickerOpen(false);
-      setPickerCell(null);
-    } catch (err: any) {
-      const status = err?.response?.status;
-      const body = err?.response?.data;
-      if (status === 409 || body?.code === 'TIME_CONFLICT') {
-        setError('This time slot is already taken!');
-      } else {
-        setError(body?.error || body?.detail || err?.message || 'Failed to create schedule');
-      }
-    }
-  };
+       // Validate times before sending
+       if (start >= end) {
+         setError('Invalid time range - end time must be after start time');
+         return;
+       }
+
+       const res = await apiClient.createSchedule({
+         playerId: pickerCell.roomId,
+         mediaId: item.id,
+         startTime: start.toISOString(),
+         endTime: end.toISOString(),
+         recurrence: "ONCE",
+       });
+
+       setEvents((prev) => [
+         ...prev,
+         {
+           id: res.schedule.id,
+           audioId: item.id,
+           title: item.title,
+           duration: item.duration,
+           roomId: pickerCell.roomId,
+           day: pickerCell.day,
+           time: pickerCell.time,
+         },
+       ]);
+       setSongPickerOpen(false);
+       setPickerCell(null);
+     } catch (err: any) {
+       const status = err?.response?.status;
+       const body = err?.response?.data;
+       if (status === 409 || body?.code === 'TIME_CONFLICT') {
+         setError('This time slot is already taken!');
+       } else {
+         setError(body?.error || body?.detail || err?.message || 'Failed to create schedule');
+       }
+     }
+   };
 
   const confirmDeleteEvent = async () => {
     if (!pendingDeleteEvent) return;
