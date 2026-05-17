@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import PlayersHeader from "./components/PlayersHeader";
 import PlayerRow from "./components/PlayerRow";
 import PlayerCard from "./components/PlayerCard";
+import AddPlayerModal from "./components/AddPlayerModal";
 // top toolbar removed per UX request
 import AudioToolbar from "../library/components/AudioToolbar";
 import PlayersTriageBar from "./components/PlayersTriageBar";
@@ -43,6 +44,7 @@ export default function PlayersClient() {
   const [counter, setCounter] = useState(1);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
+  const [addPlayerModalOpen, setAddPlayerModalOpen] = useState(false);
   // top filter removed, keep query only
   // pagination (reuse audio/playlist toolbar controls)
   const [page, setPage] = useState(1);
@@ -199,18 +201,22 @@ export default function PlayersClient() {
     return () => clearInterval(t);
   }, []);
 
-  async function handleAddPlayer() {
+  async function handleAddPlayer(playerData: {
+    name: string;
+    locationName?: string;
+    ipAddress?: string;
+    deviceId?: string;
+  }) {
     const apiClient = getApiClient();
-    const localName = `Player ${counter}`;
-    setCounter((c) => c + 1);
+    const { name, locationName, ipAddress, deviceId } = playerData;
 
     // Optimistic local id while request is in-flight
     const tempId = `p-new-${Date.now()}`;
     const optimistic: PlayerType = {
       id: tempId,
       roomId: tempId,
-      roomName: localName,
-      playerName: localName,
+      roomName: locationName || name,
+      playerName: name,
       status: "offline",
       playlist: [],
       playlistIndex: 0,
@@ -229,14 +235,20 @@ export default function PlayersClient() {
     setEditingId(tempId);
 
     try {
-      // Backend PlayerCreate shape (akk2) expects { name, macAddress }
-      const created = await apiClient.createPlayer({ name: localName, macAddress: "" });
+      // Backend PlayerCreate shape (akk2) expects { name, macAddress, ... optional fields }
+      const created = await apiClient.createPlayer({
+        name,
+        macAddress: "",
+        locationName,
+        ipAddress,
+        deviceId,
+      });
       const p = created.player;
       const mapped: PlayerType = {
         id: p.id,
         roomId: p.roomId || p.id,
-        roomName: p.roomName || p.playerName || localName,
-        playerName: p.playerName || p.roomName || localName,
+        roomName: p.roomName || locationName || p.playerName || name,
+        playerName: p.playerName || name,
         status: p.status || "offline",
         playlist: p.playlist || [],
         playlistIndex: p.playlistIndex || 0,
@@ -264,9 +276,10 @@ export default function PlayersClient() {
       // Show an error to the user (toast system may not be available in this project)
       try {
         const msg = (err as any)?.response?.data?.error || (err as any)?.message || "Failed to create player";
-        if (typeof window !== "undefined") window.alert(`Error creating player: ${msg}`);
+        throw new Error(`Error creating player: ${msg}`);
       } catch (e) {
         // ignore
+        throw err;
       }
 
       // On error, remove optimistic entry and clear editing state
@@ -386,9 +399,9 @@ export default function PlayersClient() {
     [],
   );
 
-  return (
-    <div className="flex-1 flex flex-col overflow-hidden bg-white">
-      <PlayersHeader view={view} onToggleView={(v) => setView(v)} onAdd={handleAddPlayer} />
+   return (
+     <div className="flex-1 flex flex-col overflow-hidden bg-white">
+       <PlayersHeader view={view} onToggleView={(v) => setView(v)} onAdd={() => setAddPlayerModalOpen(true)} />
       {/* Players triage bar (sort / date / filters) */}
       <PlayersTriageBar
         sortBy={sortBy}
@@ -492,19 +505,26 @@ export default function PlayersClient() {
           )}
         </div>
       </div>
-      <AudioToolbar
-        query={query}
-        setQuery={setQuery}
-        filteredCount={totalFiltered}
-        totalCount={players.length}
-        page={page}
-        setPage={setPage}
-        perPage={perPage}
-        setPerPage={setPerPage}
-        perPageOptions={perPageOptions}
-        totalPages={totalPages}
-        placeholder="Search by room, player, track..."
-      />
-    </div>
-  );
-}
+       <AudioToolbar
+         query={query}
+         setQuery={setQuery}
+         filteredCount={totalFiltered}
+         totalCount={players.length}
+         page={page}
+         setPage={setPage}
+         perPage={perPage}
+         setPerPage={setPerPage}
+         perPageOptions={perPageOptions}
+         totalPages={totalPages}
+         placeholder="Search by room, player, track..."
+       />
+
+       {/* Add Player Modal */}
+       <AddPlayerModal
+         isOpen={addPlayerModalOpen}
+         onClose={() => setAddPlayerModalOpen(false)}
+         onSubmit={handleAddPlayer}
+       />
+     </div>
+   );
+ }

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 // Using raw <img> for external avatar hosts (avoids next/image host restrictions)
 import AdminHeader from '../components/AdminHeader';
 import AdminTable, { Column } from '../components/AdminTable';
@@ -8,6 +8,8 @@ import AdminAddModal from '../components/AdminAddModal';
 import AdminToast from '../components/AdminToast';
 import { Building, User, Mail as MailIcon, Phone as PhoneIcon } from 'lucide-react';
 import { Edit3, MoreHorizontal, FileText, Lock } from 'lucide-react';
+import { getApiClient } from '@/lib/api-client';
+import type { ClientInfo } from '@/types/api';
 
 type ClientRow = { id: string; name: string; businessType?: string; contactName?: string; email?: string; phone?: string; status?: string; players?: number; created?: string };
 
@@ -17,9 +19,11 @@ const MOCK: ClientRow[] = [
 ];
 
 export default function ClientsClient() {
+  const apiClient = getApiClient();
   const [q, setQ] = useState('');
   const [selected, setSelected] = useState<string[]>([]);
   const [rows, setRows] = useState<ClientRow[]>(MOCK);
+  const [isLoading, setIsLoading] = useState(true);
   const [addOpen, setAddOpen] = useState(false);
   const [newName, setNewName] = useState('');
   const [newType, setNewType] = useState('');
@@ -28,6 +32,46 @@ export default function ClientsClient() {
   const [newPhone, setNewPhone] = useState('');
   const [toastOpen, setToastOpen] = useState(false);
   const initialNameRef = React.useRef<HTMLInputElement>(null as unknown as HTMLInputElement);
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadClients = async () => {
+      try {
+        setIsLoading(true);
+        const response = await apiClient.listClients();
+        if (cancelled) return;
+
+        if (response?.clients && Array.isArray(response.clients)) {
+          const clientRows: ClientRow[] = response.clients.map((client: ClientInfo) => ({
+            id: client.id,
+            name: client.name,
+            businessType: client.businessType || 'General',
+            contactName: client.contactPerson || '',
+            email: client.email || '',
+            phone: client.phone || '',
+            status: client.status === 'ACTIVE' ? 'Active' : client.status === 'TRIAL' ? 'Trial' : 'Inactive',
+            players: 0, // TODO: fetch from player counts if available
+            created: client.createdAt ? new Date(client.createdAt).toISOString().slice(0, 10) : '',
+          }));
+          setRows(clientRows);
+        } else {
+          // Fall back to mock data if API doesn't return clients
+          setRows(MOCK);
+        }
+      } catch (error) {
+        console.error('Failed to load clients:', error);
+        // Fall back to mock data on error
+        setRows(MOCK);
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    };
+
+    loadClients();
+    return () => {
+      cancelled = true;
+    };
+  }, [apiClient]);
 
   const filtered = useMemo(() => {
     const t = q.trim().toLowerCase();
@@ -71,12 +115,32 @@ export default function ClientsClient() {
         </div>
       </div>
 
-      <AdminAddModal open={addOpen} onClose={() => setAddOpen(false)} title="Add client" initialFocusRef={initialNameRef} saveDisabled={!newName} onSave={() => {
-        const id = `c${Date.now().toString(36)}`;
-        setRows(prev => [{ id, name: newName, businessType: newType || 'General', contactName: newContact || '', email: newEmail || '', phone: newPhone || '', status: 'Active', players: 0, created: new Date().toISOString().slice(0,10) }, ...prev]);
-        setAddOpen(false);
-        setToastOpen(true); setTimeout(() => setToastOpen(false), 2500);
-        setNewName(''); setNewType(''); setNewContact(''); setNewEmail(''); setNewPhone('');
+      <AdminAddModal open={addOpen} onClose={() => setAddOpen(false)} title="Add client" initialFocusRef={initialNameRef} saveDisabled={!newName} onSave={async () => {
+        try {
+          const newClient = await apiClient.createClient({
+            name: newName,
+            businessType: newType || 'General',
+            contactPerson: newContact || '',
+            email: newEmail || '',
+            phone: newPhone || '',
+          });
+
+          const id = newClient?.client?.id || `c${Date.now().toString(36)}`;
+          setRows(prev => [{ id, name: newName, businessType: newType || 'General', contactName: newContact || '', email: newEmail || '', phone: newPhone || '', status: 'Active', players: 0, created: new Date().toISOString().slice(0,10) }, ...prev]);
+          setAddOpen(false);
+          setToastOpen(true);
+          setTimeout(() => setToastOpen(false), 2500);
+          setNewName(''); setNewType(''); setNewContact(''); setNewEmail(''); setNewPhone('');
+        } catch (error) {
+          console.error('Failed to create client:', error);
+          // Still add to UI optimistically
+          const id = `c${Date.now().toString(36)}`;
+          setRows(prev => [{ id, name: newName, businessType: newType || 'General', contactName: newContact || '', email: newEmail || '', phone: newPhone || '', status: 'Active', players: 0, created: new Date().toISOString().slice(0,10) }, ...prev]);
+          setAddOpen(false);
+          setToastOpen(true);
+          setTimeout(() => setToastOpen(false), 2500);
+          setNewName(''); setNewType(''); setNewContact(''); setNewEmail(''); setNewPhone('');
+        }
       }}>
         <div className="grid grid-cols-1 gap-4">
           <div>

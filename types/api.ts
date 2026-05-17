@@ -43,6 +43,15 @@ export interface PlayerCreate {
   macAddress: string;
 }
 
+  /**
+   * Extended PlayerCreate with new SaaS fields
+   */
+  export interface PlayerCreateExtended extends PlayerCreate {
+    locationName?: string;
+    ipAddress?: string;
+    deviceId?: string;
+  }
+
 export interface PlayerUpdate {
   name?: string;
   status?: 'online' | 'offline' | 'idle';
@@ -168,5 +177,63 @@ export interface ApiError {
 export interface ApiErrorResponse {
   status: number;
   data: ApiError;
+}
+
+// ============ Client Types ============
+export interface ClientInfo {
+  id: string;
+  name: string;
+  businessType?: string;
+  contactPerson?: string;
+  email?: string;
+  phone?: string;
+  status: 'ACTIVE' | 'INACTIVE' | 'TRIAL';
+  subscriptionTier: 'STARTER' | 'PROFESSIONAL' | 'ENTERPRISE';
+  maxPlayers: number;
+  maxStorageGb: number;
+  createdAt?: string;
+}
+
+export interface ClientsListResponse {
+  ok: boolean;
+  clients: ClientInfo[];
+  total?: number;
+}
+
+export interface ClientResponse {
+  ok: boolean;
+  client: ClientInfo;
+}
+
+// ============ Activity Log Types ============
+export interface ActivityLogEntry {
+  id: string;
+  userId?: string;
+  clientId?: string;
+  action: string;
+  targetId?: string;
+  targetType?: string;
+  details?: Record<string, unknown>;
+  createdAt: string;
+}
+
+export interface ActivityLogsListResponse {
+  ok: boolean;
+  activityLogs: ActivityLogEntry[];
+  total?: number;
+}
+
+// ============ System Health Types ============
+export interface SystemHealthMetrics {
+  ok: boolean;
+  heartbeatSuccessRate: number;
+  totalPlayers: number;
+  onlinePlayers: number;
+  offlinePlayers: number;
+  activeSchedules: number;
+  failedSchedules: number;
+  totalPlaybackLogs: number;
+  successfulPlaybacks: number;
+  failedPlaybacks: number;
 }
 

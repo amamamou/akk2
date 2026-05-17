@@ -15,6 +15,7 @@ import {
   ChevronLeft,
   ChevronRight,
   LogOut,
+  Building,
 } from "lucide-react";
 import { cn } from "../../utils/cn";
 
@@ -49,6 +50,12 @@ const navigationGroups = [
         ],
       },
       { name: "Analytics", href: "/analytics", icon: BarChart3 },
+    ],
+  },
+  {
+    label: "Admin",
+    items: [
+      { name: "Clients", href: "/clients", icon: Building },
     ],
   },
   {

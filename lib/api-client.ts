@@ -233,19 +233,32 @@ export class ApiClient {
     return response.data;
   }
 
-  /**
-   * POST /players - Create a new player
-   */
-  async createPlayer(data: PlayerCreate): Promise<PlayerResponse> {
-    // The FastAPI backend `PlayerCreate` expects camelCase keys (name, macAddress).
-    // Send the exact shape the server's Pydantic model expects to avoid 422 errors.
-    const payload = {
-      name: (data as any).name ?? (data as any).playerName ?? undefined,
-      macAddress: (data as any).macAddress ?? (data as any).mac_address ?? '',
-    };
-    const response = await this.instance.post<PlayerResponse>('/players', payload);
-    return response.data;
-  }
+   /**
+    * POST /players - Create a new player
+    * Supports extended fields: locationName, ipAddress, deviceId
+    */
+   async createPlayer(data: PlayerCreate | any): Promise<PlayerResponse> {
+     // The FastAPI backend `PlayerCreate` expects camelCase keys (name, macAddress).
+     // Send the exact shape the server's Pydantic model expects to avoid 422 errors.
+     const payload: any = {
+       name: (data as any).name ?? (data as any).playerName ?? undefined,
+       macAddress: (data as any).macAddress ?? (data as any).mac_address ?? '',
+     };
+
+     // Add optional extended fields if provided
+     if ((data as any).locationName || (data as any).location_name) {
+       payload.locationName = (data as any).locationName || (data as any).location_name;
+     }
+     if ((data as any).ipAddress || (data as any).ip_address) {
+       payload.ipAddress = (data as any).ipAddress || (data as any).ip_address;
+     }
+     if ((data as any).deviceId || (data as any).device_id) {
+       payload.deviceId = (data as any).deviceId || (data as any).device_id;
+     }
+
+     const response = await this.instance.post<PlayerResponse>('/players', payload);
+     return response.data;
+   }
 
   /**
    * PUT /players/{id} - Update player
@@ -392,6 +405,77 @@ export class ApiClient {
     const response = await this.instance.delete(`/schedules/${scheduleId}`);
     return response.data;
   }
+
+  // ============ Clients Endpoints ============
+
+  /**
+   * GET /clients - List all clients (SUPER_ADMIN only, but fetches own client for others)
+   */
+  async listClients(): Promise<any> {
+    const response = await this.instance.get('/clients');
+    return response.data;
+  }
+
+  /**
+   * GET /clients/{id} - Get client details
+   */
+  async getClient(clientId: string): Promise<any> {
+    const response = await this.instance.get(`/clients/${clientId}`);
+    return response.data;
+  }
+
+  /**
+   * POST /clients - Create client (SUPER_ADMIN only)
+   */
+  async createClient(data: any): Promise<any> {
+    const response = await this.instance.post('/clients', data);
+    return response.data;
+  }
+
+  /**
+   * PUT /clients/{id} - Update client
+   */
+  async updateClient(clientId: string, data: any): Promise<any> {
+    const response = await this.instance.put(`/clients/${clientId}`, data);
+    return response.data;
+  }
+
+   // ============ Analytics Endpoints ============
+
+   /**
+    * GET /analytics/system-health - Get system health metrics
+    */
+   async getSystemHealth(): Promise<any> {
+     const response = await this.instance.get('/analytics/system-health');
+     return response.data;
+   }
+
+   /**
+    * GET /dashboard/stats - Get dashboard statistics
+    */
+   async getDashboardStats(): Promise<any> {
+     const response = await this.instance.get('/dashboard/stats');
+     return response.data;
+   }
+
+   /**
+    * GET /dashboard/activity - Get activity logs with pagination
+    */
+   async getDashboardActivity(page: number = 1, limit: number = 20): Promise<any> {
+     const response = await this.instance.get(`/dashboard/activity?page=${page}&limit=${limit}`);
+     return response.data;
+   }
+
+   // ============ Activity Log Endpoints ============
+
+   /**
+    * GET /activity-logs - List recent activity (legacy endpoint)
+    */
+   async listActivityLogs(limit: number = 10): Promise<any> {
+     const response = await this.instance.get(`/activity-logs?limit=${limit}`);
+     return response.data;
+   }
+
 
   // ============ Utility Methods ============
 

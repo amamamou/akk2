@@ -1,5 +1,5 @@
 import React from "react";
-import { Calendar, Cast, Clock, Music2, Speaker } from "lucide-react";
+import { Calendar, Cast, Clock, Music2, Speaker, Activity, Building } from "lucide-react";
 
 export interface QuickStat {
 	label: string;
@@ -16,6 +16,8 @@ export default function QuickStatsGrid({ stats }: { stats: QuickStat[] }) {
 		Clock,
 		Music2,
 		Speaker,
+		Activity,
+		Building,
 	};
 
 	return (
