@@ -18,6 +18,8 @@ import type {
   ScheduleCreate,
   ScheduleUpdate,
   AuthUser,
+  ClientCreateInput,
+  ClientResponse,
 } from '@/types/api';
 
 // Token storage keys
@@ -427,8 +429,17 @@ export class ApiClient {
   /**
    * POST /clients - Create client (SUPER_ADMIN only)
    */
-  async createClient(data: any): Promise<any> {
-    const response = await this.instance.post('/clients', data);
+  async createClient(data: ClientCreateInput): Promise<ClientResponse> {
+    const response = await this.instance.post<ClientResponse>('/clients', {
+      name: data.name,
+      business_type: data.businessType,
+      contact_person: data.contactPerson,
+      email: data.email,
+      phone: data.phone,
+      subscription_tier: data.subscriptionTier,
+      max_players: data.maxPlayers,
+      max_storage_gb: data.maxStorageGb,
+    });
     return response.data;
   }
 

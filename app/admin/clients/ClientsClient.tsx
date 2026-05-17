@@ -123,6 +123,9 @@ export default function ClientsClient() {
             contactPerson: newContact || '',
             email: newEmail || '',
             phone: newPhone || '',
+            subscriptionTier: 'STARTER',
+            maxPlayers: 5,
+            maxStorageGb: 10,
           });
 
           const id = newClient?.client?.id || `c${Date.now().toString(36)}`;

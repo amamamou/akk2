@@ -194,6 +194,17 @@ export interface ClientInfo {
   createdAt?: string;
 }
 
+export interface ClientCreateInput {
+  name: string;
+  businessType?: string;
+  contactPerson?: string;
+  email?: string;
+  phone?: string;
+  subscriptionTier: 'STARTER' | 'PROFESSIONAL' | 'ENTERPRISE';
+  maxPlayers?: number;
+  maxStorageGb?: number;
+}
+
 export interface ClientsListResponse {
   ok: boolean;
   clients: ClientInfo[];

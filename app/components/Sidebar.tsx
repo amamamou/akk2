@@ -87,6 +87,7 @@ export default function Sidebar() {
   // Derive display fields from auth user when available so UI updates instantly
   const displayName = user?.name || user?.email || userName;
   const displayRole = (user as any)?.role || userRole;
+  const isSuperAdmin = String((user as any)?.role || userRole || "").toUpperCase() === "SUPER_ADMIN";
   const displayInitials = (() => {
     if (user?.name) {
       const parts = user.name.split(' ');
@@ -205,6 +206,17 @@ export default function Sidebar() {
   }, [applyUserProfile]);
 
   // Render navigation groups with section labels and optional submenu
+  const visibleNavigationGroups = navigationGroups
+    .map((group) => {
+      if (group.label !== "Admin") return group;
+
+      return {
+        ...group,
+        items: isSuperAdmin ? group.items : [],
+      };
+    })
+    .filter((group) => group.items.length > 0);
+
   const renderNavigation = () => {
     return (
       <nav
@@ -215,7 +227,7 @@ export default function Sidebar() {
         role="navigation"
         aria-label="Main navigation"
       >
-        {navigationGroups.map((group) => (
+        {visibleNavigationGroups.map((group) => (
           <div key={group.label} className="flex flex-col space-y-2">
             {!collapsed && (
               <div className="px-3 py-1">
@@ -301,7 +313,7 @@ export default function Sidebar() {
           {/* User Profile Section */}
           <div className="flex items-center justify-between gap-2 rounded-lg bg-gray-50 p-2.5 hover:bg-gray-100 transition-colors duration-150 cursor-default">
             <div className="flex items-center gap-2.5 min-w-0">
-              <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-gray-200 to-gray-100 flex items-center justify-center text-xs font-semibold text-gray-700 shrink-0 overflow-hidden border border-gray-200">
+              <div className="h-8 w-8 rounded-lg bg-linear-to-br from-gray-200 to-gray-100 flex items-center justify-center text-xs font-semibold text-gray-700 shrink-0 overflow-hidden border border-gray-200">
                 {displayAvatar ? (
                   <Image
                     src={displayAvatar}
@@ -347,7 +359,7 @@ export default function Sidebar() {
                 }
               }}
               className={cn(
-                "flex items-center justify-center h-7 w-7 rounded-lg flex-shrink-0",
+                "flex items-center justify-center h-7 w-7 rounded-lg shrink-0",
                 "text-gray-400 hover:text-gray-600 hover:bg-white",
                 "transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-blue-400"
               )}
@@ -364,7 +376,7 @@ export default function Sidebar() {
       return (
         <div className="flex flex-col items-center gap-2">
           <div
-            className="h-8 w-8 rounded-lg bg-gradient-to-br from-gray-200 to-gray-100 flex items-center justify-center text-xs font-semibold text-gray-700 overflow-hidden border border-gray-200 hover:from-gray-300 hover:to-gray-200 transition-all duration-150"
+            className="h-8 w-8 rounded-lg bg-linear-to-br from-gray-200 to-gray-100 flex items-center justify-center text-xs font-semibold text-gray-700 overflow-hidden border border-gray-200 hover:from-gray-300 hover:to-gray-200 transition-all duration-150"
             aria-hidden="true"
             title={displayName}
           >
@@ -405,7 +417,7 @@ export default function Sidebar() {
           )}
         >
           {collapsed ? (
-            <div className="relative h-8 w-8 overflow-hidden rounded-lg flex-shrink-0 bg-gradient-to-br from-gray-100 to-gray-50 flex items-center justify-center">
+            <div className="relative h-8 w-8 overflow-hidden rounded-lg shrink-0 bg-linear-to-br from-gray-100 to-gray-50 flex items-center justify-center">
               <Image
                 src="/akousticarts.webp"
                 alt="Akoustic Arts"
@@ -418,7 +430,7 @@ export default function Sidebar() {
           ) : (
             <>
                   <div className="flex items-center gap-3 min-w-0">
-                  <div className="relative h-8 w-8 overflow-hidden rounded-lg flex-shrink-0 bg-gradient-to-br from-gray-100 to-gray-50 flex items-center justify-center">
+                  <div className="relative h-8 w-8 overflow-hidden rounded-lg shrink-0 bg-linear-to-br from-gray-100 to-gray-50 flex items-center justify-center">
                     <Image
                       src="/akousticarts.webp"
                       alt="Akoustic Arts"
@@ -464,7 +476,7 @@ export default function Sidebar() {
       </div>
 
       {/* Bottom Controls */}
-      <div className="flex-shrink-0 px-3 py-4 border-t border-gray-100">{renderBottomSection()}</div>
+      <div className="shrink-0 px-3 py-4 border-t border-gray-100">{renderBottomSection()}</div>
     </aside>
   );
 }
@@ -543,7 +555,7 @@ function NavLink({
             <ChevronRight
               aria-hidden="true"
               className={cn(
-                "h-4 w-4 ml-2 flex-shrink-0 transition-transform duration-150",
+                "h-4 w-4 ml-2 shrink-0 transition-transform duration-150",
                 isExpanded ? "rotate-90" : ""
               )}
             />

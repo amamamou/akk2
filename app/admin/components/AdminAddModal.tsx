@@ -9,7 +9,7 @@ export default function AdminAddModal({ open, onClose, title, children, onSave, 
   children: React.ReactNode;
   onSave: () => void;
   saveDisabled?: boolean;
-  initialFocusRef?: React.RefObject<HTMLInputElement>;
+  initialFocusRef?: React.RefObject<HTMLInputElement | null>;
 }) {
   const dialogRef = React.useRef<HTMLDivElement | null>(null);
 
