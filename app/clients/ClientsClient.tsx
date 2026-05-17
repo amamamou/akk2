@@ -34,10 +34,15 @@ const initialFormState: ClientFormState = {
 	businessType: "",
 	subscriptionTier: "STARTER",
 	maxPlayers: "5",
-	maxStorageGb: "10",
+	maxStorageGb: "2",
 	contactPerson: "",
 	email: "",
 	phone: "",
+};
+
+const tierLocks: Record<Exclude<ClientFormState["subscriptionTier"], "ENTERPRISE">, { maxPlayers: number; maxStorageGb: number }> = {
+	STARTER: { maxPlayers: 5, maxStorageGb: 2 },
+	PROFESSIONAL: { maxPlayers: 20, maxStorageGb: 20 },
 };
 
 function normalizeClient(client: any): ClientInfo {
@@ -74,6 +79,7 @@ export default function ClientsClient() {
 	const [form, setForm] = useState<ClientFormState>(initialFormState);
 	const [formError, setFormError] = useState<string | null>(null);
 	const nameRef = useRef<HTMLInputElement>(null);
+	const isEnterpriseTier = form.subscriptionTier === "ENTERPRISE";
 
 	const loadClients = useCallback(async () => {
 		if (!isSuperAdmin) {
@@ -121,6 +127,18 @@ export default function ClientsClient() {
 		}
 	}, [createOpen]);
 
+	useEffect(() => {
+		if (form.subscriptionTier === "ENTERPRISE") return;
+
+		const lock = tierLocks[form.subscriptionTier];
+		setForm((prev) => {
+			const nextPlayers = String(lock.maxPlayers);
+			const nextStorage = String(lock.maxStorageGb);
+			if (prev.maxPlayers === nextPlayers && prev.maxStorageGb === nextStorage) return prev;
+			return { ...prev, maxPlayers: nextPlayers, maxStorageGb: nextStorage };
+		});
+	}, [form.subscriptionTier]);
+
 	const filteredClients = useMemo(() => {
 		const normalizedQuery = query.trim().toLowerCase();
 		if (!normalizedQuery) return clients;
@@ -155,12 +173,12 @@ export default function ClientsClient() {
 		const maxPlayers = Number(form.maxPlayers);
 		const maxStorageGb = Number(form.maxStorageGb);
 
-		if (!Number.isFinite(maxPlayers) || maxPlayers <= 0) {
+		if (isEnterpriseTier && (!Number.isFinite(maxPlayers) || maxPlayers < 1)) {
 			setFormError("Max registered players must be a positive number.");
 			return;
 		}
 
-		if (!Number.isFinite(maxStorageGb) || maxStorageGb <= 0) {
+		if (isEnterpriseTier && (!Number.isFinite(maxStorageGb) || maxStorageGb < 1)) {
 			setFormError("Cloud storage quota must be a positive number.");
 			return;
 		}
@@ -169,15 +187,17 @@ export default function ClientsClient() {
 		setFormError(null);
 
 		try {
+			const tier = form.subscriptionTier;
+			const tierLock = tier === "ENTERPRISE" ? null : tierLocks[tier];
 			const payload: ClientCreateInput = {
 				name: trimmedName,
 				businessType: trimmedType,
-				subscriptionTier: form.subscriptionTier,
+				subscriptionTier: tier,
 				contactPerson: trimmedContact,
 				email: trimmedEmail,
 				phone: trimmedPhone,
-				maxPlayers,
-				maxStorageGb,
+				maxPlayers: tierLock ? tierLock.maxPlayers : maxPlayers,
+				maxStorageGb: tierLock ? tierLock.maxStorageGb : maxStorageGb,
 			};
 
 			await apiClient.createClient(payload);
@@ -348,12 +368,21 @@ export default function ClientsClient() {
 						<Field label="Subscription Tier" required>
 							<select
 								value={form.subscriptionTier}
-								onChange={(e) =>
-									setForm((prev) => ({
-										...prev,
-										subscriptionTier: e.target.value as ClientFormState["subscriptionTier"],
-									}))
-								}
+																	onChange={(e) => {
+																		const nextTier = e.target.value as ClientFormState["subscriptionTier"];
+																		setForm((prev) => {
+																			if (nextTier === "ENTERPRISE") {
+																				return { ...prev, subscriptionTier: nextTier };
+																			}
+																			const lock = tierLocks[nextTier];
+																			return {
+																				...prev,
+																				subscriptionTier: nextTier,
+																				maxPlayers: String(lock.maxPlayers),
+																				maxStorageGb: String(lock.maxStorageGb),
+																			};
+																		});
+																	}}
 								className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:border-[#A473FF]/40 focus:outline-none focus:ring-2 focus:ring-[#A473FF]/15"
 							>
 								{subscriptionTiers.map((tier) => (
@@ -367,23 +396,33 @@ export default function ClientsClient() {
 						<Field label="Max Registered Players" required>
 							<input
 								type="number"
-								min={1}
+																	min={1}
+																	max={!isEnterpriseTier ? tierLocks[form.subscriptionTier as Exclude<ClientFormState["subscriptionTier"], "ENTERPRISE">].maxPlayers : undefined}
 								value={form.maxPlayers}
-								onChange={(e) => setForm((prev) => ({ ...prev, maxPlayers: e.target.value }))}
+																	onChange={(e) => setForm((prev) => ({ ...prev, maxPlayers: e.target.value }))}
 								placeholder="e.g. 25"
-								className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:border-[#A473FF]/40 focus:outline-none focus:ring-2 focus:ring-[#A473FF]/15"
+																	disabled={!isEnterpriseTier}
+																	className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:border-[#A473FF]/40 focus:outline-none focus:ring-2 focus:ring-[#A473FF]/15 disabled:bg-gray-50 disabled:text-gray-500"
 							/>
+																{!isEnterpriseTier && (
+																	<p className="mt-1 text-xs text-gray-500">Locked to the selected tier limit.</p>
+																)}
 						</Field>
 
 						<Field label="Cloud Storage Quota (GB)" required>
 							<input
 								type="number"
 								min={1}
+																	max={!isEnterpriseTier ? tierLocks[form.subscriptionTier as Exclude<ClientFormState["subscriptionTier"], "ENTERPRISE">].maxStorageGb : undefined}
 								value={form.maxStorageGb}
 								onChange={(e) => setForm((prev) => ({ ...prev, maxStorageGb: e.target.value }))}
 								placeholder="e.g. 50"
-								className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:border-[#A473FF]/40 focus:outline-none focus:ring-2 focus:ring-[#A473FF]/15"
+																	disabled={!isEnterpriseTier}
+																	className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:border-[#A473FF]/40 focus:outline-none focus:ring-2 focus:ring-[#A473FF]/15 disabled:bg-gray-50 disabled:text-gray-500"
 							/>
+																{!isEnterpriseTier && (
+																	<p className="mt-1 text-xs text-gray-500">Locked to the selected tier limit.</p>
+																)}
 						</Field>
 					</div>
 

@@ -21,12 +21,23 @@ import type {
   ClientCreateInput,
   ClientResponse,
 } from '@/types/api';
+import {
+  AUTH_META_KEY,
+  AUTH_TOKEN_KEY,
+  AUTH_TENANT_ID_KEY,
+  AUTH_TENANT_SLUG_KEY,
+  AUTH_USER_EMAIL_KEY,
+  buildCookieString,
+  getSessionExpiryMs,
+  isSessionExpired,
+  readBrowserCookie,
+  removeCookieString,
+} from '@/lib/auth-session';
 
-// Token storage keys
-const TOKEN_KEY = process.env.NEXT_PUBLIC_ACCESS_TOKEN_KEY || 'akou_access_token';
-const TENANT_ID_KEY = process.env.NEXT_PUBLIC_TENANT_ID_KEY || 'akou_tenant_id';
-const TENANT_SLUG_KEY = process.env.NEXT_PUBLIC_TENANT_SLUG_KEY || 'akou_tenant_slug';
-const USER_EMAIL_KEY = process.env.NEXT_PUBLIC_USER_EMAIL_KEY || 'akou_user_email';
+type AuthMeta = {
+  expiresAt: number;
+  issuedAt: number;
+};
 
 export interface TokenSet {
   token: string;
@@ -41,6 +52,7 @@ export interface TokenSet {
 export class ApiClient {
   private instance: AxiosInstance;
   private tokenSet: TokenSet | null = null;
+  private tokenExpiresAt: number | null = null;
 
   constructor(baseURL: string = process.env.NEXT_PUBLIC_API_BASE_URL || '') {
     this.instance = axios.create({
@@ -103,13 +115,24 @@ export class ApiClient {
    * Set auth tokens after login
    */
   setTokens(token: string, tenantId: string, tenantSlug: string, userEmail: string) {
+    const now = Date.now();
+    const expiresAt = getSessionExpiryMs(token, now);
     this.tokenSet = { token, tenantId, tenantSlug, userEmail };
+    this.tokenExpiresAt = expiresAt;
 
     if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
-      localStorage.setItem(TOKEN_KEY, token);
-      localStorage.setItem(TENANT_ID_KEY, tenantId);
-      localStorage.setItem(TENANT_SLUG_KEY, tenantSlug);
-      localStorage.setItem(USER_EMAIL_KEY, userEmail);
+      localStorage.setItem(AUTH_TOKEN_KEY, token);
+      localStorage.setItem(AUTH_TENANT_ID_KEY, tenantId);
+      localStorage.setItem(AUTH_TENANT_SLUG_KEY, tenantSlug);
+      localStorage.setItem(AUTH_USER_EMAIL_KEY, userEmail);
+      localStorage.setItem(AUTH_META_KEY, JSON.stringify({ expiresAt, issuedAt: now } satisfies AuthMeta));
+
+      try {
+        const secure = window.location.protocol === 'https:';
+        document.cookie = buildCookieString(AUTH_TOKEN_KEY, token, expiresAt, secure);
+      } catch {
+        // ignore cookie write errors; localStorage remains the fallback
+      }
     }
   }
 
@@ -117,20 +140,64 @@ export class ApiClient {
    * Get current auth token
    */
   getToken(): string | null {
-    if (this.tokenSet?.token) {
+    if (this.tokenSet?.token && !isSessionExpired(this.tokenExpiresAt)) {
       return this.tokenSet.token;
     }
 
+    if (this.tokenSet?.token && isSessionExpired(this.tokenExpiresAt)) {
+      this.clearTokens();
+      return null;
+    }
+
     if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
-      const token = localStorage.getItem(TOKEN_KEY);
+      const token = localStorage.getItem(AUTH_TOKEN_KEY);
       if (token) {
-        const tenantId = localStorage.getItem(TENANT_ID_KEY);
-        const tenantSlug = localStorage.getItem(TENANT_SLUG_KEY);
-        const userEmail = localStorage.getItem(USER_EMAIL_KEY);
+        const metaRaw = localStorage.getItem(AUTH_META_KEY);
+        let expiresAt: number | null = null;
+
+        if (metaRaw) {
+          try {
+            const meta = JSON.parse(metaRaw) as Partial<AuthMeta>;
+            expiresAt = typeof meta.expiresAt === 'number' ? meta.expiresAt : null;
+          } catch {
+            expiresAt = null;
+          }
+        }
+
+        if (!expiresAt) {
+          expiresAt = getSessionExpiryMs(token);
+          localStorage.setItem(AUTH_META_KEY, JSON.stringify({ expiresAt, issuedAt: Date.now() } satisfies AuthMeta));
+        }
+
+        if (isSessionExpired(expiresAt)) {
+          this.clearTokens();
+          return null;
+        }
+
+        const tenantId = localStorage.getItem(AUTH_TENANT_ID_KEY);
+        const tenantSlug = localStorage.getItem(AUTH_TENANT_SLUG_KEY);
+        const userEmail = localStorage.getItem(AUTH_USER_EMAIL_KEY);
         if (tenantId && tenantSlug && userEmail) {
           this.tokenSet = { token, tenantId, tenantSlug, userEmail };
+          this.tokenExpiresAt = expiresAt;
         }
         return token;
+      }
+
+      const cookieToken = readBrowserCookie(AUTH_TOKEN_KEY);
+      if (cookieToken) {
+        const expiresAt = getSessionExpiryMs(cookieToken);
+        if (isSessionExpired(expiresAt)) {
+          this.clearTokens();
+          return null;
+        }
+
+        const tenantId = localStorage.getItem(AUTH_TENANT_ID_KEY) || '';
+        const tenantSlug = localStorage.getItem(AUTH_TENANT_SLUG_KEY) || '';
+        const userEmail = localStorage.getItem(AUTH_USER_EMAIL_KEY) || '';
+        this.tokenSet = { token: cookieToken, tenantId, tenantSlug, userEmail };
+        this.tokenExpiresAt = expiresAt;
+        return cookieToken;
       }
     }
 
@@ -141,21 +208,21 @@ export class ApiClient {
    * Get current tenant ID
    */
   getTenantId(): string | null {
-    return this.tokenSet?.tenantId || (typeof window !== 'undefined' ? localStorage.getItem(TENANT_ID_KEY) : null) || null;
+    return this.tokenSet?.tenantId || (typeof window !== 'undefined' ? localStorage.getItem(AUTH_TENANT_ID_KEY) : null) || null;
   }
 
   /**
    * Get current tenant slug
    */
   getTenantSlug(): string | null {
-    return this.tokenSet?.tenantSlug || (typeof window !== 'undefined' ? localStorage.getItem(TENANT_SLUG_KEY) : null) || null;
+    return this.tokenSet?.tenantSlug || (typeof window !== 'undefined' ? localStorage.getItem(AUTH_TENANT_SLUG_KEY) : null) || null;
   }
 
   /**
    * Get current user email
    */
   getUserEmail(): string | null {
-    return this.tokenSet?.userEmail || (typeof window !== 'undefined' ? localStorage.getItem(USER_EMAIL_KEY) : null) || null;
+    return this.tokenSet?.userEmail || (typeof window !== 'undefined' ? localStorage.getItem(AUTH_USER_EMAIL_KEY) : null) || null;
   }
 
   /**
@@ -163,12 +230,20 @@ export class ApiClient {
    */
   clearTokens() {
     this.tokenSet = null;
+    this.tokenExpiresAt = null;
 
     if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
-      localStorage.removeItem(TOKEN_KEY);
-      localStorage.removeItem(TENANT_ID_KEY);
-      localStorage.removeItem(TENANT_SLUG_KEY);
-      localStorage.removeItem(USER_EMAIL_KEY);
+      localStorage.removeItem(AUTH_TOKEN_KEY);
+      localStorage.removeItem(AUTH_TENANT_ID_KEY);
+      localStorage.removeItem(AUTH_TENANT_SLUG_KEY);
+      localStorage.removeItem(AUTH_USER_EMAIL_KEY);
+      localStorage.removeItem(AUTH_META_KEY);
+
+      try {
+        document.cookie = removeCookieString(AUTH_TOKEN_KEY);
+      } catch {
+        // ignore cookie removal errors
+      }
     }
   }
 
@@ -177,13 +252,43 @@ export class ApiClient {
    */
   private loadTokenFromStorage() {
     if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
-      const token = localStorage.getItem(TOKEN_KEY);
-      const tenantId = localStorage.getItem(TENANT_ID_KEY);
-      const tenantSlug = localStorage.getItem(TENANT_SLUG_KEY);
-      const userEmail = localStorage.getItem(USER_EMAIL_KEY);
+      const token = localStorage.getItem(AUTH_TOKEN_KEY);
+      const tenantId = localStorage.getItem(AUTH_TENANT_ID_KEY);
+      const tenantSlug = localStorage.getItem(AUTH_TENANT_SLUG_KEY);
+      const userEmail = localStorage.getItem(AUTH_USER_EMAIL_KEY);
 
       if (token && tenantId && tenantSlug && userEmail) {
-        this.tokenSet = { token, tenantId, tenantSlug, userEmail };
+        const metaRaw = localStorage.getItem(AUTH_META_KEY);
+        let expiresAt = metaRaw ? (() => {
+          try {
+            const meta = JSON.parse(metaRaw) as Partial<AuthMeta>;
+            return typeof meta.expiresAt === 'number' ? meta.expiresAt : null;
+          } catch {
+            return null;
+          }
+        })() : null;
+
+        if (!expiresAt) {
+          expiresAt = getSessionExpiryMs(token);
+          localStorage.setItem(AUTH_META_KEY, JSON.stringify({ expiresAt, issuedAt: Date.now() } satisfies AuthMeta));
+        }
+
+        if (!isSessionExpired(expiresAt)) {
+          this.tokenSet = { token, tenantId, tenantSlug, userEmail };
+          this.tokenExpiresAt = expiresAt;
+        } else {
+          this.clearTokens();
+        }
+        return;
+      }
+
+      const cookieToken = readBrowserCookie(AUTH_TOKEN_KEY);
+      if (cookieToken) {
+        const expiresAt = getSessionExpiryMs(cookieToken);
+        if (!isSessionExpired(expiresAt)) {
+          this.tokenSet = { token: cookieToken, tenantId: tenantId || '', tenantSlug: tenantSlug || '', userEmail: userEmail || '' };
+          this.tokenExpiresAt = expiresAt;
+        }
       }
     }
   }
@@ -414,7 +519,7 @@ export class ApiClient {
    * GET /clients - List all clients (SUPER_ADMIN only, but fetches own client for others)
    */
   async listClients(): Promise<any> {
-    const response = await this.instance.get('/clients');
+    const response = await this.instance.get('/clients/');
     return response.data;
   }
 
@@ -430,15 +535,25 @@ export class ApiClient {
    * POST /clients - Create client (SUPER_ADMIN only)
    */
   async createClient(data: ClientCreateInput): Promise<ClientResponse> {
-    const response = await this.instance.post<ClientResponse>('/clients', {
+    const normalizedTier = data.subscriptionTier;
+    const tierDefaults = normalizedTier === 'STARTER'
+      ? { maxPlayers: 5, maxStorageGb: 2 }
+      : normalizedTier === 'PROFESSIONAL'
+        ? { maxPlayers: 20, maxStorageGb: 20 }
+        : {
+            maxPlayers: Math.max(1, Number(data.maxPlayers || 1)),
+            maxStorageGb: Math.max(1, Number(data.maxStorageGb || 1)),
+          };
+
+    const response = await this.instance.post<ClientResponse>('/clients/', {
       name: data.name,
       business_type: data.businessType,
       contact_person: data.contactPerson,
       email: data.email,
       phone: data.phone,
-      subscription_tier: data.subscriptionTier,
-      max_players: data.maxPlayers,
-      max_storage_gb: data.maxStorageGb,
+      subscription_tier: normalizedTier,
+      max_players: tierDefaults.maxPlayers,
+      max_storage_gb: tierDefaults.maxStorageGb,
     });
     return response.data;
   }
@@ -457,7 +572,7 @@ export class ApiClient {
     * GET /analytics/system-health - Get system health metrics
     */
    async getSystemHealth(): Promise<any> {
-     const response = await this.instance.get('/analytics/system-health');
+          const response = await this.instance.get('/analytics/system-health');
      return response.data;
    }
 
@@ -465,7 +580,7 @@ export class ApiClient {
     * GET /dashboard/stats - Get dashboard statistics
     */
    async getDashboardStats(): Promise<any> {
-     const response = await this.instance.get('/dashboard/stats');
+      const response = await this.instance.get('/dashboard/stats');
      return response.data;
    }
 
@@ -473,7 +588,7 @@ export class ApiClient {
     * GET /dashboard/activity - Get activity logs with pagination
     */
    async getDashboardActivity(page: number = 1, limit: number = 20): Promise<any> {
-     const response = await this.instance.get(`/dashboard/activity?page=${page}&limit=${limit}`);
+      const response = await this.instance.get(`/dashboard/activity?page=${page}&limit=${limit}`);
      return response.data;
    }
 
@@ -483,7 +598,7 @@ export class ApiClient {
     * GET /activity-logs - List recent activity (legacy endpoint)
     */
    async listActivityLogs(limit: number = 10): Promise<any> {
-     const response = await this.instance.get(`/activity-logs?limit=${limit}`);
+      const response = await this.instance.get(`/activity-logs?limit=${limit}`);
      return response.data;
    }
 
