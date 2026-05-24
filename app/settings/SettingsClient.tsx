@@ -21,13 +21,8 @@ type UserProfile = {
 
 const TABS: SettingsTab[] = [
   { key: "my-details", label: "My details" },
-  { key: "profile", label: "Profile" },
-  { key: "password", label: "Password" },
-  { key: "team", label: "Team" },
   { key: "plan", label: "Plan" },
   { key: "billing", label: "Billing" },
-  { key: "email", label: "Email" },
-  { key: "notifications", label: "Notifications" },
   { key: "integrations", label: "Integrations" },
 ];
 
@@ -72,10 +67,10 @@ export default function SettingsClient() {
     // Priority 1: Use authenticated user data from auth context
     if (authUser) {
       profileToUse = {
-        firstName: authUser.name?.split(' ')[0] || '',
-        lastName: authUser.name?.split(' ').slice(1).join(' ') || '',
-        email: authUser.email || '',
-        role: (authUser as any)?.role || '',
+        firstName: authUser.name?.split(" ")[0] || "",
+        lastName: authUser.name?.split(" ").slice(1).join(" ") || "",
+        email: authUser.email || "",
+        role: authUser.role || "",
         country: profileToUse.country,
         timezone: profileToUse.timezone,
         bio: profileToUse.bio,
@@ -101,7 +96,7 @@ export default function SettingsClient() {
             };
           }
         }
-      } catch (err) {
+      } catch {
         // ignore parse errors
       }
     }
@@ -205,7 +200,6 @@ export default function SettingsClient() {
             };
 
             // Include avatar only when it looks like a remote URL (not a data: URI)
-            const isAvatarDataUrl = typeof profile.avatar === "string" && profile.avatar.startsWith("data:");
             const isAvatarUrl = typeof profile.avatar === "string" && (profile.avatar.startsWith("http") || profile.avatar.startsWith("/"));
             if (isAvatarUrl) storageProfile.avatar = profile.avatar;
 
@@ -217,7 +211,6 @@ export default function SettingsClient() {
                 } catch (err) {
                   // QuotaExceededError or other storage problems are non-fatal here.
                   // We log a warning and let the app continue with the in-memory profile.
-                  // eslint-disable-next-line no-console
                   console.warn("Failed to write user metadata to localStorage", err);
                 }
 
@@ -235,7 +228,6 @@ export default function SettingsClient() {
                 );
               } catch (err) {
                 // Something unexpected happened while saving/dispatching. Don't crash the app.
-                // eslint-disable-next-line no-console
                 console.error("Failed to persist user update", err);
               }
             }
