@@ -9,8 +9,9 @@ import CalendarCell from "./components/CalendarCell";
 import ScheduleAssignModal, { type PlaylistPick } from "./components/ScheduleAssignModal";
 import type { ScheduleEventCard } from "./components/EventCard";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
+import { useAuth } from "@/app/context/AuthContext";
 import { getApiClient } from "@/lib/api-client";
-import type { ScheduleEntry } from "@/types/api";
+import type { ClientInfo, ScheduleEntry } from "@/types/api";
 
 type AudioItem = {
   id: string;
@@ -76,8 +77,31 @@ function playlistDurationMinutes(trackCount: number) {
   return Math.max(15, trackCount * 4);
 }
 
+function normalizeScheduleClient(raw: Record<string, unknown>): ClientInfo {
+  return {
+    id: String(raw.id ?? ""),
+    tenantId: (raw.tenantId ?? raw.tenant_id) as string | undefined,
+    name: String(raw.name ?? "Untitled client"),
+    businessType: String(raw.businessType ?? raw.business_type ?? ""),
+    contactPerson: String(raw.contactPerson ?? raw.contact_person ?? ""),
+    email: String(raw.email ?? ""),
+    phone: String(raw.phone ?? ""),
+    status: (String(raw.status ?? "INACTIVE").toUpperCase() as ClientInfo["status"]),
+    subscriptionTier: (raw.subscriptionTier ??
+      raw.subscription_tier ??
+      "STARTER") as ClientInfo["subscriptionTier"],
+    maxPlayers: Number(raw.maxPlayers ?? raw.max_players ?? 0),
+    maxStorageGb: Number(raw.maxStorageGb ?? raw.max_storage_gb ?? 0),
+    createdAt: (raw.createdAt ?? raw.created_at) as string | undefined,
+  };
+}
+
 export default function ScheduleClientPage() {
   const apiClient = getApiClient();
+  const { user, isLoading: authLoading } = useAuth();
+  const role = String(user?.role || "").toUpperCase();
+  const isSuperAdmin = role === "SUPER_ADMIN";
+
   const [events, setEvents] = useState<ScheduleEventCard[]>([]);
   const [audio, setAudio] = useState<AudioItem[]>([]);
   const [rooms, setRooms] = useState<{ id: string; name: string }[]>([]);
@@ -86,6 +110,14 @@ export default function ScheduleClientPage() {
   const [selectedRoom, setSelectedRoom] = useState<string>("all");
   const [selectedDay, setSelectedDay] = useState<string>("all");
   const [query, setQuery] = useState("");
+  const [workspaceClients, setWorkspaceClients] = useState<
+    { id: string; name: string; tenantId: string }[]
+  >([]);
+  const [selectedWorkspaceClientId, setSelectedWorkspaceClientId] =
+    useState<string>("");
+  const [workspaceTenantId, setWorkspaceTenantId] = useState<string | null>(
+    null
+  );
   const [pendingDeleteEvent, setPendingDeleteEvent] =
     useState<ScheduleEventCard | null>(null);
   const [assignModalOpen, setAssignModalOpen] = useState(false);
@@ -95,7 +127,63 @@ export default function ScheduleClientPage() {
     time: string;
   } | null>(null);
 
+  const workspaceReady = !isSuperAdmin || Boolean(workspaceTenantId);
+
   useEffect(() => {
+    if (!isSuperAdmin || authLoading) return;
+
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await apiClient.listClients();
+        if (cancelled) return;
+        const eligible = (res?.clients ?? [])
+          .map((c: Record<string, unknown>) => normalizeScheduleClient(c))
+          .filter(
+            (c: ClientInfo) =>
+              c.status === "ACTIVE" &&
+              Boolean(c.tenantId && String(c.tenantId).trim())
+          )
+          .map((c: ClientInfo) => ({
+            id: c.id,
+            name: c.name,
+            tenantId: String(c.tenantId),
+          }));
+        setWorkspaceClients(eligible);
+        if (eligible.length > 0 && !selectedWorkspaceClientId) {
+          setSelectedWorkspaceClientId(eligible[0].id);
+          setWorkspaceTenantId(eligible[0].tenantId);
+        }
+      } catch (err: unknown) {
+        if (cancelled) return;
+        const ax = err as { response?: { data?: { error?: string } } };
+        setError(ax?.response?.data?.error || "Failed to load client workspaces");
+        setWorkspaceClients([]);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      apiClient.clearWorkspaceTenant();
+    };
+  }, [apiClient, isSuperAdmin, authLoading]);
+
+  useEffect(() => {
+    if (authLoading) return;
+    if (isSuperAdmin && !workspaceTenantId) {
+      setIsLoading(false);
+      setRooms([]);
+      setAudio([]);
+      setEvents([]);
+      return;
+    }
+
+    if (isSuperAdmin && workspaceTenantId) {
+      apiClient.setWorkspaceTenant(workspaceTenantId);
+    }
+
+    let cancelled = false;
+
     const loadData = async () => {
       try {
         setIsLoading(true);
@@ -105,6 +193,7 @@ export default function ScheduleClientPage() {
           apiClient.listMedia(),
           apiClient.listSchedules(),
         ]);
+        if (cancelled) return;
 
         setRooms(
           playersRes.players.map((p) => ({
@@ -130,14 +219,30 @@ export default function ScheduleClientPage() {
           (schedulesRes.schedules ?? []).map((s) => scheduleEntryToEvent(s))
         );
       } catch (err: unknown) {
+        if (cancelled) return;
         const ax = err as { response?: { data?: { error?: string } } };
         setError(ax?.response?.data?.error || "Failed to load schedule");
       } finally {
-        setIsLoading(false);
+        if (!cancelled) setIsLoading(false);
       }
     };
+
     void loadData();
-  }, [apiClient]);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [apiClient, authLoading, isSuperAdmin, workspaceTenantId]);
+
+  const handleWorkspaceClientChange = (clientId: string) => {
+    const match = workspaceClients.find((c) => c.id === clientId);
+    if (!match) return;
+    setSelectedWorkspaceClientId(clientId);
+    setWorkspaceTenantId(match.tenantId);
+    setSelectedRoom("all");
+    setSelectedDay("all");
+    setError(null);
+  };
 
   const roomsToShow = useMemo(
     () =>
@@ -310,7 +415,7 @@ export default function ScheduleClientPage() {
 
   const normalizedQuery = query.trim().toLowerCase();
 
-  if (isLoading) {
+  if (authLoading || (isLoading && workspaceReady)) {
     return (
       <div className="flex-1 flex items-center justify-center bg-gray-50">
         <div className="text-center">
@@ -333,6 +438,10 @@ export default function ScheduleClientPage() {
           onChangeDay={setSelectedDay}
           rooms={rooms}
           days={weekDays}
+          showWorkspaceSelector={isSuperAdmin}
+          workspaceClients={workspaceClients}
+          selectedWorkspaceClientId={selectedWorkspaceClientId}
+          onChangeWorkspaceClient={handleWorkspaceClientChange}
         />
 
         <div className="flex-1 overflow-auto">
@@ -350,7 +459,19 @@ export default function ScheduleClientPage() {
             </div>
           )}
 
-          {rooms.length === 0 ? (
+          {isSuperAdmin && !workspaceTenantId ? (
+            <div className="flex items-center justify-center h-full min-h-[240px]">
+              <div className="text-center max-w-md px-4">
+                <h2 className="font-semibold text-gray-900">
+                  Select a client workspace
+                </h2>
+                <p className="text-sm text-gray-500 mt-1">
+                  Choose an active client from the dropdown above to view and
+                  manage that tenant&apos;s weekly schedule.
+                </p>
+              </div>
+            </div>
+          ) : rooms.length === 0 ? (
             <div className="flex items-center justify-center h-full min-h-[240px]">
               <div className="text-center">
                 <h2 className="font-semibold text-gray-900">No players yet</h2>

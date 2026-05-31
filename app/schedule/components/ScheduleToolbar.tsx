@@ -11,6 +11,10 @@ export default function ScheduleToolbar({
   onChangeDay,
   rooms,
   days,
+  showWorkspaceSelector,
+  workspaceClients,
+  selectedWorkspaceClientId,
+  onChangeWorkspaceClient,
 }: {
   query: string;
   onQueryChange: (q: string) => void;
@@ -20,9 +24,40 @@ export default function ScheduleToolbar({
   onChangeDay: (d: string) => void;
   rooms: { id: string; name: string }[];
   days: { short: string; full: string }[];
+  showWorkspaceSelector?: boolean;
+  workspaceClients?: { id: string; name: string; tenantId: string }[];
+  selectedWorkspaceClientId?: string;
+  onChangeWorkspaceClient?: (clientId: string) => void;
 }) {
   return (
-    <div className="flex-shrink-0 border-b border-gray-200 p-2.5 flex items-center justify-between bg-white z-30">
+    <div className="flex-shrink-0 border-b border-gray-200 bg-white z-30">
+      {showWorkspaceSelector && (
+        <div className="px-2.5 pt-2.5 pb-2 border-b border-gray-100 flex items-center gap-2">
+          <label
+            htmlFor="schedule-workspace-client"
+            className="text-xs font-semibold uppercase tracking-wide text-gray-500 shrink-0"
+          >
+            Select Client Workspace
+          </label>
+          <select
+            id="schedule-workspace-client"
+            value={selectedWorkspaceClientId || ""}
+            onChange={(e) => onChangeWorkspaceClient?.(e.target.value)}
+            className="flex-1 max-w-md text-sm px-3 py-1.5 rounded-md bg-violet-50 border border-violet-100 text-gray-900"
+          >
+            <option value="" disabled>
+              Choose a client…
+            </option>
+            {(workspaceClients ?? []).map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+
+      <div className="p-2.5 flex items-center justify-between">
       <div className="flex items-center gap-3">
         <h2 className="text-lg font-semibold text-gray-900">Weekly Schedule</h2>
         <div className="relative">
@@ -59,6 +94,7 @@ export default function ScheduleToolbar({
             <option key={d.short} value={d.short}>{d.full}</option>
           ))}
         </select>
+      </div>
       </div>
     </div>
   );

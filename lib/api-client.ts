@@ -68,6 +68,8 @@ export class ApiClient {
   private instance: AxiosInstance;
   private tokenSet: TokenSet | null = null;
   private tokenExpiresAt: number | null = null;
+  /** In-memory tenant override for SUPER_ADMIN workspace switching (not persisted). */
+  private workspaceTenant: { tenantId: string; tenantSlug?: string } | null = null;
 
   constructor(baseURL: string = process.env.NEXT_PUBLIC_API_BASE_URL || '') {
     this.instance = axios.create({
@@ -82,7 +84,7 @@ export class ApiClient {
     this.instance.interceptors.request.use(
       (config: InternalAxiosRequestConfig) => {
         const token = this.getToken();
-        const tenantId = this.getTenantId();
+        const tenantId = this.getEffectiveTenantId();
 
         if (token) {
           config.headers.Authorization = `Bearer ${token}`;
@@ -224,6 +226,26 @@ export class ApiClient {
    */
   getTenantId(): string | null {
     return this.tokenSet?.tenantId || (typeof window !== 'undefined' ? localStorage.getItem(AUTH_TENANT_ID_KEY) : null) || null;
+  }
+
+  /**
+   * Tenant ID used on API requests (workspace override when set).
+   */
+  getEffectiveTenantId(): string | null {
+    return this.workspaceTenant?.tenantId || this.getTenantId();
+  }
+
+  /**
+   * SUPER_ADMIN: scope subsequent requests to a client workspace without changing login session storage.
+   */
+  setWorkspaceTenant(tenantId: string, tenantSlug?: string) {
+    const id = (tenantId || '').trim();
+    if (!id) return;
+    this.workspaceTenant = { tenantId: id, tenantSlug: tenantSlug?.trim() || undefined };
+  }
+
+  clearWorkspaceTenant() {
+    this.workspaceTenant = null;
   }
 
   /**
