@@ -111,6 +111,15 @@ export default function ScheduleClientPage() {
 
   const workspaceReady = !isSuperAdmin || Boolean(workspaceTenantId);
 
+  /** Tenant scope for ScheduleAssignModal (super admin workspace or session tenant). */
+  const assignModalTenantId = useMemo(
+    () =>
+      isSuperAdmin
+        ? workspaceTenantId
+        : user?.tenantId || apiClient.getEffectiveTenantId() || null,
+    [isSuperAdmin, workspaceTenantId, user?.tenantId, apiClient]
+  );
+
   useEffect(() => {
     if (!isSuperAdmin || authLoading) return;
 
@@ -122,8 +131,10 @@ export default function ScheduleClientPage() {
         const eligible = toActiveWorkspaceClients(res?.clients ?? []);
         setWorkspaceClients(eligible);
         if (eligible.length > 0 && !selectedWorkspaceClientId) {
-          setSelectedWorkspaceClientId(eligible[0].id);
-          setWorkspaceTenantId(eligible[0].tenantId);
+          const preferred =
+            eligible.find((c) => c.tenantId === user?.tenantId) ?? eligible[0];
+          setSelectedWorkspaceClientId(preferred.id);
+          setWorkspaceTenantId(preferred.tenantId);
         }
       } catch (err: unknown) {
         if (cancelled) return;
@@ -137,7 +148,7 @@ export default function ScheduleClientPage() {
       cancelled = true;
       apiClient.clearWorkspaceTenant();
     };
-  }, [apiClient, isSuperAdmin, authLoading]);
+  }, [apiClient, isSuperAdmin, authLoading, user?.tenantId]);
 
   useEffect(() => {
     if (authLoading) return;
@@ -540,11 +551,11 @@ export default function ScheduleClientPage() {
 
         <ScheduleAssignModal
           open={assignModalOpen}
+          workspaceTenantId={assignModalTenantId}
           onClose={() => {
             setAssignModalOpen(false);
             setPickerCell(null);
           }}
-          audio={audio}
           onSelectAudio={handleSelectAudio}
           onSelectPlaylist={handleSelectPlaylist}
         />

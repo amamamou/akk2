@@ -454,6 +454,11 @@ export class ApiClient {
     return response.data;
   }
 
+  /** Alias used by schedule assign modal and library flows. */
+  async listAudios(): Promise<MediaListResponse> {
+    return this.listMedia();
+  }
+
   /**
    * GET /media/{id} - Get media by ID
    */

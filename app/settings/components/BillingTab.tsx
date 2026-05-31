@@ -5,13 +5,7 @@ import { ExternalLink, Loader2 } from "lucide-react";
 import { getApiClient } from "@/lib/api-client";
 import type { InvoiceInfo } from "@/types/api";
 import { cn } from "@/utils/cn";
-
-function formatMoney(amount: number) {
-  return new Intl.NumberFormat(undefined, {
-    style: "currency",
-    currency: "USD",
-  }).format(amount);
-}
+import { formatMoney } from "@/lib/format-currency";
 
 function formatDate(iso?: string | null) {
   if (!iso) return "—";

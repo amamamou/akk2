@@ -1,4 +1,5 @@
 import type { ClientInfo } from "@/types/api";
+import { applyDemoEnterpriseLabels } from "@/lib/demo-workspaces";
 
 export type WorkspaceClientOption = {
   id: string;
@@ -28,7 +29,7 @@ export function normalizeClientRecord(raw: Record<string, unknown>): ClientInfo 
 export function toActiveWorkspaceClients(
   clients: Record<string, unknown>[]
 ): WorkspaceClientOption[] {
-  return clients
+  const active = clients
     .map(normalizeClientRecord)
     .filter(
       (c) =>
@@ -39,4 +40,6 @@ export function toActiveWorkspaceClients(
       name: c.name,
       tenantId: String(c.tenantId),
     }));
+
+  return applyDemoEnterpriseLabels(active);
 }

@@ -10,6 +10,7 @@ import type {
 	InvoiceInfo,
 } from "@/types/api";
 import IssueInvoiceModal from "./components/IssueInvoiceModal";
+import { formatMoney } from "@/lib/format-currency";
 import AdminAddModal from "@/app/admin/components/AdminAddModal";
 import AdminToast from "@/app/admin/components/AdminToast";
 import {
@@ -566,11 +567,6 @@ function Field({
 	);
 }
 
-function formatMoney(amount: number) {
-	return new Intl.NumberFormat(undefined, { style: "currency", currency: "USD" }).format(
-		amount
-	);
-}
 
 function ClientCard({
 	client,

@@ -109,7 +109,7 @@ export default function IssueInvoiceModal({
         </label>
         <label className="block">
           <span className="mb-1 block text-xs font-medium uppercase tracking-wide text-gray-500">
-            Amount (USD)
+            Amount (EUR)
           </span>
           <input
             type="number"
