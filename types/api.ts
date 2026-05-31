@@ -94,8 +94,10 @@ export interface ScheduleEntry {
   id: string;
   playerId: string;
   playerName: string;
-  mediaId: string;
+  mediaId?: string | null;
+  playlistId?: string | null;
   title: string;
+  trackCount?: number | null;
   startsAt: string;
   endsAt: string;
   recurrence: string;
@@ -114,7 +116,8 @@ export interface ScheduleResponse {
 
 export interface ScheduleCreate {
   playerId: string;
-  mediaId: string;
+  mediaId?: string;
+  playlistId?: string;
   startTime: string;
   endTime: string;
   recurrence?: string;
@@ -123,6 +126,7 @@ export interface ScheduleCreate {
 export interface ScheduleUpdate {
   playerId?: string;
   mediaId?: string;
+  playlistId?: string;
   startTime?: string;
   endTime?: string;
   recurrence?: string;

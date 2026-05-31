@@ -1,16 +1,24 @@
 "use client";
-import React, { useState, useEffect } from "react";
+
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { DndProvider } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
 import { AlertCircle, Loader } from "lucide-react";
 import ScheduleToolbar from "./components/ScheduleToolbar";
 import CalendarCell from "./components/CalendarCell";
-import SongPickerModal from "./components/SongPickerModal";
+import ScheduleAssignModal, { type PlaylistPick } from "./components/ScheduleAssignModal";
+import type { ScheduleEventCard } from "./components/EventCard";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import { getApiClient } from "@/lib/api-client";
+import type { ScheduleEntry } from "@/types/api";
 
-type AudioItem = { id: string; title: string; duration: number; type: string; url?: string };
-type ScheduleEvent = { id: string; audioId: string; title: string; duration: number; roomId: string; day: string; time: string };
+type AudioItem = {
+  id: string;
+  title: string;
+  duration: number;
+  type: string;
+  url?: string;
+};
 
 const weekDays = [
   { short: "Mon", full: "Monday", date: "01" },
@@ -39,9 +47,38 @@ function shortDayFromDate(date: Date) {
   return shortDays[date.getDay()] || "Mon";
 }
 
+function scheduleEntryToEvent(entry: ScheduleEntry): ScheduleEventCard {
+  const startDate = new Date(entry.startsAt);
+  const endDate = new Date(entry.endsAt);
+  const durationMinutes = Math.max(
+    1,
+    Math.round((endDate.getTime() - startDate.getTime()) / 60000)
+  );
+
+  return {
+    id: entry.id,
+    audioId: entry.mediaId ?? undefined,
+    playlistId: entry.playlistId ?? undefined,
+    title: entry.title,
+    duration: durationMinutes,
+    trackCount: entry.trackCount ?? undefined,
+    roomId: entry.playerId,
+    day: shortDayFromDate(startDate),
+    time: startDate.toLocaleTimeString("en-US", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    }),
+  };
+}
+
+function playlistDurationMinutes(trackCount: number) {
+  return Math.max(15, trackCount * 4);
+}
+
 export default function ScheduleClientPage() {
   const apiClient = getApiClient();
-  const [events, setEvents] = useState<ScheduleEvent[]>([]);
+  const [events, setEvents] = useState<ScheduleEventCard[]>([]);
   const [audio, setAudio] = useState<AudioItem[]>([]);
   const [rooms, setRooms] = useState<{ id: string; name: string }[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -49,153 +86,229 @@ export default function ScheduleClientPage() {
   const [selectedRoom, setSelectedRoom] = useState<string>("all");
   const [selectedDay, setSelectedDay] = useState<string>("all");
   const [query, setQuery] = useState("");
-  const [audioQuery, setAudioQuery] = useState("");
-  const [pendingDeleteEvent, setPendingDeleteEvent] = useState<ScheduleEvent | null>(null);
-  const [songPickerOpen, setSongPickerOpen] = useState(false);
-  const [pickerCell, setPickerCell] = useState<{ roomId: string; day: string; time: string } | null>(null);
+  const [pendingDeleteEvent, setPendingDeleteEvent] =
+    useState<ScheduleEventCard | null>(null);
+  const [assignModalOpen, setAssignModalOpen] = useState(false);
+  const [pickerCell, setPickerCell] = useState<{
+    roomId: string;
+    day: string;
+    time: string;
+  } | null>(null);
 
   useEffect(() => {
     const loadData = async () => {
       try {
         setIsLoading(true);
-        const ftp = await Promise.all([
+        setError(null);
+        const [playersRes, mediaRes, schedulesRes] = await Promise.all([
           apiClient.listPlayers(),
           apiClient.listMedia(),
           apiClient.listSchedules(),
         ]);
 
-        setRooms(ftp[0].players.map(p => ({
-          id: p.id,
-          name: p.roomName || p.playerName || "Unnamed",
-        })));
+        setRooms(
+          playersRes.players.map((p) => ({
+            id: p.id,
+            name: p.roomName || p.playerName || "Unnamed",
+          }))
+        );
 
-        setAudio(ftp[1].media.map(m => ({
-          id: m.id,
-          title: m.title,
-          duration: m.durationMinutes && m.durationMinutes > 0 ? m.durationMinutes : 60,
-          type: m.category || "Audio",
-          url: m.url,
-        })));
+        setAudio(
+          mediaRes.media.map((m) => ({
+            id: m.id,
+            title: m.title,
+            duration:
+              m.durationMinutes && m.durationMinutes > 0
+                ? m.durationMinutes
+                : 60,
+            type: m.category || "Audio",
+            url: m.url,
+          }))
+        );
 
-        setEvents(ftp[2].schedules.map(s => {
-          const sd = new Date(s.startsAt);
-          return {
-            id: s.id,
-            audioId: s.mediaId,
-            title: s.title,
-            duration: 60,
-            roomId: s.playerId,
-            day: shortDayFromDate(sd),
-            time: sd.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false }),
-          };
-        }));
-      } catch (err: any) {
-        setError(err?.response?.data?.error || "Failed to load");
+        setEvents(
+          (schedulesRes.schedules ?? []).map((s) => scheduleEntryToEvent(s))
+        );
+      } catch (err: unknown) {
+        const ax = err as { response?: { data?: { error?: string } } };
+        setError(ax?.response?.data?.error || "Failed to load schedule");
       } finally {
         setIsLoading(false);
       }
     };
-    loadData();
+    void loadData();
   }, [apiClient]);
 
-   const handleDropEvent = async (item: AudioItem, roomId: string, day: string, time: string) => {
-     try {
-       const start = buildDateForDayAndTime(day, time);
-       const end = new Date(start);
-       const durationMinutes = Math.max(1, item.duration); // Ensure at least 1 minute
-       end.setMinutes(end.getMinutes() + durationMinutes);
+  const roomsToShow = useMemo(
+    () =>
+      selectedRoom === "all"
+        ? rooms
+        : rooms.filter((r) => r.id === selectedRoom),
+    [rooms, selectedRoom]
+  );
 
-       // Validate times before sending
-       if (start >= end) {
-         setError('Invalid time range - end time must be after start time');
-         return;
-       }
+  const daysToShow = useMemo(
+    () =>
+      selectedDay === "all"
+        ? weekDays
+        : weekDays.filter((d) => d.short === selectedDay),
+    [selectedDay]
+  );
 
-       const res = await apiClient.createSchedule({
-         playerId: roomId,
-         mediaId: item.id,
-         startTime: start.toISOString(),
-         endTime: end.toISOString(),
-         recurrence: "ONCE",
-       });
+  const appendEventFromResponse = useCallback(
+    (schedule: ScheduleEntry, roomId: string, day: string, time: string) => {
+      const mapped = scheduleEntryToEvent(schedule);
+      setEvents((prev) => [
+        ...prev,
+        {
+          ...mapped,
+          roomId,
+          day,
+          time,
+        },
+      ]);
+    },
+    []
+  );
 
-       setEvents(prev => [...prev, {
-         id: res.schedule.id,
-         audioId: item.id,
-         title: item.title,
-         duration: item.duration,
-         roomId, day, time,
-       }]);
-     } catch (err: any) {
-       const status = err?.response?.status;
-       const body = err?.response?.data;
-       if (status === 409 || body?.code === 'TIME_CONFLICT') {
-         setError('This time slot is already taken!');
-       } else {
-         setError(body?.error || body?.detail || err?.message || 'Failed to create schedule');
-       }
-     }
-   };
+  const handleScheduleError = (err: unknown) => {
+    const ax = err as {
+      response?: { status?: number; data?: { error?: string; code?: string } };
+      message?: string;
+    };
+    const status = ax?.response?.status;
+    const body = ax?.response?.data;
+    if (status === 409 || body?.code === "TIME_CONFLICT") {
+      setError("This time slot is already taken!");
+    } else {
+      setError(
+        body?.error || body?.code || ax?.message || "Failed to create schedule"
+      );
+    }
+  };
 
-   const handleSelectSong = async (item: AudioItem) => {
-     if (!pickerCell) return;
-     try {
-       const start = buildDateForDayAndTime(pickerCell.day, pickerCell.time);
-       const end = new Date(start);
-       const durationMinutes = Math.max(1, item.duration); // Ensure at least 1 minute
-       end.setMinutes(end.getMinutes() + durationMinutes);
+  const createAudioSchedule = async (
+    item: AudioItem,
+    roomId: string,
+    day: string,
+    time: string
+  ) => {
+    const start = buildDateForDayAndTime(day, time);
+    const end = new Date(start);
+    end.setMinutes(end.getMinutes() + Math.max(1, item.duration));
+    if (start >= end) {
+      setError("Invalid time range - end time must be after start time");
+      return;
+    }
+    const res = await apiClient.createSchedule({
+      playerId: roomId,
+      mediaId: item.id,
+      startTime: start.toISOString(),
+      endTime: end.toISOString(),
+      recurrence: "ONCE",
+    });
+    appendEventFromResponse(res.schedule, roomId, day, time);
+  };
 
-       // Validate times before sending
-       if (start >= end) {
-         setError('Invalid time range - end time must be after start time');
-         return;
-       }
+  const createPlaylistSchedule = async (
+    playlist: PlaylistPick,
+    roomId: string,
+    day: string,
+    time: string
+  ) => {
+    const start = buildDateForDayAndTime(day, time);
+    const end = new Date(start);
+    const minutes = playlistDurationMinutes(playlist.trackCount);
+    end.setMinutes(end.getMinutes() + minutes);
+    if (start >= end) {
+      setError("Invalid time range - end time must be after start time");
+      return;
+    }
+    const res = await apiClient.createSchedule({
+      playerId: roomId,
+      playlistId: playlist.playlistId,
+      startTime: start.toISOString(),
+      endTime: end.toISOString(),
+      recurrence: "ONCE",
+    });
+    appendEventFromResponse(res.schedule, roomId, day, time);
+  };
 
-       const res = await apiClient.createSchedule({
-         playerId: pickerCell.roomId,
-         mediaId: item.id,
-         startTime: start.toISOString(),
-         endTime: end.toISOString(),
-         recurrence: "ONCE",
-       });
+  const handleDropEvent = async (
+    item: AudioItem,
+    roomId: string,
+    day: string,
+    time: string
+  ) => {
+    try {
+      setError(null);
+      await createAudioSchedule(item, roomId, day, time);
+    } catch (err: unknown) {
+      handleScheduleError(err);
+    }
+  };
 
-       setEvents((prev) => [
-         ...prev,
-         {
-           id: res.schedule.id,
-           audioId: item.id,
-           title: item.title,
-           duration: item.duration,
-           roomId: pickerCell.roomId,
-           day: pickerCell.day,
-           time: pickerCell.time,
-         },
-       ]);
-       setSongPickerOpen(false);
-       setPickerCell(null);
-     } catch (err: any) {
-       const status = err?.response?.status;
-       const body = err?.response?.data;
-       if (status === 409 || body?.code === 'TIME_CONFLICT') {
-         setError('This time slot is already taken!');
-       } else {
-         setError(body?.error || body?.detail || err?.message || 'Failed to create schedule');
-       }
-     }
-   };
+  const handleDropPlaylist = async (
+    item: PlaylistPick,
+    roomId: string,
+    day: string,
+    time: string
+  ) => {
+    try {
+      setError(null);
+      await createPlaylistSchedule(item, roomId, day, time);
+    } catch (err: unknown) {
+      handleScheduleError(err);
+    }
+  };
+
+  const handleSelectAudio = async (item: AudioItem) => {
+    if (!pickerCell) return;
+    try {
+      setError(null);
+      await createAudioSchedule(
+        item,
+        pickerCell.roomId,
+        pickerCell.day,
+        pickerCell.time
+      );
+      setAssignModalOpen(false);
+      setPickerCell(null);
+    } catch (err: unknown) {
+      handleScheduleError(err);
+    }
+  };
+
+  const handleSelectPlaylist = async (playlist: PlaylistPick) => {
+    if (!pickerCell) return;
+    try {
+      setError(null);
+      await createPlaylistSchedule(
+        playlist,
+        pickerCell.roomId,
+        pickerCell.day,
+        pickerCell.time
+      );
+      setAssignModalOpen(false);
+      setPickerCell(null);
+    } catch (err: unknown) {
+      handleScheduleError(err);
+    }
+  };
 
   const confirmDeleteEvent = async () => {
     if (!pendingDeleteEvent) return;
     try {
       await apiClient.deleteSchedule(pendingDeleteEvent.id);
-      setEvents(prev => prev.filter(e => e.id !== pendingDeleteEvent.id));
+      setEvents((prev) => prev.filter((e) => e.id !== pendingDeleteEvent.id));
       setPendingDeleteEvent(null);
-    } catch (err: any) {
-      setError(err?.response?.data?.error || "Failed to delete");
+    } catch (err: unknown) {
+      const ax = err as { response?: { data?: { error?: string } } };
+      setError(ax?.response?.data?.error || "Failed to delete");
     }
   };
 
-  const roomsToShow = selectedRoom === "all" ? rooms : rooms.filter(r => r.id === selectedRoom);
+  const normalizedQuery = query.trim().toLowerCase();
 
   if (isLoading) {
     return (
@@ -211,26 +324,89 @@ export default function ScheduleClientPage() {
   return (
     <DndProvider backend={HTML5Backend}>
       <div className="flex-1 flex flex-col overflow-hidden bg-white">
-        <ScheduleToolbar query={query} onQueryChange={setQuery} selectedRoom={selectedRoom} onChangeRoom={setSelectedRoom as any} selectedDay={selectedDay} onChangeDay={setSelectedDay as any} rooms={rooms} days={weekDays} />
+        <ScheduleToolbar
+          query={query}
+          onQueryChange={setQuery}
+          selectedRoom={selectedRoom}
+          onChangeRoom={setSelectedRoom}
+          selectedDay={selectedDay}
+          onChangeDay={setSelectedDay}
+          rooms={rooms}
+          days={weekDays}
+        />
 
         <div className="flex-1 overflow-auto">
-          {error && <div className="mx-4 my-2 p-2 bg-red-50 border border-red-200 rounded text-sm text-red-800 flex gap-2"><AlertCircle className="w-4 h-4 shrink-0 mt-0.5" /><span>{error}</span></div>}
+          {error && (
+            <div className="mx-4 my-2 p-2 bg-red-50 border border-red-200 rounded text-sm text-red-800 flex gap-2">
+              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+              <span>{error}</span>
+              <button
+                type="button"
+                className="ml-auto text-xs underline"
+                onClick={() => setError(null)}
+              >
+                Dismiss
+              </button>
+            </div>
+          )}
 
           {rooms.length === 0 ? (
-            <div className="flex items-center justify-center h-full">
+            <div className="flex items-center justify-center h-full min-h-[240px]">
               <div className="text-center">
                 <h2 className="font-semibold text-gray-900">No players yet</h2>
-                <p className="text-sm text-gray-500 mt-1">Create a player in the Players page to get started</p>
+                <p className="text-sm text-gray-500 mt-1">
+                  Create a player in the Players page to get started
+                </p>
               </div>
             </div>
+          ) : roomsToShow.length === 0 ? (
+            <div className="flex items-center justify-center h-full min-h-[240px] text-sm text-gray-500">
+              No room matches the selected filter.
+            </div>
           ) : (
-            <div>
-              {roomsToShow.map(room => (
-                <div key={room.id} className="border-b">
-                  <div className="font-medium p-3 bg-gray-50 text-sm">{room.name}</div>
-                  <div className="grid grid-cols-7">
-                    {weekDays.map(day => {
-                      const cellEvents = events.filter(e => e.roomId === room.id && e.day === day.short && e.title.toLowerCase().includes(query.toLowerCase()));
+            <div className="min-w-0">
+              {daysToShow.length > 0 && (
+                <div
+                  className="grid border-b border-gray-200 bg-gray-50 sticky top-0 z-20"
+                  style={{
+                    gridTemplateColumns: `repeat(${daysToShow.length}, minmax(0, 1fr))`,
+                  }}
+                >
+                  {daysToShow.map((day) => (
+                    <div
+                      key={day.short}
+                      className="px-3 py-2 text-center text-xs font-semibold uppercase tracking-wide text-gray-600 border-r border-gray-200 last:border-r-0"
+                    >
+                      {day.full}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {roomsToShow.map((room) => (
+                <div key={room.id} className="border-b border-gray-200">
+                  <div className="font-medium px-4 py-2.5 bg-white text-sm text-gray-900 border-b border-gray-100">
+                    {room.name}
+                    {selectedRoom !== "all" ? null : (
+                      <span className="text-gray-400 font-normal ml-2">
+                        · {daysToShow.map((d) => d.short).join(", ")}
+                      </span>
+                    )}
+                  </div>
+                  <div
+                    className="grid w-full"
+                    style={{
+                      gridTemplateColumns: `repeat(${Math.max(1, daysToShow.length)}, minmax(0, 1fr))`,
+                    }}
+                  >
+                    {daysToShow.map((day) => {
+                      const cellEvents = events.filter((e) => {
+                        if (e.roomId !== room.id || e.day !== day.short) {
+                          return false;
+                        }
+                        if (!normalizedQuery) return true;
+                        return e.title.toLowerCase().includes(normalizedQuery);
+                      });
                       return (
                         <CalendarCell
                           key={`${room.id}-${day.short}`}
@@ -239,12 +415,12 @@ export default function ScheduleClientPage() {
                           time="09:00"
                           events={cellEvents}
                           onDropEvent={handleDropEvent}
-                          onDropPlaylist={() => {}}
+                          onDropPlaylist={handleDropPlaylist}
                           onEventDelete={setPendingDeleteEvent}
-                          compact={false}
+                          compact={daysToShow.length > 3}
                           onQuickCreate={(r, d, t) => {
                             setPickerCell({ roomId: r, day: d, time: t });
-                            setSongPickerOpen(true);
+                            setAssignModalOpen(true);
                           }}
                         />
                       );
@@ -256,9 +432,30 @@ export default function ScheduleClientPage() {
           )}
         </div>
 
-        <ConfirmDialog open={!!pendingDeleteEvent} title="Remove from schedule?" description={pendingDeleteEvent ? `Remove "${pendingDeleteEvent.title}"?` : undefined} confirmLabel="Remove" cancelLabel="Keep" onCancel={() => setPendingDeleteEvent(null)} onConfirm={confirmDeleteEvent} />
+        <ConfirmDialog
+          open={!!pendingDeleteEvent}
+          title="Remove from schedule?"
+          description={
+            pendingDeleteEvent
+              ? `Remove "${pendingDeleteEvent.title}"?`
+              : undefined
+          }
+          confirmLabel="Remove"
+          cancelLabel="Keep"
+          onCancel={() => setPendingDeleteEvent(null)}
+          onConfirm={confirmDeleteEvent}
+        />
 
-        <SongPickerModal open={songPickerOpen} onClose={() => { setSongPickerOpen(false); setPickerCell(null); }} audio={audio} onSelect={handleSelectSong} />
+        <ScheduleAssignModal
+          open={assignModalOpen}
+          onClose={() => {
+            setAssignModalOpen(false);
+            setPickerCell(null);
+          }}
+          audio={audio}
+          onSelectAudio={handleSelectAudio}
+          onSelectPlaylist={handleSelectPlaylist}
+        />
       </div>
     </DndProvider>
   );

@@ -14,10 +14,10 @@ export default function ScheduleToolbar({
 }: {
   query: string;
   onQueryChange: (q: string) => void;
-  selectedRoom: string | "all";
-  onChangeRoom: (r: string | "all") => void;
-  selectedDay: string | "all";
-  onChangeDay: (d: string | "all") => void;
+  selectedRoom: string;
+  onChangeRoom: (r: string) => void;
+  selectedDay: string;
+  onChangeDay: (d: string) => void;
   rooms: { id: string; name: string }[];
   days: { short: string; full: string }[];
 }) {
@@ -40,7 +40,7 @@ export default function ScheduleToolbar({
       <div className="flex items-center gap-3">
         <select
           value={selectedRoom}
-          onChange={(e) => onChangeRoom(e.target.value as string)}
+          onChange={(e) => onChangeRoom(e.target.value)}
           className="text-sm px-3 py-1.5 rounded-md bg-gray-50 border border-transparent"
         >
           <option value="all">All Rooms</option>
@@ -51,7 +51,7 @@ export default function ScheduleToolbar({
 
         <select
           value={selectedDay}
-          onChange={(e) => onChangeDay(e.target.value as string)}
+          onChange={(e) => onChangeDay(e.target.value)}
           className="text-sm px-3 py-1.5 rounded-md bg-gray-50 border border-transparent"
         >
           <option value="all">All Days</option>
