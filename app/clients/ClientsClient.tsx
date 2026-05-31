@@ -3,7 +3,13 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/app/context/AuthContext";
 import { getApiClient } from "@/lib/api-client";
-import type { ClientCreateInput, ClientInfo } from "@/types/api";
+import type {
+	ClientBillingSummary,
+	ClientCreateInput,
+	ClientInfo,
+	InvoiceInfo,
+} from "@/types/api";
+import IssueInvoiceModal from "./components/IssueInvoiceModal";
 import AdminAddModal from "@/app/admin/components/AdminAddModal";
 import AdminToast from "@/app/admin/components/AdminToast";
 import {
@@ -12,6 +18,7 @@ import {
 	Mail,
 	Phone,
 	Search,
+	Receipt,
 	ShieldAlert,
 	X,
 } from "lucide-react";
@@ -45,9 +52,41 @@ const tierLocks: Record<Exclude<ClientFormState["subscriptionTier"], "ENTERPRISE
 	PROFESSIONAL: { maxPlayers: 20, maxStorageGb: 20 },
 };
 
+function normalizeBillingSummary(raw: Record<string, unknown>): ClientBillingSummary {
+	return {
+		clientId: String(raw.clientId ?? raw.client_id ?? ""),
+		tenantId: (raw.tenantId ?? raw.tenant_id) as string | null | undefined,
+		subscriptionTier: String(raw.subscriptionTier ?? raw.subscription_tier ?? "STARTER"),
+		planName: (raw.planName ?? raw.plan_name) as string | null | undefined,
+		maxPlayers: Number(raw.maxPlayers ?? raw.max_players ?? 0),
+		maxStorageGb: Number(raw.maxStorageGb ?? raw.max_storage_gb ?? 0),
+		totalInvoiced: Number(raw.totalInvoiced ?? raw.total_invoiced ?? 0),
+		outstandingBalance: Number(raw.outstandingBalance ?? raw.outstanding_balance ?? 0),
+		paidTotal: Number(raw.paidTotal ?? raw.paid_total ?? 0),
+		invoiceCount: Number(raw.invoiceCount ?? raw.invoice_count ?? 0),
+		recentInvoices: ((raw.recentInvoices ?? raw.recent_invoices) as unknown[])?.map(
+			(inv) => normalizeInvoice(inv as Record<string, unknown>)
+		) ?? [],
+	};
+}
+
+function normalizeInvoice(raw: Record<string, unknown>): InvoiceInfo {
+	return {
+		id: String(raw.id),
+		tenantId: String(raw.tenantId ?? raw.tenant_id ?? ""),
+		invoiceNumber: String(raw.invoiceNumber ?? raw.invoice_number ?? ""),
+		amount: Number(raw.amount ?? 0),
+		status: (String(raw.status ?? "UNPAID").toUpperCase() === "PAID" ? "PAID" : "UNPAID"),
+		dueDate: (raw.dueDate ?? raw.due_date) as string | null | undefined,
+		downloadUrl: (raw.downloadUrl ?? raw.download_url) as string | null | undefined,
+		createdAt: (raw.createdAt ?? raw.created_at) as string | null | undefined,
+	};
+}
+
 function normalizeClient(client: any): ClientInfo {
 	return {
 		id: client.id,
+		tenantId: client.tenantId ?? client.tenant_id ?? undefined,
 		name: client.name ?? "Untitled client",
 		businessType: client.businessType ?? client.business_type ?? "",
 		contactPerson: client.contactPerson ?? client.contact_person ?? "",
@@ -78,6 +117,11 @@ export default function ClientsClient() {
 	const [toastMessage, setToastMessage] = useState("Client created successfully");
 	const [form, setForm] = useState<ClientFormState>(initialFormState);
 	const [formError, setFormError] = useState<string | null>(null);
+	const [billingByClientId, setBillingByClientId] = useState<
+		Record<string, ClientBillingSummary>
+	>({});
+	const [invoiceClient, setInvoiceClient] = useState<ClientInfo | null>(null);
+	const [invoiceModalOpen, setInvoiceModalOpen] = useState(false);
 	const nameRef = useRef<HTMLInputElement>(null);
 	const isEnterpriseTier = form.subscriptionTier === "ENTERPRISE";
 
@@ -93,9 +137,20 @@ export default function ClientsClient() {
 		setError(null);
 
 		try {
-			const response = await apiClient.listClients();
+			const [clientsRes, billingRes] = await Promise.all([
+				apiClient.listClients(),
+				apiClient.getClientsBillingOverview().catch(() => null),
+			]);
 			if (cancelled) return;
-			setClients((response?.clients || []).map(normalizeClient));
+			setClients((clientsRes?.clients || []).map(normalizeClient));
+			if (billingRes?.summaries) {
+				const map: Record<string, ClientBillingSummary> = {};
+				for (const s of billingRes.summaries) {
+					const normalized = normalizeBillingSummary(s as unknown as Record<string, unknown>);
+					map[normalized.clientId] = normalized;
+				}
+				setBillingByClientId(map);
+			}
 		} catch (err: any) {
 			if (cancelled) return;
 			const status = err?.response?.status;
@@ -316,9 +371,24 @@ export default function ClientsClient() {
 						</div>
 					) : (
 						<div className="space-y-3">
-							{filteredClients.map((client) => (
-								<ClientCard key={client.id} client={client} />
-							))}
+							{filteredClients.map((client) => {
+								const billing = billingByClientId[client.id];
+								return (
+									<ClientCard
+										key={client.id}
+										client={client}
+										billing={billing}
+										onIssueInvoice={() => {
+											setInvoiceClient({
+												...client,
+												tenantId:
+													client.tenantId ?? billing?.tenantId ?? undefined,
+											});
+											setInvoiceModalOpen(true);
+										}}
+									/>
+								);
+							})}
 						</div>
 					)}
 				</div>
@@ -458,6 +528,20 @@ export default function ClientsClient() {
 				</div>
 			</AdminAddModal>
 
+			<IssueInvoiceModal
+				open={invoiceModalOpen}
+				client={invoiceClient}
+				onClose={() => {
+					setInvoiceModalOpen(false);
+					setInvoiceClient(null);
+				}}
+				onSuccess={() => {
+					void loadClients();
+					setToastMessage("Invoice registered successfully");
+					setToastOpen(true);
+				}}
+			/>
+
 			<AdminToast open={toastOpen} message={toastMessage} />
 		</div>
 	);
@@ -482,7 +566,21 @@ function Field({
 	);
 }
 
-function ClientCard({ client }: { client: ClientInfo }) {
+function formatMoney(amount: number) {
+	return new Intl.NumberFormat(undefined, { style: "currency", currency: "USD" }).format(
+		amount
+	);
+}
+
+function ClientCard({
+	client,
+	billing,
+	onIssueInvoice,
+}: {
+	client: ClientInfo;
+	billing?: ClientBillingSummary;
+	onIssueInvoice: () => void;
+}) {
 	const statusStyles: Record<ClientInfo["status"], string> = {
 		ACTIVE: "bg-green-50 text-green-700 border-green-100",
 		INACTIVE: "bg-gray-50 text-gray-700 border-gray-200",
@@ -521,19 +619,57 @@ function ClientCard({ client }: { client: ClientInfo }) {
 						<span
 							className={`rounded-full px-2.5 py-1 font-medium ${subscriptionStyles[client.subscriptionTier]}`}
 						>
-							{client.subscriptionTier}
+							{billing?.planName || client.subscriptionTier}
 						</span>
 						<span className="rounded-full bg-gray-50 px-2.5 py-1 text-gray-600">
-							{client.maxPlayers} players
+							{client.maxPlayers} players max
 						</span>
 						<span className="rounded-full bg-gray-50 px-2.5 py-1 text-gray-600">
-							{client.maxStorageGb} GB storage
+							{client.maxStorageGb} GB storage max
 						</span>
 					</div>
+
+					{billing && (
+						<div className="mt-4 grid gap-3 rounded-xl border border-gray-100 bg-gray-50/80 p-4 sm:grid-cols-3">
+							<Info
+								label="Total invoiced"
+								value={formatMoney(billing.totalInvoiced)}
+							/>
+							<Info
+								label="Outstanding"
+								value={formatMoney(billing.outstandingBalance)}
+							/>
+							<Info
+								label="Paid"
+								value={formatMoney(billing.paidTotal)}
+							/>
+						</div>
+					)}
+
+					{billing && billing.recentInvoices.length > 0 && (
+						<div className="mt-3 text-xs text-gray-500">
+							<span className="font-medium text-gray-700">Recent: </span>
+							{billing.recentInvoices
+								.slice(0, 3)
+								.map((inv) => inv.invoiceNumber)
+								.join(" · ")}
+						</div>
+					)}
 				</div>
 
-										<div className="shrink-0 pt-1 text-gray-400">
-					<ChevronRight size={20} />
+				<div className="flex shrink-0 flex-col items-end gap-2 pt-1">
+					<button
+						type="button"
+						onClick={onIssueInvoice}
+						disabled={!(client.tenantId ?? billing?.tenantId)}
+						className="inline-flex items-center gap-1.5 rounded-md border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 shadow-sm hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+					>
+						<Receipt size={14} />
+						Issue invoice
+					</button>
+					<div className="text-gray-400">
+						<ChevronRight size={20} />
+					</div>
 				</div>
 			</div>
 		</div>

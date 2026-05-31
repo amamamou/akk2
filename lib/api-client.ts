@@ -23,6 +23,15 @@ import type {
   SystemHealthMetrics,
   AnalyticsTimelineResponse,
   InvoicesListResponse,
+  InvoiceCreateInput,
+  InvoiceDetailResponse,
+  ClientsBillingOverviewResponse,
+  TenantSettingsResponse,
+  PlaylistsListResponse,
+  PlaylistDetailResponse,
+  PlaylistCreateInput,
+  PlaylistUpdateInput,
+  PlaylistItemAddInput,
 } from '@/types/api';
 import {
   AUTH_META_KEY,
@@ -621,6 +630,101 @@ export class ApiClient {
    */
   async listInvoices(): Promise<InvoicesListResponse> {
     const response = await this.instance.get<InvoicesListResponse>('/invoices/');
+    return response.data;
+  }
+
+  /**
+   * POST /invoices/ - Register manual invoice (SUPER_ADMIN)
+   */
+  async createInvoice(data: InvoiceCreateInput): Promise<InvoiceDetailResponse> {
+    const response = await this.instance.post<InvoiceDetailResponse>('/invoices/', {
+      tenant_id: data.tenantId,
+      invoice_number: data.invoiceNumber,
+      amount: data.amount,
+      status: data.status ?? 'UNPAID',
+      due_date: data.dueDate ?? null,
+      download_url: data.downloadUrl ?? null,
+    });
+    return response.data;
+  }
+
+  // ============ Clients Billing (Super Admin) ============
+
+  async getClientsBillingOverview(): Promise<ClientsBillingOverviewResponse> {
+    const response = await this.instance.get<ClientsBillingOverviewResponse>(
+      '/clients/billing-overview'
+    );
+    return response.data;
+  }
+
+  // ============ Tenant Settings ============
+
+  async getTenantSettings(): Promise<TenantSettingsResponse> {
+    const response = await this.instance.get<TenantSettingsResponse>('/settings/tenant');
+    return response.data;
+  }
+
+  // ============ Playlists ============
+
+  async listPlaylists(): Promise<PlaylistsListResponse> {
+    const response = await this.instance.get<PlaylistsListResponse>('/playlists');
+    return response.data;
+  }
+
+  async getPlaylist(playlistId: string): Promise<PlaylistDetailResponse> {
+    const response = await this.instance.get<PlaylistDetailResponse>(
+      `/playlists/${playlistId}`
+    );
+    return response.data;
+  }
+
+  async createPlaylist(data: PlaylistCreateInput): Promise<PlaylistDetailResponse> {
+    const response = await this.instance.post<PlaylistDetailResponse>('/playlists', {
+      title: data.title,
+      description: data.description,
+      cover_color: data.coverColor,
+    });
+    return response.data;
+  }
+
+  async updatePlaylist(
+    playlistId: string,
+    data: PlaylistUpdateInput
+  ): Promise<PlaylistDetailResponse> {
+    const response = await this.instance.put<PlaylistDetailResponse>(
+      `/playlists/${playlistId}`,
+      {
+        title: data.title,
+        description: data.description,
+        cover_color: data.coverColor,
+      }
+    );
+    return response.data;
+  }
+
+  async deletePlaylist(playlistId: string): Promise<{ ok: boolean; message?: string }> {
+    const response = await this.instance.delete(`/playlists/${playlistId}`);
+    return response.data;
+  }
+
+  async addPlaylistItem(
+    playlistId: string,
+    data: PlaylistItemAddInput
+  ): Promise<PlaylistDetailResponse> {
+    const response = await this.instance.post<PlaylistDetailResponse>(
+      `/playlists/${playlistId}/items`,
+      { mediaId: data.mediaId, position: data.position }
+    );
+    return response.data;
+  }
+
+  async removePlaylistItem(
+    playlistId: string,
+    itemId: string
+  ): Promise<PlaylistDetailResponse> {
+    const response = await this.instance.delete<PlaylistDetailResponse>(
+      `/playlists/${playlistId}/items/${itemId}`
+    );
     return response.data;
   }
 

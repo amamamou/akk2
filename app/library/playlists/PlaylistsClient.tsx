@@ -1,156 +1,93 @@
 "use client";
 
-import React, { useEffect, useState, useRef } from "react";
-import { Plus, Music } from "lucide-react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { Plus, Music, Loader2, AlertCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
 import PlaylistCard from "../components/PlaylistCard";
 import PlaylistModal from "../components/PlaylistModal";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import type { Playlist } from "../components/PlaylistModal";
 import AudioToolbar from "../components/AudioToolbar";
-import { useMemo } from "react";
+import { getApiClient } from "@/lib/api-client";
+import { apiPlaylistToUi } from "@/lib/playlist-mapper";
 
-const backendSupportsPlaylists = false;
-const samplePlaylists: Playlist[] = [];
+const PLAYLISTS_STORAGE_KEY = "aa_playlists";
 
 export default function LibraryPlaylistsClient() {
-  const [playlistModalOpen, setPlaylistModalOpen] = useState(false);
-  const PLAYLISTS_STORAGE_KEY = "aa_playlists";
-
-  // No backend playlist endpoint yet; keep this empty so the UI doesn't imply persistence.
+  const apiClient = getApiClient();
+  const router = useRouter();
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
+  const [playlistModalOpen, setPlaylistModalOpen] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [selectedPlaylistForDelete, setSelectedPlaylistForDelete] = useState<Playlist | null>(null);
+  const [query, setQuery] = useState("");
 
-  // On client mount, load persisted playlists (if any). Use a microtask to avoid sync setState in effect.
-  useEffect(() => {
-    if (!backendSupportsPlaylists) return;
+  const persistCache = useCallback((items: Playlist[]) => {
     try {
       if (typeof window === "undefined") return;
-      const raw = window.localStorage.getItem(PLAYLISTS_STORAGE_KEY);
-      if (raw !== null) {
-        const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed)) Promise.resolve().then(() => setPlaylists(parsed));
-      }
-    } catch {
-      // ignore
-    }
-  }, []);
-
-  // ref to keep the latest playlists for event handler comparisons
-  const playlistsRef = useRef<Playlist[]>(playlists);
-
-  // persist playlists to localStorage on change and notify other parts of the app
-  useEffect(() => {
-    if (!backendSupportsPlaylists) return;
-    try {
-      if (typeof window === "undefined") return;
-      const nextJson = JSON.stringify(playlists);
-      const existing = window.localStorage.getItem(PLAYLISTS_STORAGE_KEY);
-      // If storage is empty and we're still at the built-in sample playlists, don't write them.
-      if (existing === null && playlists === samplePlaylists) return;
-      console.debug?.("[playlists] persist check", { key: PLAYLISTS_STORAGE_KEY, existing, nextJson });
-      // only write/dispatch if the stored value actually differs
-      if (existing !== nextJson) {
-        console.debug?.("[playlists] writing to localStorage", PLAYLISTS_STORAGE_KEY);
-        window.localStorage.setItem(PLAYLISTS_STORAGE_KEY, nextJson);
-        // update the ref first so same-window handlers don't treat this as an external change
-        playlistsRef.current = playlists;
-        // dispatch a custom event so other clients/components can react without relying on storage events
-        window.dispatchEvent(new CustomEvent("aa:playlists-updated", { detail: { count: playlists.length } }));
-      } else {
-        // ensure ref still matches current playlists
-        playlistsRef.current = playlists;
-      }
+      window.localStorage.setItem(PLAYLISTS_STORAGE_KEY, JSON.stringify(items));
+      window.dispatchEvent(
+        new CustomEvent("aa:playlists-updated", { detail: { count: items.length } })
+      );
     } catch {
       /* ignore */
     }
-  }, [playlists]);
-
-  // keep the ref in sync with the latest playlists (covers initial mount too)
-  useEffect(() => {
-    if (!backendSupportsPlaylists) return;
-    playlistsRef.current = playlists;
-  }, [playlists]);
-
-  // keep playlists in sync if updated in another tab or elsewhere in the app
-  useEffect(() => {
-    if (!backendSupportsPlaylists) return;
-    if (typeof window === "undefined") return;
-
-
-    const handleStorage = (event: StorageEvent) => {
-      if (event.key !== PLAYLISTS_STORAGE_KEY) return;
-      try {
-        console.debug?.("[playlists] storage event", event);
-        const raw = event.newValue;
-        if (!raw) {
-          // only update if different
-          if (playlistsRef.current.length !== samplePlaylists.length || JSON.stringify(playlistsRef.current) !== JSON.stringify(samplePlaylists)) {
-            setPlaylists(samplePlaylists);
-            playlistsRef.current = samplePlaylists;
-          }
-          return;
-        }
-        const parsed = JSON.parse(raw) as Playlist[];
-        console.debug?.("[playlists] storage parsed:", parsed);
-        if (Array.isArray(parsed) && JSON.stringify(parsed) !== JSON.stringify(playlistsRef.current)) {
-          console.debug?.("[playlists] storage -> updating playlists state");
-          setPlaylists(parsed);
-          playlistsRef.current = parsed;
-        }
-      } catch {
-        // ignore
-      }
-    };
-
-    const handleCustom = () => {
-      try {
-        console.debug?.("[playlists] custom aa:playlists-updated event received");
-        const raw = window.localStorage.getItem(PLAYLISTS_STORAGE_KEY);
-        if (!raw) return;
-        const parsed = JSON.parse(raw) as Playlist[];
-        console.debug?.("[playlists] custom parsed:", parsed);
-        if (Array.isArray(parsed) && JSON.stringify(parsed) !== JSON.stringify(playlistsRef.current)) {
-          console.debug?.("[playlists] custom -> updating playlists state");
-          setPlaylists(parsed);
-          playlistsRef.current = parsed;
-        }
-      } catch {
-        // ignore
-      }
-    };
-
-    window.addEventListener("storage", handleStorage);
-    window.addEventListener("aa:playlists-updated", handleCustom as EventListener);
-
-    return () => {
-      window.removeEventListener("storage", handleStorage);
-      window.removeEventListener("aa:playlists-updated", handleCustom as EventListener);
-    };
   }, []);
-  const [deleteOpen, setDeleteOpen] = useState(false);
-  const [selectedPlaylistForDelete, setSelectedPlaylistForDelete] = useState<Playlist | null>(null);
-  const router = useRouter();
 
-  // Pagination (match AudioClient behavior)
-  const [page, setPage] = useState<number>(1);
-  const [perPage, setPerPage] = useState<number>(10);
+  const loadPlaylists = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await apiClient.listPlaylists();
+      const mapped = (res.playlists ?? []).map(apiPlaylistToUi);
+      setPlaylists(mapped);
+      persistCache(mapped);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load playlists");
+      try {
+        const raw = window.localStorage.getItem(PLAYLISTS_STORAGE_KEY);
+        if (raw) {
+          const parsed = JSON.parse(raw) as Playlist[];
+          if (Array.isArray(parsed)) setPlaylists(parsed);
+        }
+      } catch {
+        /* ignore */
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, [apiClient, persistCache]);
+
+  useEffect(() => {
+    void loadPlaylists();
+  }, [loadPlaylists]);
+
+  const filteredPlaylists = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return playlists;
+    return playlists.filter(
+      (p) =>
+        p.title.toLowerCase().includes(q) ||
+        (p.description ?? "").toLowerCase().includes(q)
+    );
+  }, [playlists, query]);
+
+  const [page, setPage] = useState(1);
+  const [perPage, setPerPage] = useState(10);
   const perPageOptions = [5, 10, 20, 50];
-  const filteredCount = playlists.length;
+  const filteredCount = filteredPlaylists.length;
   const totalPages = Math.max(1, Math.ceil(filteredCount / perPage));
 
-  // clamp page if playlists change
   useEffect(() => {
-    if (page > totalPages) {
-      // schedule an update to avoid synchronous setState inside effect
-  Promise.resolve().then(() => setPage(totalPages));
-    }
-    // only run when totalPages changes or page changes
+    if (page > totalPages) setPage(totalPages);
   }, [page, totalPages]);
 
   const paginatedPlaylists = useMemo(() => {
     const start = (page - 1) * perPage;
-    return playlists.slice(start, start + perPage);
-  }, [playlists, page, perPage]);
+    return filteredPlaylists.slice(start, start + perPage);
+  }, [filteredPlaylists, page, perPage]);
 
   const handlePlaylistClick = (playlistId: string) => {
     router.push(`/library/playlists/${playlistId}`);
@@ -158,7 +95,6 @@ export default function LibraryPlaylistsClient() {
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-white">
-      {/* Header */}
       <div className="sticky top-0 z-10 bg-white border-b border-gray-200">
         <div className="px-8 py-6">
           <div className="flex items-center justify-between">
@@ -167,15 +103,12 @@ export default function LibraryPlaylistsClient() {
               <p className="mt-1 text-sm text-gray-500">
                 Create and manage playback programs for your spaces
               </p>
-              <span className="mt-3 inline-flex items-center rounded-full bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-800">
-                Coming Soon
-              </span>
             </div>
 
             <button
               type="button"
-              disabled
-              className="inline-flex items-center gap-2 rounded-md bg-gray-100 text-gray-400 px-4 py-2 text-sm font-medium cursor-not-allowed"
+              onClick={() => setPlaylistModalOpen(true)}
+              className="inline-flex items-center gap-2 rounded-md bg-[#A473FF] px-4 py-2 text-sm font-medium text-white hover:bg-[#7A42FF]"
             >
               <Plus size={16} />
               <span>New playlist</span>
@@ -184,78 +117,113 @@ export default function LibraryPlaylistsClient() {
         </div>
       </div>
 
-      {/* Content */}
       <div className="flex-1 overflow-auto bg-white">
         <div className="px-6 py-6">
-          
-          {paginatedPlaylists.length === 0 ? (
+          {error && (
+            <div className="mb-4 flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+              <AlertCircle size={16} className="shrink-0" />
+              <span>{error}</span>
+            </div>
+          )}
+
+          {loading ? (
+            <div className="flex items-center justify-center py-16 text-sm text-gray-500">
+              <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+              Loading playlists…
+            </div>
+          ) : paginatedPlaylists.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16">
               <div className="text-center space-y-4 max-w-sm">
                 <div className="inline-flex items-center justify-center w-14 h-14 rounded-lg bg-gray-100">
                   <Music size={28} className="text-gray-400" />
                 </div>
-                <h2 className="text-lg font-semibold text-gray-900">Playlists coming soon</h2>
+                <h2 className="text-lg font-semibold text-gray-900">No playlists yet</h2>
                 <p className="text-sm text-gray-600">
-                  Playlists are not connected to a backend endpoint yet, so we are hiding dummy data until they are ready.
+                  Create your first playlist to organize tracks for scheduling and playback.
                 </p>
-                <div className="inline-flex items-center gap-2 rounded-md bg-gray-100 text-gray-400 px-5 py-2.5 text-sm font-medium mt-4">
+                <button
+                  type="button"
+                  onClick={() => setPlaylistModalOpen(true)}
+                  className="inline-flex items-center gap-2 rounded-md bg-[#A473FF] px-5 py-2.5 text-sm font-medium text-white hover:bg-[#7A42FF]"
+                >
                   <Plus size={16} />
                   Create playlist
-                </div>
+                </button>
               </div>
             </div>
           ) : (
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-                {paginatedPlaylists.map((playlist) => (
-                  <PlaylistCard
-                    key={playlist.id}
-                    playlist={playlist}
-                    onClick={handlePlaylistClick}
-                    onEdit={(id, newTitle) => {
-                      if (!newTitle) return;
-                      setPlaylists((prev) => prev.map((pl) => (pl.id === id ? { ...pl, title: newTitle } : pl)));
-                    }}
-                    onDelete={(id) => {
-                      const p = playlists.find((pl) => pl.id === id) || null;
-                      setSelectedPlaylistForDelete(p);
-                      setDeleteOpen(true);
-                    }}
-                  />
-                ))}
-              </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+              {paginatedPlaylists.map((playlist) => (
+                <PlaylistCard
+                  key={playlist.id}
+                  playlist={playlist}
+                  onClick={handlePlaylistClick}
+                  onEdit={async (id, newTitle) => {
+                    if (!newTitle?.trim()) return;
+                    try {
+                      await apiClient.updatePlaylist(id, { title: newTitle.trim() });
+                      await loadPlaylists();
+                    } catch {
+                      setPlaylists((prev) =>
+                        prev.map((pl) =>
+                          pl.id === id ? { ...pl, title: newTitle.trim() } : pl
+                        )
+                      );
+                    }
+                  }}
+                  onDelete={(id) => {
+                    const p = playlists.find((pl) => pl.id === id) || null;
+                    setSelectedPlaylistForDelete(p);
+                    setDeleteOpen(true);
+                  }}
+                />
+              ))}
             </div>
           )}
         </div>
       </div>
 
       <AudioToolbar
-        query={""}
-        setQuery={() => {}}
+        query={query}
+        setQuery={setQuery}
         filteredCount={filteredCount}
         totalCount={playlists.length}
         page={page}
-        setPage={(n) => setPage(n)}
+        setPage={setPage}
         perPage={perPage}
-        setPerPage={(n) => { setPerPage(n); }}
+        setPerPage={setPerPage}
         perPageOptions={perPageOptions}
         totalPages={totalPages}
-        placeholder={"Search by title, track."}
+        placeholder="Search by title, track."
       />
 
-      {/* Create playlist modal */}
       <PlaylistModal
         open={playlistModalOpen}
         onClose={() => setPlaylistModalOpen(false)}
         playlists={playlists}
-        onCreatePlaylist={(playlist) => {
-          setPlaylists((prev) => [...prev, playlist]);
-          console.log("[v0] Playlist created:", playlist);
-        }}
-        onAddToPlaylist={(playlistId, trackId) => {
-          console.log("[v0] Added track to playlist:", playlistId, trackId);
+        onCreatePlaylist={async (playlist) => {
+          try {
+            const res = await apiClient.createPlaylist({
+              title: playlist.title,
+              description: playlist.description,
+              coverColor: playlist.coverColor,
+            });
+            const created = apiPlaylistToUi(res.playlist);
+            setPlaylists((prev) => {
+              const next = [created, ...prev];
+              persistCache(next);
+              return next;
+            });
+            setPlaylistModalOpen(false);
+            router.push(`/library/playlists/${created.id}`);
+          } catch (err) {
+            setError(
+              err instanceof Error ? err.message : "Failed to create playlist"
+            );
+          }
         }}
       />
+
       <ConfirmDialog
         open={deleteOpen}
         title="Delete playlist"
@@ -266,8 +234,16 @@ export default function LibraryPlaylistsClient() {
           setDeleteOpen(false);
           setSelectedPlaylistForDelete(null);
         }}
-        onConfirm={() => {
-          setPlaylists((prev) => prev.filter((p) => p.id !== selectedPlaylistForDelete?.id));
+        onConfirm={async () => {
+          const id = selectedPlaylistForDelete?.id;
+          if (!id) return;
+          try {
+            await apiClient.deletePlaylist(id);
+            await loadPlaylists();
+          } catch {
+            setPlaylists((prev) => prev.filter((p) => p.id !== id));
+            persistCache(playlists.filter((p) => p.id !== id));
+          }
           setSelectedPlaylistForDelete(null);
           setDeleteOpen(false);
         }}

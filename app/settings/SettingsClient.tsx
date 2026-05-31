@@ -6,6 +6,7 @@ import { useAuth } from "@/app/context/AuthContext";
 import SettingsHeader, { type SettingsTab } from "./components/SettingsHeader";
 import MyDetailsTab from "./components/MyDetailsTab";
 import BillingTab from "./components/BillingTab";
+import PlanTab from "./components/PlanTab";
 
 const USER_STORAGE_KEY = "akou.user";
 
@@ -262,11 +263,17 @@ export default function SettingsClient() {
               setAvatar={setAvatar}
               setDirty={setDirty}
             />
+          ) : activeTab === "plan" ? (
+            <PlanTab />
           ) : activeTab === "billing" ? (
             <BillingTab />
           ) : (
-            <div className="text-sm text-gray-500">
-              This feature is coming soon.
+            <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-6 text-sm text-gray-600">
+              <p className="font-medium text-gray-900">Integrations</p>
+              <p className="mt-2">
+                Third-party integrations are not configured for this environment yet.
+                Use the Plan and Billing tabs for subscription and invoice details.
+              </p>
             </div>
           )}
         </div>

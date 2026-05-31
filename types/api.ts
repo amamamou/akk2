@@ -183,6 +183,7 @@ export interface ApiErrorResponse {
 export interface ClientInfo {
   id: string;
   name: string;
+  tenantId?: string;
   businessType?: string;
   contactPerson?: string;
   email?: string;
@@ -276,5 +277,104 @@ export interface InvoicesListResponse {
   ok: boolean;
   tenantId: string;
   invoices: InvoiceInfo[];
+}
+
+export interface InvoiceCreateInput {
+  tenantId: string;
+  invoiceNumber: string;
+  amount: number;
+  status?: 'PAID' | 'UNPAID';
+  dueDate?: string | null;
+  downloadUrl?: string | null;
+}
+
+export interface InvoiceDetailResponse {
+  ok: boolean;
+  invoice: InvoiceInfo;
+}
+
+export interface ClientBillingSummary {
+  clientId: string;
+  tenantId?: string | null;
+  subscriptionTier: 'STARTER' | 'PROFESSIONAL' | 'ENTERPRISE' | string;
+  planName?: string | null;
+  maxPlayers: number;
+  maxStorageGb: number;
+  totalInvoiced: number;
+  outstandingBalance: number;
+  paidTotal: number;
+  invoiceCount: number;
+  recentInvoices: InvoiceInfo[];
+}
+
+export interface ClientsBillingOverviewResponse {
+  ok: boolean;
+  summaries: ClientBillingSummary[];
+}
+
+export interface TenantSettingsData {
+  brandingName?: string | null;
+  brandingColor?: string | null;
+  logoUrl?: string | null;
+  planName?: string | null;
+  subscriptionTier?: string | null;
+  maxPlayers: number;
+  maxStorageGb: number;
+  usedPlayers: number;
+  usedStorageGb: number;
+}
+
+export interface TenantSettingsResponse {
+  ok: boolean;
+  tenantId: string;
+  settings: TenantSettingsData;
+}
+
+export interface PlaylistTrackInfo {
+  id: string;
+  mediaId: string;
+  title: string;
+  duration: number;
+  position: number;
+}
+
+export interface PlaylistApiInfo {
+  id: string;
+  title: string;
+  description?: string | null;
+  trackCount: number;
+  totalDurationSeconds: number;
+  totalDuration: string;
+  coverColor?: string | null;
+  lastModified?: string | null;
+  tracks?: PlaylistTrackInfo[];
+}
+
+export interface PlaylistsListResponse {
+  ok: boolean;
+  tenantId: string;
+  playlists: PlaylistApiInfo[];
+}
+
+export interface PlaylistDetailResponse {
+  ok: boolean;
+  playlist: PlaylistApiInfo;
+}
+
+export interface PlaylistCreateInput {
+  title: string;
+  description?: string;
+  coverColor?: string;
+}
+
+export interface PlaylistUpdateInput {
+  title?: string;
+  description?: string;
+  coverColor?: string;
+}
+
+export interface PlaylistItemAddInput {
+  mediaId: string;
+  position?: number;
 }
 
