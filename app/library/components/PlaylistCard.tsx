@@ -4,6 +4,7 @@ import React, { useState, useRef, useEffect } from "react";
 import { Music, MoreVertical, Edit2, Trash } from "lucide-react";
 import { cn } from "@/utils/cn";
 import type { Playlist } from "./PlaylistModal";
+import { isValidPlaylistId } from "@/lib/playlist-mapper";
 
 // Cover gradient presets (richer palette)
 const coverGradients = {
@@ -26,7 +27,7 @@ export default function PlaylistCard({
   // onEdit called when renaming: (id, newTitle)
   onEdit?: (playlistId: string, newTitle: string) => void;
   onDelete?: (playlistId: string) => void;
-  onClick?: (playlistId: string) => void;
+  onClick?: () => void;
   onPlay?: (playlistId: string) => void;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -51,6 +52,12 @@ export default function PlaylistCard({
     }
   }
   const gradientClass = coverGradients[playlist.coverColor || "indigo"];
+
+  const openPlaylist = () => {
+    if (!isValidPlaylistId(playlist.id)) return;
+    onClick?.();
+  };
+
   return (
     <div
       className="group relative cursor-pointer w-full flex flex-col items-start transform transition-transform duration-200 will-change-transform group-hover:scale-[1.03]"
@@ -59,16 +66,16 @@ export default function PlaylistCard({
       <div
         onClick={(e) => {
           e.stopPropagation();
-          // prefer onPlay if provided for backwards compatibility with callers
+          if (!isValidPlaylistId(playlist.id)) return;
           if (onPlay) onPlay(playlist.id);
-          else onClick?.(playlist.id);
+          else openPlaylist();
         }}
         role="button"
         tabIndex={0}
         onKeyDown={(e) => {
           if (e.key === "Enter") {
             e.stopPropagation();
-            onClick?.(playlist.id);
+            openPlaylist();
           }
         }}
         className={cn("w-full aspect-square rounded-lg overflow-hidden relative bg-gradient-to-br", gradientClass)}

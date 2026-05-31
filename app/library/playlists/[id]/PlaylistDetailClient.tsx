@@ -1,18 +1,34 @@
 "use client";
 
 import React, { useCallback, useEffect, useState, useRef } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useParams } from "next/navigation";
 import { Music, Plus, Edit, Trash, Check, Loader2, X } from "lucide-react";
 import { cn } from "@/utils/cn";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import type { Playlist } from "../../components/PlaylistModal";
 import { getApiClient } from "@/lib/api-client";
-import { apiPlaylistToUi } from "@/lib/playlist-mapper";
+import { apiPlaylistToUi, isValidPlaylistId } from "@/lib/playlist-mapper";
 import type { PlaylistTrackInfo } from "@/types/api";
 
-export default function PlaylistDetailClient({ playlistId }: { playlistId: string }) {
+export default function PlaylistDetailClient({
+  playlistId: playlistIdProp,
+}: {
+  playlistId?: string;
+}) {
   const apiClient = getApiClient();
   const router = useRouter();
+  const routeParams = useParams();
+  const routeId =
+    typeof routeParams?.id === "string"
+      ? routeParams.id
+      : Array.isArray(routeParams?.id)
+        ? routeParams.id[0]
+        : undefined;
+  const playlistId = isValidPlaylistId(playlistIdProp)
+    ? playlistIdProp
+    : isValidPlaylistId(routeId)
+      ? routeId
+      : "";
   const [playlist, setPlaylist] = useState<Playlist | null>(null);
   const [tracks, setTracks] = useState<PlaylistTrackInfo[]>([]);
   const [loading, setLoading] = useState(true);
@@ -27,11 +43,22 @@ export default function PlaylistDetailClient({ playlistId }: { playlistId: strin
   const titleRef = useRef<HTMLInputElement | null>(null);
 
   const loadPlaylist = useCallback(async () => {
+    if (!isValidPlaylistId(playlistId)) {
+      setLoading(false);
+      setError("Invalid playlist link.");
+      setPlaylist(null);
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
       const res = await apiClient.getPlaylist(playlistId);
       const ui = apiPlaylistToUi(res.playlist);
+      if (!ui) {
+        setError("Playlist response is missing an id.");
+        setPlaylist(null);
+        return;
+      }
       setPlaylist(ui);
       setTracks(res.playlist.tracks ?? []);
       setName(ui.title);

@@ -1,8 +1,12 @@
 "use client";
 
 import React, { useRef, useState } from "react";
-import NextImage from "next/image";
-import { UploadCloud, Edit2, Trash, Camera } from "lucide-react";
+import { UploadCloud, Edit2, Trash, Camera, Loader2 } from "lucide-react";
+import { getApiClient } from "@/lib/api-client";
+import {
+  dispatchUserProfileUpdated,
+  persistUserProfileToStorage,
+} from "@/lib/user-profile-events";
 
 type Country = {
   name: string;
@@ -41,6 +45,13 @@ interface MyDetailsTabProps {
   setDirty: (val: boolean) => void;
 }
 
+function isRemoteImageUrl(src: string | null | undefined): boolean {
+  return (
+    typeof src === "string" &&
+    (src.startsWith("http://") || src.startsWith("https://") || src.startsWith("/"))
+  );
+}
+
 export default function MyDetailsTab({
   initial,
   firstName,
@@ -64,9 +75,57 @@ export default function MyDetailsTab({
 }: MyDetailsTabProps) {
   const [photoError, setPhotoError] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const initials = `${(firstName || "").trim().charAt(0)}${(lastName || "").trim().charAt(0)}`.toUpperCase();
+
+  function notifyAvatarChange(url: string | null) {
+    dispatchUserProfileUpdated({
+      firstName,
+      lastName,
+      role,
+      avatar: url,
+    });
+    persistUserProfileToStorage({
+      firstName,
+      lastName,
+      email,
+      avatar: url,
+    });
+  }
+
+  async function uploadAndPersistPhoto(f: File) {
+    const apiClient = getApiClient();
+    setUploadingPhoto(true);
+    setPhotoError(null);
+    try {
+      const uploadRes = await apiClient.uploadImage(f);
+      const publicUrl = uploadRes.url;
+      if (!publicUrl) {
+        throw new Error("Upload succeeded but no URL was returned");
+      }
+
+      await apiClient.updateUserProfile({ profilePhotoUrl: publicUrl });
+      setAvatar(publicUrl);
+      setDirty(false);
+      notifyAvatarChange(publicUrl);
+    } catch (err) {
+      const ax = err as { response?: { data?: { detail?: { error?: string } | string } } };
+      const detail = ax?.response?.data?.detail;
+      const msg =
+        typeof detail === "object" && detail && "error" in detail
+          ? String(detail.error)
+          : typeof detail === "string"
+            ? detail
+            : err instanceof Error
+              ? err.message
+              : "Failed to upload profile photo";
+      setPhotoError(msg);
+    } finally {
+      setUploadingPhoto(false);
+    }
+  }
 
   async function validateAndSetFile(f: File | null) {
     setPhotoError(null);
@@ -76,32 +135,19 @@ export default function MyDetailsTab({
       return;
     }
 
-    // Enforce a sensible file size limit to avoid enormous data URIs
-    const MAX_BYTES = 2 * 1024 * 1024; // 2 MB recommended in UI
+    const MAX_BYTES = 2 * 1024 * 1024;
     if (f.size > MAX_BYTES) {
       setPhotoError("Image file is too large. Please use a file under 2MB.");
       return;
     }
 
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      const result = reader.result;
-      if (typeof result === "string") {
-        // For now we keep the data URL in-memory so the UI shows the preview,
-        // but SettingsClient will avoid persisting full data URIs to localStorage.
-        setAvatar(result);
-        setDirty(true);
-      }
-    };
-    reader.onerror = () => {
-      setPhotoError("Failed to read image.");
-    };
-    reader.readAsDataURL(f);
+    await uploadAndPersistPhoto(f);
   }
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0] ?? null;
     void validateAndSetFile(f);
+    if (fileInputRef.current) fileInputRef.current.value = "";
   }
 
   function handleDrop(e: React.DragEvent<HTMLDivElement>) {
@@ -125,10 +171,23 @@ export default function MyDetailsTab({
     setIsDragging(false);
   }
 
-  function removePhoto() {
-    setAvatar(null);
-    setDirty(true);
-    if (fileInputRef.current) fileInputRef.current.value = "";
+  async function removePhoto() {
+    setPhotoError(null);
+    setUploadingPhoto(true);
+    try {
+      const apiClient = getApiClient();
+      await apiClient.updateUserProfile({ profilePhotoUrl: null });
+      setAvatar(null);
+      setDirty(false);
+      notifyAvatarChange(null);
+    } catch (err) {
+      setPhotoError(
+        err instanceof Error ? err.message : "Failed to remove profile photo"
+      );
+    } finally {
+      setUploadingPhoto(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
   }
 
   return (
@@ -150,10 +209,11 @@ export default function MyDetailsTab({
             <input
               ref={fileInputRef}
               type="file"
-              accept="image/*"
+              accept="image/jpeg,image/png,image/gif,image/webp"
               onChange={handleFileChange}
               className="hidden"
               aria-hidden
+              disabled={uploadingPhoto}
             />
 
             <div
@@ -170,6 +230,7 @@ export default function MyDetailsTab({
               <div className="flex-shrink-0">
                 <button
                   type="button"
+                  disabled={uploadingPhoto}
                   onClick={() => fileInputRef.current?.click()}
                   onKeyDown={(e) => {
                     if (e.key === "Enter" || e.key === " ") {
@@ -177,20 +238,27 @@ export default function MyDetailsTab({
                       fileInputRef.current?.click();
                     }
                   }}
-                  className="relative group h-24 w-24 rounded-full bg-gray-50 flex items-center justify-center overflow-hidden focus:outline-none focus:ring-2 focus:ring-gray-300 focus:ring-offset-2"
+                  className="relative group h-24 w-24 rounded-full bg-gray-50 flex items-center justify-center overflow-hidden focus:outline-none focus:ring-2 focus:ring-gray-300 focus:ring-offset-2 disabled:opacity-60"
                   aria-label={avatar ? "Change profile photo" : "Upload profile photo"}
                 >
-                  {avatar ? (
-                    <NextImage
-                      src={avatar}
-                      alt="Profile preview"
-                      width={96}
-                      height={96}
-                      // Prevent Next/Image aspect-ratio warnings by allowing the browser
-                      // to size the image and using contain for safe letterboxing.
-                      style={{ width: "auto", height: "auto", objectFit: "contain" }}
-                      className=""
-                    />
+                  {uploadingPhoto ? (
+                    <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+                  ) : avatar ? (
+                    isRemoteImageUrl(avatar) ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={avatar}
+                        alt="Profile"
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={avatar}
+                        alt="Profile preview"
+                        className="h-full w-full object-cover"
+                      />
+                    )
                   ) : (
                     <div
                       className="h-full w-full flex items-center justify-center bg-gray-100 text-gray-500 text-sm font-medium"
@@ -200,7 +268,6 @@ export default function MyDetailsTab({
                       {initials || ""}
                     </div>
                   )}
-                  {/* subtle camera affordance on hover/focus */}
                   <span className="pointer-events-none absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 group-focus:opacity-100 transition-opacity">
                     <span className="bg-white/80 p-1 rounded-full">
                       <Camera size={16} className="text-gray-500" />
@@ -215,8 +282,9 @@ export default function MyDetailsTab({
                     <>
                       <button
                         type="button"
+                        disabled={uploadingPhoto}
                         onClick={() => fileInputRef.current?.click()}
-                        className="inline-flex items-center gap-2 px-2 py-1 rounded-md bg-white text-sm text-gray-700 border border-gray-200 hover:bg-gray-50 focus:outline-none focus:ring-1 focus:ring-gray-200"
+                        className="inline-flex items-center gap-2 px-2 py-1 rounded-md bg-white text-sm text-gray-700 border border-gray-200 hover:bg-gray-50 focus:outline-none focus:ring-1 focus:ring-gray-200 disabled:opacity-50"
                         aria-label="Upload photo"
                       >
                         <UploadCloud size={14} className="text-gray-500" />
@@ -229,27 +297,29 @@ export default function MyDetailsTab({
                       <div className="flex items-center gap-2">
                         <button
                           type="button"
+                          disabled={uploadingPhoto}
                           onClick={() => fileInputRef.current?.click()}
-                          className="inline-flex items-center gap-2 text-sm text-gray-700 px-3 py-1 rounded-md border border-gray-200 bg-white hover:bg-gray-50"
+                          className="inline-flex items-center gap-2 text-sm text-gray-700 px-3 py-1 rounded-md border border-gray-200 bg-white hover:bg-gray-50 disabled:opacity-50"
                         >
                           <Edit2 size={14} className="text-gray-500" />
                           <span>Replace</span>
                         </button>
                         <button
                           type="button"
-                          onClick={removePhoto}
-                          className="inline-flex items-center gap-2 text-sm text-gray-600 px-3 py-1 rounded-md border border-gray-200 bg-white hover:bg-gray-50"
+                          disabled={uploadingPhoto}
+                          onClick={() => void removePhoto()}
+                          className="inline-flex items-center gap-2 text-sm text-gray-600 px-3 py-1 rounded-md border border-gray-200 bg-white hover:bg-gray-50 disabled:opacity-50"
                         >
                           <Trash size={14} className="text-gray-400" />
                           <span>Remove</span>
                         </button>
                       </div>
-                      <div className="text-sm text-gray-400">Click Replace to change photo</div>
+                      <div className="text-sm text-gray-400">Stored on Cloudflare R2</div>
                     </div>
                   )}
                 </div>
 
-                <p className="text-xs text-gray-400 mt-2">PNG, JPG, GIF — recommended 400×400px. Max 2MB.</p>
+                <p className="text-xs text-gray-400 mt-2">PNG, JPG, WebP, or GIF — max 2MB.</p>
                 {photoError && <p className="mt-2 text-xs text-red-600">{photoError}</p>}
               </div>
             </div>

@@ -32,6 +32,9 @@ import type {
   PlaylistCreateInput,
   PlaylistUpdateInput,
   PlaylistItemAddInput,
+  ImageUploadResponse,
+  UserProfileResponse,
+  UserProfileUpdateInput,
 } from '@/types/api';
 import {
   AUTH_META_KEY,
@@ -463,6 +466,44 @@ export class ApiClient {
    */
   async deleteMedia(mediaId: string): Promise<{ ok: boolean; message: string }> {
     const response = await this.instance.delete(`/media/${mediaId}`);
+    return response.data;
+  }
+
+  // ============ Assets (images) ============
+
+  /**
+   * POST /assets/upload-image - Upload image to R2 (profile photos, branding)
+   */
+  async uploadImage(file: File): Promise<ImageUploadResponse> {
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await this.instance.post<ImageUploadResponse>(
+      '/assets/upload-image',
+      formData,
+      {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      }
+    );
+    return response.data;
+  }
+
+  // ============ User Profile ============
+
+  async getUserProfile(): Promise<UserProfileResponse> {
+    const response = await this.instance.get<UserProfileResponse>('/users/profile');
+    return response.data;
+  }
+
+  async updateUserProfile(data: UserProfileUpdateInput): Promise<UserProfileResponse> {
+    const response = await this.instance.put<UserProfileResponse>('/users/profile', {
+      name: data.name,
+      firstName: data.firstName,
+      lastName: data.lastName,
+      country: data.country,
+      timezone: data.timezone,
+      bio: data.bio,
+      profilePhotoUrl: data.profilePhotoUrl,
+    });
     return response.data;
   }
 

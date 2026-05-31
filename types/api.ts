@@ -378,3 +378,37 @@ export interface PlaylistItemAddInput {
   position?: number;
 }
 
+export interface ImageUploadResponse {
+  ok: boolean;
+  url: string;
+  objectKey?: string;
+}
+
+export interface UserProfileApi {
+  id: string;
+  email: string;
+  name?: string | null;
+  firstName?: string | null;
+  lastName?: string | null;
+  role: string;
+  country?: string | null;
+  timezone?: string | null;
+  bio?: string | null;
+  profilePhotoUrl?: string | null;
+}
+
+export interface UserProfileResponse {
+  ok: boolean;
+  user: UserProfileApi;
+}
+
+export interface UserProfileUpdateInput {
+  name?: string;
+  firstName?: string;
+  lastName?: string;
+  country?: string;
+  timezone?: string;
+  bio?: string;
+  profilePhotoUrl?: string | null;
+}
+

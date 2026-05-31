@@ -4,13 +4,21 @@ import { useDrag } from "react-dnd";
 import { GripHorizontal, Music } from "lucide-react";
 import { cn } from "../../../utils/cn";
 import type { Playlist } from "../../library/components/PlaylistModal";
+import { isValidPlaylistId } from "@/lib/playlist-mapper";
 
 const ITEM_TYPES = { PLAYLIST: "playlist" };
 
 export default function DraggablePlaylistCard({ playlist }: { playlist: Playlist }) {
+  const playlistId = isValidPlaylistId(playlist.id) ? playlist.id : "";
   const [{ isDragging }, dragRef] = useDrag(() => ({
     type: ITEM_TYPES.PLAYLIST,
-    item: { playlistId: playlist.id, title: playlist.title, trackCount: playlist.trackCount, totalDuration: playlist.totalDuration },
+    item: {
+      playlistId,
+      title: playlist.title,
+      trackCount: playlist.trackCount,
+      totalDuration: playlist.totalDuration,
+    },
+    canDrag: () => isValidPlaylistId(playlist.id),
     collect: (monitor) => ({ isDragging: !!monitor.isDragging() }),
   }));
 

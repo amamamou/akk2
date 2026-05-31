@@ -9,7 +9,7 @@ import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import type { Playlist } from "../components/PlaylistModal";
 import AudioToolbar from "../components/AudioToolbar";
 import { getApiClient } from "@/lib/api-client";
-import { apiPlaylistToUi } from "@/lib/playlist-mapper";
+import { apiPlaylistToUi, isValidPlaylistId } from "@/lib/playlist-mapper";
 
 const PLAYLISTS_STORAGE_KEY = "aa_playlists";
 
@@ -41,7 +41,9 @@ export default function LibraryPlaylistsClient() {
     setError(null);
     try {
       const res = await apiClient.listPlaylists();
-      const mapped = (res.playlists ?? []).map(apiPlaylistToUi);
+      const mapped = (res.playlists ?? [])
+        .map((p) => apiPlaylistToUi(p))
+        .filter((p): p is Playlist => p !== null);
       setPlaylists(mapped);
       persistCache(mapped);
     } catch (err) {
@@ -50,7 +52,11 @@ export default function LibraryPlaylistsClient() {
         const raw = window.localStorage.getItem(PLAYLISTS_STORAGE_KEY);
         if (raw) {
           const parsed = JSON.parse(raw) as Playlist[];
-          if (Array.isArray(parsed)) setPlaylists(parsed);
+          if (Array.isArray(parsed)) {
+            setPlaylists(
+              parsed.filter((p) => isValidPlaylistId(p?.id))
+            );
+          }
         }
       } catch {
         /* ignore */
@@ -89,8 +95,13 @@ export default function LibraryPlaylistsClient() {
     return filteredPlaylists.slice(start, start + perPage);
   }, [filteredPlaylists, page, perPage]);
 
-  const handlePlaylistClick = (playlistId: string) => {
-    router.push(`/library/playlists/${playlistId}`);
+  const navigateToPlaylist = (playlist: Playlist) => {
+    const id = playlist.id;
+    if (!isValidPlaylistId(id)) {
+      setError("This playlist cannot be opened (missing id). Refresh and try again.");
+      return;
+    }
+    router.push(`/library/playlists/${id}`);
   };
 
   return (
@@ -157,7 +168,7 @@ export default function LibraryPlaylistsClient() {
                 <PlaylistCard
                   key={playlist.id}
                   playlist={playlist}
-                  onClick={handlePlaylistClick}
+                  onClick={() => navigateToPlaylist(playlist)}
                   onEdit={async (id, newTitle) => {
                     if (!newTitle?.trim()) return;
                     try {
@@ -209,6 +220,11 @@ export default function LibraryPlaylistsClient() {
               coverColor: playlist.coverColor,
             });
             const created = apiPlaylistToUi(res.playlist);
+            if (!created || !isValidPlaylistId(created.id)) {
+              setError("Playlist was created but the server did not return an id. Refresh the list.");
+              await loadPlaylists();
+              return;
+            }
             setPlaylists((prev) => {
               const next = [created, ...prev];
               persistCache(next);

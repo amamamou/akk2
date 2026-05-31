@@ -7,6 +7,11 @@ import SettingsHeader, { type SettingsTab } from "./components/SettingsHeader";
 import MyDetailsTab from "./components/MyDetailsTab";
 import BillingTab from "./components/BillingTab";
 import PlanTab from "./components/PlanTab";
+import { getApiClient } from "@/lib/api-client";
+import {
+  dispatchUserProfileUpdated,
+  persistUserProfileToStorage,
+} from "@/lib/user-profile-events";
 
 const USER_STORAGE_KEY = "akou.user";
 
@@ -62,23 +67,94 @@ export default function SettingsClient() {
     { name: "France", code: "FR", emoji: "🇫🇷" },
   ]);
 
-  // Load user profile: prefer authenticated user, fall back to localStorage, then defaults
+  // Load user profile from API when authenticated, else localStorage / auth defaults
   useEffect(() => {
+    let cancelled = false;
+
+    const applyProfile = (profileToUse: UserProfile) => {
+      if (cancelled) return;
+      setInitialProfile(profileToUse);
+      setFirstName(profileToUse.firstName);
+      setLastName(profileToUse.lastName);
+      setEmail(profileToUse.email);
+      setRole(profileToUse.role);
+      setCountry(profileToUse.country);
+      setTimezone(profileToUse.timezone);
+      setBio(profileToUse.bio);
+      setAvatar(profileToUse.avatar ?? null);
+      setDirty(false);
+    };
+
+    const loadFromStorage = (): UserProfile | null => {
+      if (typeof window === "undefined") return null;
+      try {
+        const raw = window.localStorage.getItem(USER_STORAGE_KEY);
+        if (!raw) return null;
+        const parsed: unknown = JSON.parse(raw);
+        if (!parsed || typeof parsed !== "object") return null;
+        const stored = parsed as Partial<UserProfile>;
+        return {
+          firstName: stored.firstName || "",
+          lastName: stored.lastName || "",
+          email: stored.email || "",
+          role: stored.role || "",
+          country: stored.country ?? defaultProfile.country,
+          timezone: stored.timezone ?? defaultProfile.timezone,
+          bio: stored.bio || "",
+          avatar: stored.avatar || null,
+        };
+      } catch {
+        return null;
+      }
+    };
+
+    if (authUser) {
+      void (async () => {
+        try {
+          const res = await getApiClient().getUserProfile();
+          if (cancelled) return;
+          const u = res.user;
+          const profileToUse: UserProfile = {
+            firstName: u.firstName ?? authUser.name?.split(" ")[0] ?? "",
+            lastName: u.lastName ?? authUser.name?.split(" ").slice(1).join(" ") ?? "",
+            email: u.email || authUser.email || "",
+            role: u.role || authUser.role || "",
+            country: u.country ?? defaultProfile.country,
+            timezone: u.timezone ?? defaultProfile.timezone,
+            bio: u.bio ?? "",
+            avatar: u.profilePhotoUrl ?? null,
+          };
+          applyProfile(profileToUse);
+          if (profileToUse.avatar) {
+            dispatchUserProfileUpdated({
+              firstName: profileToUse.firstName,
+              lastName: profileToUse.lastName,
+              role: profileToUse.role,
+              avatar: profileToUse.avatar,
+            });
+          }
+        } catch {
+          const fallback: UserProfile = {
+            firstName: authUser.name?.split(" ")[0] || "",
+            lastName: authUser.name?.split(" ").slice(1).join(" ") || "",
+            email: authUser.email || "",
+            role: authUser.role || "",
+            country: defaultProfile.country,
+            timezone: defaultProfile.timezone,
+            bio: "",
+            avatar: loadFromStorage()?.avatar ?? null,
+          };
+          applyProfile(fallback);
+        }
+      })();
+      return () => {
+        cancelled = true;
+      };
+    }
+
     let profileToUse: UserProfile = defaultProfile;
 
-    // Priority 1: Use authenticated user data from auth context
-    if (authUser) {
-      profileToUse = {
-        firstName: authUser.name?.split(" ")[0] || "",
-        lastName: authUser.name?.split(" ").slice(1).join(" ") || "",
-        email: authUser.email || "",
-        role: authUser.role || "",
-        country: profileToUse.country,
-        timezone: profileToUse.timezone,
-        bio: profileToUse.bio,
-        avatar: null,
-      };
-    } else if (typeof window !== 'undefined') {
+    if (typeof window !== 'undefined') {
       // Priority 2: Fall back to localStorage
       try {
         const raw = window.localStorage.getItem(USER_STORAGE_KEY);
@@ -103,16 +179,7 @@ export default function SettingsClient() {
       }
     }
 
-    setInitialProfile(profileToUse);
-    setFirstName(profileToUse.firstName);
-    setLastName(profileToUse.lastName);
-    setEmail(profileToUse.email);
-    setRole(profileToUse.role);
-    setCountry(profileToUse.country);
-    setTimezone(profileToUse.timezone);
-    setBio(profileToUse.bio);
-    setAvatar(profileToUse.avatar ?? null);
-    setDirty(false);
+    applyProfile(profileToUse);
   }, [authUser]);
 
   useEffect(() => {
@@ -181,62 +248,52 @@ export default function SettingsClient() {
             setDirty(false);
           }}
           onSave={() => {
-            // Keep full in-memory profile for the running app/UI
-            const profile: UserProfile = {
-              firstName,
-              lastName,
-              email,
-              role,
-              country,
-              timezone,
-              bio,
-              avatar,
-            };
+            void (async () => {
+              const profile: UserProfile = {
+                firstName,
+                lastName,
+                email,
+                role,
+                country,
+                timezone,
+                bio,
+                avatar,
+              };
 
-            // Only persist a minimal, safe subset to localStorage to avoid
-            // filling the storage with large base64 image data.
-            const storageProfile: Partial<UserProfile> = {
-              firstName: profile.firstName,
-              lastName: profile.lastName,
-              email: profile.email,
-            };
+              const isAvatarUrl =
+                typeof profile.avatar === "string" &&
+                (profile.avatar.startsWith("http") || profile.avatar.startsWith("/"));
 
-            // Include avatar only when it looks like a remote URL (not a data: URI)
-            const isAvatarUrl = typeof profile.avatar === "string" && (profile.avatar.startsWith("http") || profile.avatar.startsWith("/"));
-            if (isAvatarUrl) storageProfile.avatar = profile.avatar;
-
-            if (typeof window !== "undefined") {
               try {
-                // Wrap the single setItem call so quota errors don't break the save flow
-                try {
-                  window.localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(storageProfile));
-                } catch (err) {
-                  // QuotaExceededError or other storage problems are non-fatal here.
-                  // We log a warning and let the app continue with the in-memory profile.
-                  console.warn("Failed to write user metadata to localStorage", err);
-                }
-
-                // Notify other parts of the app about the updated user. Only include
-                // the avatar in the event when it's a safe URL (not a potentially huge data URI).
-                window.dispatchEvent(
-                  new CustomEvent("akou:user-updated", {
-                    detail: {
-                      firstName: profile.firstName,
-                      lastName: profile.lastName,
-                      role: profile.role,
-                      avatar: isAvatarUrl ? profile.avatar : null,
-                    },
-                  }),
-                );
+                await getApiClient().updateUserProfile({
+                  firstName: profile.firstName,
+                  lastName: profile.lastName,
+                  country: profile.country,
+                  timezone: profile.timezone,
+                  bio: profile.bio,
+                  profilePhotoUrl: isAvatarUrl ? profile.avatar : profile.avatar ?? null,
+                });
               } catch (err) {
-                // Something unexpected happened while saving/dispatching. Don't crash the app.
-                console.error("Failed to persist user update", err);
+                console.error("Failed to save profile to server", err);
               }
-            }
 
-            // Keep the full profile in memory (this includes data URIs temporarily)
-            setInitialProfile(profile);
-            setDirty(false);
+              persistUserProfileToStorage({
+                firstName: profile.firstName,
+                lastName: profile.lastName,
+                email: profile.email,
+                avatar: isAvatarUrl ? profile.avatar : null,
+              });
+
+              dispatchUserProfileUpdated({
+                firstName: profile.firstName,
+                lastName: profile.lastName,
+                role: profile.role,
+                avatar: isAvatarUrl ? profile.avatar : null,
+              });
+
+              setInitialProfile(profile);
+              setDirty(false);
+            })();
           }}
         />
 
