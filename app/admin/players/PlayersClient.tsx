@@ -7,11 +7,12 @@ import {
   toActiveWorkspaceClients,
   type WorkspaceClientOption,
 } from "@/lib/workspace-clients";
+import { ALL_CLIENTS_WORKSPACE_ID } from "@/lib/demo-workspaces";
 import type { PlayerInfo } from "@/types/api";
 import AdminHeader from "../components/AdminHeader";
 import AdminTable, { Column } from "../components/AdminTable";
 import AddPlayerModal from "@/app/players/components/AddPlayerModal";
-import { Edit3, FileText, Loader2 } from "lucide-react";
+import { ChevronDown, Edit3, FileText, Loader2 } from "lucide-react";
 
 type PlayerRow = {
   id: string;
@@ -23,6 +24,13 @@ type PlayerRow = {
   ip?: string;
   currentAudio?: string;
   lastActive?: string;
+};
+
+type ClientPlayerGroup = {
+  clientId: string;
+  clientName: string;
+  tenantId: string;
+  players: PlayerRow[];
 };
 
 function formatLastActive(lastSeen?: string | null): string {
@@ -74,6 +82,10 @@ export default function PlayersClient() {
   const [q, setQ] = useState("");
   const [selected, setSelected] = useState<string[]>([]);
   const [rows, setRows] = useState<PlayerRow[]>([]);
+  const [clientGroups, setClientGroups] = useState<ClientPlayerGroup[]>([]);
+  const [expandedClients, setExpandedClients] = useState<Record<string, boolean>>(
+    {}
+  );
   const [addOpen, setAddOpen] = useState(false);
   const [pageLoading, setPageLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
@@ -82,16 +94,11 @@ export default function PlayersClient() {
     []
   );
   const [selectedWorkspaceClientId, setSelectedWorkspaceClientId] =
-    useState("");
+    useState(ALL_CLIENTS_WORKSPACE_ID);
   const [workspaceTenantId, setWorkspaceTenantId] = useState<string | null>(null);
 
-  const clientNameByTenantId = useMemo(() => {
-    const map: Record<string, string> = {};
-    for (const c of workspaceClients) {
-      map[c.tenantId] = c.name;
-    }
-    return map;
-  }, [workspaceClients]);
+  const showAllClients =
+    isSuperAdmin && selectedWorkspaceClientId === ALL_CLIENTS_WORKSPACE_ID;
 
   useEffect(() => {
     if (!isSuperAdmin || authLoading) return;
@@ -103,14 +110,18 @@ export default function PlayersClient() {
         if (cancelled) return;
         const eligible = toActiveWorkspaceClients(res?.clients ?? []);
         setWorkspaceClients(eligible);
-        if (eligible.length > 0 && !selectedWorkspaceClientId) {
-          setSelectedWorkspaceClientId(eligible[0].id);
-          setWorkspaceTenantId(eligible[0].tenantId);
-        }
+        setExpandedClients((prev) => {
+          const next = { ...prev };
+          for (const c of eligible) {
+            if (next[c.id] === undefined) next[c.id] = true;
+          }
+          return next;
+        });
       } catch (err: unknown) {
         if (cancelled) return;
         const ax = err as { response?: { data?: { error?: string } } };
         setError(ax?.response?.data?.error || "Failed to load clients");
+        setWorkspaceClients([]);
       }
     })();
 
@@ -120,30 +131,97 @@ export default function PlayersClient() {
     };
   }, [apiClient, isSuperAdmin, authLoading]);
 
+  const loadPlayersForTenant = useCallback(
+    async (tenantId: string, clientName: string, clientId: string) => {
+      apiClient.setWorkspaceTenant(tenantId);
+      const res = await apiClient.getPlayers();
+      return (res.players ?? []).map((p) => mapPlayerToRow(p, clientName));
+    },
+    [apiClient]
+  );
+
   const loadPlayers = useCallback(async () => {
-    if (isSuperAdmin && !workspaceTenantId) {
+    if (!isSuperAdmin) {
+      setPageLoading(true);
+      setError(null);
+      try {
+        const res = await apiClient.getPlayers();
+        setRows((res.players ?? []).map((p) => mapPlayerToRow(p)));
+      } catch (err: unknown) {
+        const ax = err as { response?: { data?: { error?: string } } };
+        setError(ax?.response?.data?.error || "Failed to load players");
+        setRows([]);
+      } finally {
+        setPageLoading(false);
+      }
+      return;
+    }
+
+    if (showAllClients) {
+      if (workspaceClients.length === 0) {
+        setClientGroups([]);
+        setRows([]);
+        setPageLoading(false);
+        return;
+      }
+
+      setPageLoading(true);
+      setError(null);
+      try {
+        const groups: ClientPlayerGroup[] = [];
+        for (const client of workspaceClients) {
+          const players = await loadPlayersForTenant(
+            client.tenantId,
+            client.name,
+            client.id
+          );
+          groups.push({
+            clientId: client.id,
+            clientName: client.name,
+            tenantId: client.tenantId,
+            players,
+          });
+        }
+        setClientGroups(groups);
+        setRows(groups.flatMap((g) => g.players));
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(
+            new CustomEvent("akou:players-updated", {
+              detail: { count: groups.reduce((n, g) => n + g.players.length, 0) },
+            })
+          );
+        }
+      } catch (err: unknown) {
+        const ax = err as { response?: { data?: { error?: string } } };
+        setError(ax?.response?.data?.error || "Failed to load players");
+        setClientGroups([]);
+        setRows([]);
+      } finally {
+        setPageLoading(false);
+      }
+      return;
+    }
+
+    if (!workspaceTenantId) {
       setRows([]);
+      setClientGroups([]);
       setPageLoading(false);
       return;
     }
 
-    if (isSuperAdmin && workspaceTenantId) {
-      apiClient.setWorkspaceTenant(workspaceTenantId);
-    }
-
     setPageLoading(true);
     setError(null);
-
     try {
-      const res = await apiClient.getPlayers();
-      const clientLabel = isSuperAdmin
-        ? clientNameByTenantId[workspaceTenantId ?? ""] ??
-          workspaceClients.find((c) => c.tenantId === workspaceTenantId)?.name
-        : undefined;
-      const mapped = (res.players ?? []).map((p) =>
-        mapPlayerToRow(p, clientLabel)
+      const client = workspaceClients.find(
+        (c) => c.id === selectedWorkspaceClientId
+      );
+      const mapped = await loadPlayersForTenant(
+        workspaceTenantId,
+        client?.name ?? "Client",
+        selectedWorkspaceClientId
       );
       setRows(mapped);
+      setClientGroups([]);
       if (typeof window !== "undefined") {
         window.dispatchEvent(
           new CustomEvent("akou:players-updated", { detail: { count: mapped.length } })
@@ -159,9 +237,11 @@ export default function PlayersClient() {
   }, [
     apiClient,
     isSuperAdmin,
-    workspaceTenantId,
-    clientNameByTenantId,
+    showAllClients,
     workspaceClients,
+    workspaceTenantId,
+    selectedWorkspaceClientId,
+    loadPlayersForTenant,
   ]);
 
   useEffect(() => {
@@ -170,10 +250,17 @@ export default function PlayersClient() {
   }, [authLoading, loadPlayers]);
 
   const handleWorkspaceChange = (clientId: string) => {
+    if (clientId === ALL_CLIENTS_WORKSPACE_ID) {
+      setSelectedWorkspaceClientId(ALL_CLIENTS_WORKSPACE_ID);
+      setWorkspaceTenantId(null);
+      setSelected([]);
+      return;
+    }
     const match = workspaceClients.find((c) => c.id === clientId);
     if (!match) return;
     setSelectedWorkspaceClientId(clientId);
     setWorkspaceTenantId(match.tenantId);
+    setSelected([]);
   };
 
   const handleAddPlayer = async (data: {
@@ -217,8 +304,23 @@ export default function PlayersClient() {
     setActionLoading(true);
     setError(null);
     try {
-      for (const id of ids) {
-        await apiClient.deletePlayer(id);
+      if (showAllClients) {
+        for (const id of ids) {
+          const group = clientGroups.find((g) =>
+            g.players.some((p) => p.id === id)
+          );
+          if (group) {
+            apiClient.setWorkspaceTenant(group.tenantId);
+            await apiClient.deletePlayer(id);
+          }
+        }
+      } else {
+        if (workspaceTenantId) {
+          apiClient.setWorkspaceTenant(workspaceTenantId);
+        }
+        for (const id of ids) {
+          await apiClient.deletePlayer(id);
+        }
       }
       setSelected([]);
       await loadPlayers();
@@ -228,6 +330,13 @@ export default function PlayersClient() {
     } finally {
       setActionLoading(false);
     }
+  };
+
+  const toggleClientExpanded = (clientId: string) => {
+    setExpandedClients((prev) => ({
+      ...prev,
+      [clientId]: !prev[clientId],
+    }));
   };
 
   const filtered = useMemo(() => {
@@ -240,6 +349,19 @@ export default function PlayersClient() {
     );
   }, [q, rows]);
 
+  const filteredGroups = useMemo(() => {
+    const t = q.trim().toLowerCase();
+    if (!t) return clientGroups;
+    return clientGroups
+      .map((g) => ({
+        ...g,
+        players: g.players.filter((p) =>
+          `${p.name} ${p.location} ${p.deviceId}`.toLowerCase().includes(t)
+        ),
+      }))
+      .filter((g) => g.players.length > 0);
+  }, [q, clientGroups]);
+
   const columns: Column<PlayerRow>[] = [
     {
       key: "name",
@@ -250,47 +372,69 @@ export default function PlayersClient() {
         </div>
       ),
     },
-    { key: "deviceId", label: "Device ID", render: (r) => <span className="text-gray-600">{r.deviceId}</span> },
-    { key: "location", label: "Location", render: (r) => <span className="text-gray-600">{r.location}</span> },
-    { key: "client", label: "Client", render: (r) => <span className="text-gray-600">{r.client ?? "—"}</span> },
-    { key: "status", label: "Status", render: (r) => <StatusBadge s={r.status} /> },
-    { key: "ip", label: "IP Address", render: (r) => <span className="text-gray-600">{r.ip ?? "—"}</span> },
+    {
+      key: "deviceId",
+      label: "Device ID",
+      render: (r) => <span className="text-gray-600">{r.deviceId}</span>,
+    },
+    {
+      key: "location",
+      label: "Location",
+      render: (r) => <span className="text-gray-600">{r.location}</span>,
+    },
+    {
+      key: "client",
+      label: "Client",
+      render: (r) => <span className="text-gray-600">{r.client ?? "—"}</span>,
+    },
+    {
+      key: "status",
+      label: "Status",
+      render: (r) => <StatusBadge s={r.status} />,
+    },
+    {
+      key: "ip",
+      label: "IP Address",
+      render: (r) => <span className="text-gray-600">{r.ip ?? "—"}</span>,
+    },
     {
       key: "currentAudio",
       label: "Current Audio",
-      render: (r) => <span className="text-gray-600">{r.currentAudio ?? "—"}</span>,
+      render: (r) => (
+        <span className="text-gray-600">{r.currentAudio ?? "—"}</span>
+      ),
     },
     {
       key: "lastActive",
       label: "Last Active",
-      render: (r) => <span className="text-gray-600">{r.lastActive ?? "—"}</span>,
+      render: (r) => (
+        <span className="text-gray-600">{r.lastActive ?? "—"}</span>
+      ),
     },
     {
       key: "actions",
       label: "Actions",
       className: "w-24",
-      render: (r) => (
+      render: () => (
         <div className="flex items-center justify-end gap-2">
-          <button
-            type="button"
-            title="View player"
-            className="inline-flex items-center justify-center h-8 w-8 rounded-md text-gray-600 hover:bg-gray-100"
-          >
+          <span className="inline-flex h-8 w-8 items-center justify-center rounded-md text-gray-400">
             <FileText size={16} />
-          </button>
-          <button
-            type="button"
-            title="Edit player"
-            className="inline-flex items-center justify-center h-8 w-8 rounded-md text-gray-600 hover:bg-gray-100"
-          >
+          </span>
+          <span className="inline-flex h-8 w-8 items-center justify-center rounded-md text-gray-400">
             <Edit3 size={16} />
-          </button>
+          </span>
         </div>
       ),
     },
   ];
 
-  const workspaceBlocked = isSuperAdmin && !workspaceTenantId;
+  const workspaceBlocked =
+    isSuperAdmin && !showAllClients && !workspaceTenantId;
+
+  const defaultModalClientId =
+    showAllClients || !selectedWorkspaceClientId
+      ? workspaceClients[0]?.id ?? ""
+      : selectedWorkspaceClientId;
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-white">
@@ -316,9 +460,7 @@ export default function PlayersClient() {
             onChange={(e) => handleWorkspaceChange(e.target.value)}
             className="max-w-md flex-1 text-sm px-3 py-1.5 rounded-md bg-violet-50 border border-violet-100"
           >
-            <option value="" disabled>
-              Choose a client…
-            </option>
+            <option value={ALL_CLIENTS_WORKSPACE_ID}>All Clients</option>
             {workspaceClients.map((c) => (
               <option key={c.id} value={c.id}>
                 {c.name}
@@ -345,6 +487,82 @@ export default function PlayersClient() {
             <p className="text-sm text-gray-500 py-12 text-center">
               Select a client workspace to load and manage players.
             </p>
+          ) : showAllClients ? (
+            <div className="space-y-3">
+              {filteredGroups.length === 0 && !pageLoading ? (
+                <p className="text-sm text-gray-500 py-12 text-center">
+                  No players found across client workspaces.
+                </p>
+              ) : (
+                filteredGroups.map((group) => {
+                  const expanded = expandedClients[group.clientId] ?? true;
+                  return (
+                    <div
+                      key={group.clientId}
+                      className="rounded-lg border border-gray-200 overflow-hidden bg-white shadow-sm"
+                    >
+                      <button
+                        type="button"
+                        onClick={() => toggleClientExpanded(group.clientId)}
+                        className="w-full flex items-center justify-between gap-3 px-4 py-3 bg-gradient-to-r from-violet-50 to-white hover:from-violet-100/80 transition-colors text-left"
+                      >
+                        <div>
+                          <span className="font-semibold text-gray-900">
+                            {group.clientName}
+                          </span>
+                          <span className="ml-2 text-xs text-gray-500">
+                            {group.players.length}{" "}
+                            {group.players.length === 1 ? "player" : "players"}
+                          </span>
+                        </div>
+                        <ChevronDown
+                          size={18}
+                          className={`text-gray-500 shrink-0 transition-transform duration-200 ${
+                            expanded ? "rotate-180" : ""
+                          }`}
+                        />
+                      </button>
+                      {expanded && (
+                        <div className="border-t border-gray-100 px-2 py-2">
+                          {group.players.length === 0 ? (
+                            <p className="text-sm text-gray-500 px-2 py-4">
+                              No players assigned to this client yet.
+                            </p>
+                          ) : (
+                            <AdminTable
+                              columns={columns}
+                              rows={group.players}
+                              selected={selected.filter((id) =>
+                                group.players.some((p) => p.id === id)
+                              )}
+                              onSelect={(id, checked) =>
+                                setSelected((s) =>
+                                  checked
+                                    ? [...s, id]
+                                    : s.filter((x) => x !== id)
+                                )
+                              }
+                              onSelectAll={(checked) => {
+                                const ids = group.players.map((p) => p.id);
+                                setSelected((s) =>
+                                  checked
+                                    ? [...new Set([...s, ...ids])]
+                                    : s.filter((x) => !ids.includes(x))
+                                );
+                              }}
+                              onRowClick={() => {}}
+                              onDeleteSelected={(ids) =>
+                                void handleDeletePlayers(ids)
+                              }
+                            />
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })
+              )}
+            </div>
           ) : (
             <AdminTable
               columns={columns}
@@ -369,7 +587,7 @@ export default function PlayersClient() {
         isOpen={addOpen}
         onClose={() => setAddOpen(false)}
         onSubmit={handleAddPlayer}
-        defaultClientId={selectedWorkspaceClientId}
+        defaultClientId={defaultModalClientId}
       />
     </div>
   );

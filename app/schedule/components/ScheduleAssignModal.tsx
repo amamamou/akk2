@@ -20,29 +20,72 @@ type Tab = "audio" | "playlist";
 export default function ScheduleAssignModal({
   open,
   onClose,
-  audio,
+  workspaceTenantId,
   onSelectAudio,
   onSelectPlaylist,
 }: {
   open: boolean;
   onClose: () => void;
-  audio: AudioItem[];
+  /** Active client workspace tenant — required for scoped media/playlist fetch. */
+  workspaceTenantId: string | null;
   onSelectAudio: (item: AudioItem) => void;
   onSelectPlaylist: (item: PlaylistPick) => void;
 }) {
   const [tab, setTab] = useState<Tab>("audio");
+  const [audio, setAudio] = useState<AudioItem[]>([]);
   const [playlists, setPlaylists] = useState<PlaylistPick[]>([]);
+  const [loadingAudio, setLoadingAudio] = useState(false);
   const [loadingPlaylists, setLoadingPlaylists] = useState(false);
+  const [audioError, setAudioError] = useState<string | null>(null);
   const [playlistError, setPlaylistError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open || !workspaceTenantId) {
+      setAudio([]);
+      setPlaylists([]);
+      return;
+    }
+
     let cancelled = false;
+    const api = getApiClient();
+    api.setWorkspaceTenant(workspaceTenantId);
+
+    setLoadingAudio(true);
     setLoadingPlaylists(true);
+    setAudioError(null);
     setPlaylistError(null);
+
     void (async () => {
       try {
-        const res = await getApiClient().listPlaylists();
+        const mediaRes = await api.listAudios();
+        if (cancelled) return;
+        setAudio(
+          (mediaRes.media ?? []).map((m) => ({
+            id: m.id,
+            title: m.title,
+            duration:
+              m.durationMinutes && m.durationMinutes > 0
+                ? m.durationMinutes
+                : 60,
+            type: m.category || "Audio",
+            url: m.url,
+          }))
+        );
+      } catch (err) {
+        if (!cancelled) {
+          setAudio([]);
+          setAudioError(
+            err instanceof Error ? err.message : "Failed to load audio for workspace"
+          );
+        }
+      } finally {
+        if (!cancelled) setLoadingAudio(false);
+      }
+    })();
+
+    void (async () => {
+      try {
+        const res = await api.listPlaylists();
         if (cancelled) return;
         const picks: PlaylistPick[] = [];
         for (const row of res.playlists ?? []) {
@@ -58,20 +101,24 @@ export default function ScheduleAssignModal({
         setPlaylists(picks);
       } catch (err) {
         if (!cancelled) {
+          setPlaylists([]);
           setPlaylistError(
-            err instanceof Error ? err.message : "Failed to load playlists"
+            err instanceof Error ? err.message : "Failed to load playlists for workspace"
           );
         }
       } finally {
         if (!cancelled) setLoadingPlaylists(false);
       }
     })();
+
     return () => {
       cancelled = true;
     };
-  }, [open]);
+  }, [open, workspaceTenantId]);
 
   if (!open) return null;
+
+  const needsWorkspace = !workspaceTenantId;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
@@ -88,95 +135,116 @@ export default function ScheduleAssignModal({
           </button>
         </div>
 
-        <div className="flex gap-2 mb-4 border-b border-gray-100 pb-2">
-          <button
-            type="button"
-            onClick={() => setTab("audio")}
-            className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-md ${
-              tab === "audio"
-                ? "bg-gray-900 text-white"
-                : "bg-gray-50 text-gray-700 hover:bg-gray-100"
-            }`}
-          >
-            <Music size={14} />
-            Assign track
-          </button>
-          <button
-            type="button"
-            onClick={() => setTab("playlist")}
-            className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-md ${
-              tab === "playlist"
-                ? "bg-[#A473FF] text-white"
-                : "bg-gray-50 text-gray-700 hover:bg-gray-100"
-            }`}
-          >
-            <ListMusic size={14} />
-            Assign playlist
-          </button>
-        </div>
-
-        {tab === "audio" ? (
-          <div className="space-y-2">
-            {audio.length === 0 && (
-              <div className="text-sm text-gray-500">No audio in library</div>
-            )}
-            {audio.map((a) => (
-              <div
-                key={a.id}
-                className="flex items-center justify-between p-2 rounded hover:bg-gray-50"
-              >
-                <div>
-                  <div className="font-medium text-sm">{a.title}</div>
-                  <div className="text-xs text-gray-400">{a.duration} min</div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => onSelectAudio(a)}
-                  className="px-3 py-1 rounded-md bg-gray-900 text-white text-sm hover:bg-gray-800"
-                >
-                  Select
-                </button>
-              </div>
-            ))}
-          </div>
+        {needsWorkspace ? (
+          <p className="text-sm text-gray-500 py-6 text-center">
+            Select a client workspace above before assigning audio or playlists.
+          </p>
         ) : (
-          <div className="space-y-2">
-            {loadingPlaylists && (
-              <div className="text-sm text-gray-500 py-4 text-center">
-                Loading playlists…
-              </div>
-            )}
-            {playlistError && (
-              <div className="text-sm text-red-600 py-2">{playlistError}</div>
-            )}
-            {!loadingPlaylists && !playlistError && playlists.length === 0 && (
-              <div className="text-sm text-gray-500 py-4 text-center">
-                No playlists yet. Create one in Library → Playlists.
-              </div>
-            )}
-            {playlists.map((pl) => (
-              <div
-                key={pl.playlistId}
-                className="flex items-center justify-between p-3 rounded-lg border border-purple-100 bg-purple-50/40 hover:bg-purple-50"
+          <>
+            <div className="flex gap-2 mb-4 border-b border-gray-100 pb-2">
+              <button
+                type="button"
+                onClick={() => setTab("audio")}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-md ${
+                  tab === "audio"
+                    ? "bg-gray-900 text-white"
+                    : "bg-gray-50 text-gray-700 hover:bg-gray-100"
+                }`}
               >
-                <div>
-                  <div className="font-medium text-sm text-gray-900">{pl.title}</div>
-                  <div className="text-xs text-gray-500 mt-0.5">
-                    {pl.trackCount} {pl.trackCount === 1 ? "track" : "tracks"} ·{" "}
-                    {pl.totalDuration}
+                <Music size={14} />
+                Assign track
+              </button>
+              <button
+                type="button"
+                onClick={() => setTab("playlist")}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-md ${
+                  tab === "playlist"
+                    ? "bg-[#A473FF] text-white"
+                    : "bg-gray-50 text-gray-700 hover:bg-gray-100"
+                }`}
+              >
+                <ListMusic size={14} />
+                Assign playlist
+              </button>
+            </div>
+
+            {tab === "audio" ? (
+              <div className="space-y-2">
+                {loadingAudio && (
+                  <div className="text-sm text-gray-500 py-4 text-center">
+                    Loading audio for workspace…
                   </div>
-                </div>
-                <button
-                  type="button"
-                  disabled={pl.trackCount < 1}
-                  onClick={() => onSelectPlaylist(pl)}
-                  className="px-3 py-1 rounded-md bg-[#A473FF] text-white text-sm hover:bg-[#7A42FF] disabled:opacity-50"
-                >
-                  Assign
-                </button>
+                )}
+                {audioError && (
+                  <div className="text-sm text-red-600 py-2">{audioError}</div>
+                )}
+                {!loadingAudio && !audioError && audio.length === 0 && (
+                  <div className="text-sm text-gray-500">No audio in library</div>
+                )}
+                {audio.map((a) => (
+                  <div
+                    key={a.id}
+                    className="flex items-center justify-between p-2 rounded hover:bg-gray-50"
+                  >
+                    <div>
+                      <div className="font-medium text-sm">{a.title}</div>
+                      <div className="text-xs text-gray-400">{a.duration} min</div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => onSelectAudio(a)}
+                      className="px-3 py-1 rounded-md bg-gray-900 text-white text-sm hover:bg-gray-800"
+                    >
+                      Select
+                    </button>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
+            ) : (
+              <div className="space-y-2">
+                {loadingPlaylists && (
+                  <div className="text-sm text-gray-500 py-4 text-center">
+                    Loading playlists…
+                  </div>
+                )}
+                {playlistError && (
+                  <div className="text-sm text-red-600 py-2">{playlistError}</div>
+                )}
+                {!loadingPlaylists &&
+                  !playlistError &&
+                  playlists.length === 0 && (
+                    <div className="text-sm text-gray-500 py-4 text-center">
+                      No playlists yet. Create one in Library → Playlists.
+                    </div>
+                  )}
+                {playlists.map((pl) => (
+                  <div
+                    key={pl.playlistId}
+                    className="flex items-center justify-between p-3 rounded-lg border border-purple-100 bg-purple-50/40 hover:bg-purple-50"
+                  >
+                    <div>
+                      <div className="font-medium text-sm text-gray-900">
+                        {pl.title}
+                      </div>
+                      <div className="text-xs text-gray-500 mt-0.5">
+                        {pl.trackCount}{" "}
+                        {pl.trackCount === 1 ? "track" : "tracks"} ·{" "}
+                        {pl.totalDuration}
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      disabled={pl.trackCount < 1}
+                      onClick={() => onSelectPlaylist(pl)}
+                      className="px-3 py-1 rounded-md bg-[#A473FF] text-white text-sm hover:bg-[#7A42FF] disabled:opacity-50"
+                    >
+                      Assign
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>
