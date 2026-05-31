@@ -2,7 +2,13 @@
 "use client";
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { useAuth } from "@/app/context/AuthContext";
 import { getApiClient } from "@/lib/api-client";
+import {
+  toActiveWorkspaceClients,
+  type WorkspaceClientOption,
+} from "@/lib/workspace-clients";
+import type { PlayerInfo } from "@/types/api";
 import { useRouter } from "next/navigation";
 import PlayersHeader from "./components/PlayersHeader";
 import PlayerRow from "./components/PlayerRow";
@@ -30,21 +36,47 @@ export type PlayerType = {
   playingProgress?: number;
 };
 
-const STORAGE_KEY = "akou.players";
-
-// Start with no players; they are added dynamically by the user
-// and optionally restored from localStorage.
 const initialPlayers: PlayerType[] = [];
 
 // PlayerStatusFilter removed (top filter removed)
 
+function mapApiPlayerToLocal(p: PlayerInfo): PlayerType {
+  const lastSeenMs = p.lastSeen ? new Date(p.lastSeen).getTime() : 0;
+  const isOnline = lastSeenMs && Date.now() - lastSeenMs <= 2 * 60 * 1000;
+  return {
+    id: p.id,
+    roomId: p.roomId || p.id,
+    roomName: p.roomName || p.playerName || "",
+    playerName: p.playerName || p.roomName || "",
+    status: isOnline ? "online" : p.status || "offline",
+    playlist: p.playlist || [],
+    playlistIndex: p.playlistIndex || 0,
+    nowPlaying: p.nowPlaying || null,
+    isPlaying: p.isPlaying || false,
+    nextEvent: null,
+    playingProgress: p.playingProgress || 0,
+  };
+}
+
 export default function PlayersClient() {
+  const apiClient = getApiClient();
+  const { user, isLoading: authLoading } = useAuth();
+  const isSuperAdmin = String(user?.role || "").toUpperCase() === "SUPER_ADMIN";
+
   const [view, setView] = useState<"list" | "grid">("grid");
   const [players, setPlayers] = useState<PlayerType[]>(initialPlayers);
   const [counter, setCounter] = useState(1);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [addPlayerModalOpen, setAddPlayerModalOpen] = useState(false);
+  const [workspaceClients, setWorkspaceClients] = useState<WorkspaceClientOption[]>(
+    []
+  );
+  const [selectedWorkspaceClientId, setSelectedWorkspaceClientId] =
+    useState("");
+  const [workspaceTenantId, setWorkspaceTenantId] = useState<string | null>(null);
+  const [playersLoading, setPlayersLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   // top filter removed, keep query only
   // pagination (reuse audio/playlist toolbar controls)
   const [page, setPage] = useState(1);
@@ -89,89 +121,87 @@ export default function PlayersClient() {
 
   const formatDateLabel = (iso:string|null) => iso ? new Date(iso).toLocaleDateString() : null;
 
-  const persistPlayers = useCallback((next: PlayerType[]) => {
-    try {
-      if (typeof window !== "undefined") {
-        window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-        // Let other parts of the app (like the schedule page) know that
-        // players have changed so they can refresh any derived views.
-        window.dispatchEvent(
-          new CustomEvent("akou:players-updated", {
-            detail: { count: next.length },
-          }),
-        );
-      }
-    } catch (err) {
-      console.error("Failed to persist players", err);
+  const notifyPlayersUpdated = useCallback((count: number) => {
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(
+        new CustomEvent("akou:players-updated", { detail: { count } })
+      );
     }
   }, []);
 
-  // After first mount on the client, replace the in-memory state with any
-  // previously persisted players from localStorage. This runs only on the
-  // client, so it won't cause SSR/client HTML mismatches.
   useEffect(() => {
-    if (typeof window === "undefined") return;
+    if (!isSuperAdmin || authLoading) return;
 
-    // Try loading players from API first; fall back to localStorage if offline
-    const apiClient = getApiClient();
     let cancelled = false;
-
-    (async () => {
+    void (async () => {
       try {
-        const res = await apiClient.listPlayers();
+        const res = await apiClient.listClients();
         if (cancelled) return;
-          if (res?.players && Array.isArray(res.players) && res.players.length > 0) {
-            // Map server PlayerInfo -> local PlayerType shape (best-effort)
-            // Use lastSeen to derive an accurate online/offline status instead
-            // of trusting any stale/hardcoded status values.
-            const mapped = res.players.map((p) => {
-              const lastSeenMs = p.lastSeen ? new Date(p.lastSeen).getTime() : 0;
-              const isOnline = lastSeenMs && (Date.now() - lastSeenMs <= 2 * 60 * 1000);
-              return ({
-                id: p.id,
-                roomId: p.roomId || p.id,
-                roomName: p.roomName || p.playerName || "",
-                playerName: p.playerName || p.roomName || "",
-                status: isOnline ? "online" : "offline",
-                playlist: p.playlist || [],
-                playlistIndex: p.playlistIndex || 0,
-                nowPlaying: p.nowPlaying || null,
-                isPlaying: p.isPlaying || false,
-                nextEvent: null,
-                playingProgress: p.playingProgress || 0,
-                // preserve raw lastSeen and macAddress for other flows
-                // @ts-ignore - extend shape locally
-                lastSeen: p.lastSeen,
-                // @ts-ignore
-                macAddress: p.macAddress || p.mac_address || "",
-              } as PlayerType);
-            });
-
-          setPlayers(mapped);
-          persistPlayers(mapped);
-          return;
+        const eligible = toActiveWorkspaceClients(res?.clients ?? []);
+        setWorkspaceClients(eligible);
+        if (eligible.length > 0 && !selectedWorkspaceClientId) {
+          setSelectedWorkspaceClientId(eligible[0].id);
+          setWorkspaceTenantId(eligible[0].tenantId);
         }
-      } catch (err) {
-        // ignore and fall back to localStorage
-      }
-
-      try {
-        const raw = window.localStorage.getItem(STORAGE_KEY);
-        if (!raw) return;
-
-        const parsed = JSON.parse(raw);
-        if (!Array.isArray(parsed)) return;
-
-        setPlayers(parsed as PlayerType[]);
-      } catch (err) {
-        console.error("Failed to read players from storage", err);
+      } catch (err: unknown) {
+        if (cancelled) return;
+        const ax = err as { response?: { data?: { error?: string } } };
+        setLoadError(ax?.response?.data?.error || "Failed to load clients");
+        setWorkspaceClients([]);
       }
     })();
 
     return () => {
       cancelled = true;
+      apiClient.clearWorkspaceTenant();
     };
-  }, []);
+  }, [apiClient, isSuperAdmin, authLoading]);
+
+  const loadPlayersFromApi = useCallback(async () => {
+    if (isSuperAdmin && !workspaceTenantId) {
+      setPlayers([]);
+      setPlayersLoading(false);
+      return;
+    }
+
+    if (isSuperAdmin && workspaceTenantId) {
+      apiClient.setWorkspaceTenant(workspaceTenantId);
+    }
+
+    setPlayersLoading(true);
+    setLoadError(null);
+
+    try {
+      const res = await apiClient.getPlayers();
+      if (res?.players && Array.isArray(res.players)) {
+        const mapped = res.players.map((p) => mapApiPlayerToLocal(p));
+        setPlayers(mapped);
+        notifyPlayersUpdated(mapped.length);
+        return;
+      }
+      setPlayers([]);
+      notifyPlayersUpdated(0);
+    } catch (err: unknown) {
+      const ax = err as { response?: { data?: { error?: string } } };
+      setLoadError(ax?.response?.data?.error || "Failed to load players");
+      setPlayers([]);
+    } finally {
+      setPlayersLoading(false);
+    }
+  }, [apiClient, isSuperAdmin, workspaceTenantId, notifyPlayersUpdated]);
+
+  useEffect(() => {
+    if (authLoading) return;
+    void loadPlayersFromApi();
+  }, [authLoading, loadPlayersFromApi]);
+
+  const handleWorkspaceClientChange = (clientId: string) => {
+    const match = workspaceClients.find((c) => c.id === clientId);
+    if (!match) return;
+    setSelectedWorkspaceClientId(clientId);
+    setWorkspaceTenantId(match.tenantId);
+    setLoadError(null);
+  };
 
   // Simulate playback progress for all playing players
   useEffect(() => {
@@ -206,89 +236,42 @@ export default function PlayersClient() {
     locationName?: string;
     ipAddress?: string;
     deviceId?: string;
+    clientId?: string;
+    tenantId?: string;
   }) {
-    const apiClient = getApiClient();
-    const { name, locationName, ipAddress, deviceId } = playerData;
+    const { name, locationName, ipAddress, deviceId, tenantId } = playerData;
 
-    // Optimistic local id while request is in-flight
-    const tempId = `p-new-${Date.now()}`;
-    const optimistic: PlayerType = {
-      id: tempId,
-      roomId: tempId,
-      roomName: locationName || name,
-      playerName: name,
-      status: "offline",
-      playlist: [],
-      playlistIndex: 0,
-      nowPlaying: null,
-      isPlaying: false,
-      nextEvent: null,
-      playingProgress: 0,
-    };
-
-    setPlayers((prev) => {
-      const next = [optimistic, ...prev];
-      persistPlayers(next);
-      return next;
-    });
-
-    setEditingId(tempId);
+    if (isSuperAdmin) {
+      if (!tenantId) {
+        throw new Error("Select a client workspace before creating a player.");
+      }
+      apiClient.setWorkspaceTenant(tenantId);
+      if (playerData.clientId) {
+        setSelectedWorkspaceClientId(playerData.clientId);
+        setWorkspaceTenantId(tenantId);
+      }
+    }
 
     try {
-      // Backend PlayerCreate shape (akk2) expects { name, macAddress, ... optional fields }
-      const created = await apiClient.createPlayer({
+      await apiClient.createPlayer({
         name,
         macAddress: "",
         locationName,
         ipAddress,
         deviceId,
+        tenantId,
+        clientId: playerData.clientId,
       });
-      const p = created.player;
-      const mapped: PlayerType = {
-        id: p.id,
-        roomId: p.roomId || p.id,
-        roomName: p.roomName || locationName || p.playerName || name,
-        playerName: p.playerName || name,
-        status: p.status || "offline",
-        playlist: p.playlist || [],
-        playlistIndex: p.playlistIndex || 0,
-        nowPlaying: p.nowPlaying || null,
-        isPlaying: p.isPlaying || false,
-        nextEvent: null,
-        playingProgress: p.playingProgress || 0,
-      };
-
-      // Replace optimistic item if present, otherwise prepend
-      setPlayers((prev) => {
-        const replaced = prev.map((pl) => (pl.id === tempId ? mapped : pl));
-        const exists = replaced.some((pl) => pl.id === mapped.id);
-        const next = exists ? replaced : [mapped, ...prev.filter((pl) => pl.id !== tempId)];
-        persistPlayers(next);
-        return next;
-      });
-
-      // Fire a global event so other parts (dashboard/schedule) can refresh
-      if (typeof window !== "undefined") {
-        window.dispatchEvent(new CustomEvent("akou:players-updated", { detail: { count: 1 } }));
-      }
+      await loadPlayersFromApi();
+      setEditingId(null);
     } catch (err) {
       console.error("Failed to create player", err);
-      // Show an error to the user (toast system may not be available in this project)
-      try {
-        const msg = (err as any)?.response?.data?.error || (err as any)?.message || "Failed to create player";
-        throw new Error(`Error creating player: ${msg}`);
-      } catch (e) {
-        // ignore
-        throw err;
-      }
-
-      // On error, remove optimistic entry and clear editing state
-      setPlayers((prev) => {
-        const next = prev.filter((pl) => pl.id !== tempId);
-        persistPlayers(next);
-        return next;
-      });
-      setEditingId(null);
+      const msg =
+        (err as { response?: { data?: { error?: string } }; message?: string })
+          ?.response?.data?.error ||
+        (err as Error)?.message ||
+        "Failed to create player";
+      throw new Error(msg);
     }
   }
 
@@ -334,24 +317,22 @@ export default function PlayersClient() {
   }
 
   function renamePlayer(id: string, name: string) {
-    // rename the room name (per user request) instead of the player label
-    setPlayers((prev) => {
-      const next = prev.map((p) =>
-        p.id === id ? { ...p, roomName: name } : p,
-      );
-      persistPlayers(next);
-      return next;
-    });
+    setPlayers((prev) =>
+      prev.map((p) => (p.id === id ? { ...p, roomName: name } : p))
+    );
     setEditingId(null);
   }
 
-  function deletePlayer(id: string) {
-    setPlayers((prev) => {
-      const next = prev.filter((p) => p.id !== id);
-      persistPlayers(next);
-      return next;
-    });
-    setEditingId(null);
+  async function deletePlayer(id: string) {
+    setLoadError(null);
+    try {
+      await apiClient.deletePlayer(id);
+      setEditingId(null);
+      await loadPlayersFromApi();
+    } catch (err: unknown) {
+      const ax = err as { response?: { data?: { error?: string } } };
+      setLoadError(ax?.response?.data?.error || "Failed to delete player");
+    }
   }
 
   const router = useRouter();
@@ -401,7 +382,15 @@ export default function PlayersClient() {
 
    return (
      <div className="flex-1 flex flex-col overflow-hidden bg-white">
-       <PlayersHeader view={view} onToggleView={(v) => setView(v)} onAdd={() => setAddPlayerModalOpen(true)} />
+       <PlayersHeader
+         view={view}
+         onToggleView={(v) => setView(v)}
+         onAdd={() => setAddPlayerModalOpen(true)}
+         showWorkspaceSelector={isSuperAdmin}
+         workspaceClients={workspaceClients}
+         selectedWorkspaceClientId={selectedWorkspaceClientId}
+         onChangeWorkspaceClient={handleWorkspaceClientChange}
+       />
       {/* Players triage bar (sort / date / filters) */}
       <PlayersTriageBar
         sortBy={sortBy}
@@ -450,7 +439,28 @@ export default function PlayersClient() {
 
       <div className="flex-1 overflow-auto">
   <div className="px-6 py-6">
-          {players.length === 0 ? (
+          {loadError && (
+            <div className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+              {loadError}
+            </div>
+          )}
+          {isSuperAdmin && !workspaceTenantId ? (
+            <div className="flex flex-col items-center justify-center py-16">
+              <div className="text-center space-y-2 max-w-sm">
+                <h2 className="text-sm font-semibold text-gray-900">
+                  Select a client workspace
+                </h2>
+                <p className="text-xs text-gray-500">
+                  Choose a client above to view or add players for that tenant.
+                  Those players will appear on the Weekly Schedule for that client.
+                </p>
+              </div>
+            </div>
+          ) : playersLoading ? (
+            <div className="flex flex-col items-center justify-center py-16 text-sm text-gray-500">
+              Loading players…
+            </div>
+          ) : players.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16">
               <div className="text-center space-y-2">
                 <h2 className="text-sm font-semibold text-gray-900">
@@ -524,6 +534,7 @@ export default function PlayersClient() {
          isOpen={addPlayerModalOpen}
          onClose={() => setAddPlayerModalOpen(false)}
          onSubmit={handleAddPlayer}
+         defaultClientId={selectedWorkspaceClientId}
        />
      </div>
    );

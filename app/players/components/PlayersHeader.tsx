@@ -4,12 +4,56 @@ import React from "react";
 import { useAuth } from '@/app/context/AuthContext';
 import { Plus } from "lucide-react";
 import ViewToggle from "./ViewToggle";
+import type { WorkspaceClientOption } from "@/lib/workspace-clients";
 
-export default function PlayersHeader({ view, onToggleView, onAdd }: { view: "list" | "grid"; onToggleView: (v: "list" | "grid") => void; onAdd: () => void }) {
+export default function PlayersHeader({
+  view,
+  onToggleView,
+  onAdd,
+  showWorkspaceSelector,
+  workspaceClients,
+  selectedWorkspaceClientId,
+  onChangeWorkspaceClient,
+}: {
+  view: "list" | "grid";
+  onToggleView: (v: "list" | "grid") => void;
+  onAdd: () => void;
+  showWorkspaceSelector?: boolean;
+  workspaceClients?: WorkspaceClientOption[];
+  selectedWorkspaceClientId?: string;
+  onChangeWorkspaceClient?: (clientId: string) => void;
+}) {
   const { user } = useAuth();
+  const canAddPlayer = Boolean(user);
 
   return (
     <div className="sticky top-0 z-10 bg-white border-gray-200">
+      {showWorkspaceSelector && (
+        <div className="px-4 sm:px-8 pt-4 pb-2 border-b border-gray-100 flex items-center gap-2">
+          <label
+            htmlFor="players-workspace-client"
+            className="text-xs font-semibold uppercase tracking-wide text-gray-500 shrink-0"
+          >
+            Select Client Workspace
+          </label>
+          <select
+            id="players-workspace-client"
+            value={selectedWorkspaceClientId || ""}
+            onChange={(e) => onChangeWorkspaceClient?.(e.target.value)}
+            className="flex-1 max-w-md text-sm px-3 py-1.5 rounded-md bg-violet-50 border border-violet-100 text-gray-900"
+          >
+            <option value="" disabled>
+              Choose a client…
+            </option>
+            {(workspaceClients ?? []).map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+
       <div className="px-4 sm:px-8 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold text-gray-900">Players</h1>
@@ -18,7 +62,7 @@ export default function PlayersHeader({ view, onToggleView, onAdd }: { view: "li
 
         <div className="flex items-center gap-3">
           <ViewToggle view={view} onChange={onToggleView} />
-          {user?.role === 'SUPER_ADMIN' && (
+          {canAddPlayer && (
             <button
               type="button"
               onClick={onAdd}

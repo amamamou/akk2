@@ -369,6 +369,11 @@ export class ApiClient {
     return response.data;
   }
 
+  /** Alias for listPlayers (admin/grid refresh flows). */
+  async getPlayers(): Promise<PlayersListResponse> {
+    return this.listPlayers();
+  }
+
   /**
    * GET /players/{id} - Get player by ID
    */
@@ -398,6 +403,13 @@ export class ApiClient {
      }
      if ((data as any).deviceId || (data as any).device_id) {
        payload.deviceId = (data as any).deviceId || (data as any).device_id;
+     }
+     // Tenant scoping uses x-tenant-id (setWorkspaceTenant); optional body fields for tracing.
+     if ((data as any).tenantId || (data as any).tenant_id) {
+       payload.tenantId = (data as any).tenantId || (data as any).tenant_id;
+     }
+     if ((data as any).clientId || (data as any).client_id) {
+       payload.clientId = (data as any).clientId || (data as any).client_id;
      }
 
      const response = await this.instance.post<PlayerResponse>('/players', payload);

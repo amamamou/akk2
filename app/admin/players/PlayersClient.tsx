@@ -1,91 +1,376 @@
 "use client";
 
-import React, { useMemo, useState } from 'react';
-// Using raw <img> for external avatar hosts (avoids next/image host restrictions)
-import AdminHeader from '../components/AdminHeader';
-import AdminTable, { Column } from '../components/AdminTable';
-import AdminAddModal from '../components/AdminAddModal';
-import { Edit3, MoreHorizontal, FileText, Lock } from 'lucide-react';
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { useAuth } from "@/app/context/AuthContext";
+import { getApiClient } from "@/lib/api-client";
+import {
+  toActiveWorkspaceClients,
+  type WorkspaceClientOption,
+} from "@/lib/workspace-clients";
+import type { PlayerInfo } from "@/types/api";
+import AdminHeader from "../components/AdminHeader";
+import AdminTable, { Column } from "../components/AdminTable";
+import AddPlayerModal from "@/app/players/components/AddPlayerModal";
+import { Edit3, FileText, Loader2 } from "lucide-react";
 
-type PlayerRow = { id: string; name: string; deviceId: string; location: string; client?: string; status: 'online'|'offline'; ip?: string; currentAudio?: string; lastActive?: string };
+type PlayerRow = {
+  id: string;
+  name: string;
+  deviceId: string;
+  location: string;
+  client?: string;
+  status: "online" | "offline";
+  ip?: string;
+  currentAudio?: string;
+  lastActive?: string;
+};
 
-const MOCK: PlayerRow[] = [
-  { id: 'p1', name: 'Studio One', deviceId: 'PLR-012-XYZ', location: 'Control Room', client: 'Zen Yoga Studio', status: 'online', ip: '192.168.1.12', currentAudio: 'Morning Mix', lastActive: '2m ago' },
-  { id: 'p2', name: 'Lobby Player', deviceId: 'PLR-045-ABC', location: 'Reception', client: 'Retail Space Co', status: 'offline', ip: '192.168.1.45', currentAudio: '—', lastActive: '3h ago' },
-];
+function formatLastActive(lastSeen?: string | null): string {
+  if (!lastSeen) return "—";
+  const ms = new Date(lastSeen).getTime();
+  if (Number.isNaN(ms)) return "—";
+  const diffMin = Math.floor((Date.now() - ms) / 60000);
+  if (diffMin < 1) return "just now";
+  if (diffMin < 60) return `${diffMin}m ago`;
+  const diffH = Math.floor(diffMin / 60);
+  if (diffH < 24) return `${diffH}h ago`;
+  return new Date(lastSeen).toLocaleDateString();
+}
 
-function StatusBadge({ s }: { s: 'online'|'offline' }) {
-  return <span className={`text-xs px-2 py-0.5 rounded ${s === 'online' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>{s}</span>;
+function mapPlayerToRow(p: PlayerInfo, clientName?: string): PlayerRow {
+  const meta = (p.metadata ?? {}) as Record<string, unknown>;
+  const lastSeenMs = p.lastSeen ? new Date(p.lastSeen).getTime() : 0;
+  const isOnline = Boolean(lastSeenMs && Date.now() - lastSeenMs <= 2 * 60 * 1000);
+  return {
+    id: p.id,
+    name: p.playerName || p.roomName || "Unnamed",
+    deviceId: String(meta.deviceId ?? meta.device_id ?? p.macAddress ?? "—"),
+    location: p.roomName || String(meta.location ?? "—"),
+    client: clientName,
+    status: isOnline ? "online" : "offline",
+    ip: String(meta.ipAddress ?? meta.ip_address ?? "—"),
+    currentAudio: p.nowPlaying?.title ?? "—",
+    lastActive: formatLastActive(p.lastSeen),
+  };
+}
+
+function StatusBadge({ s }: { s: "online" | "offline" }) {
+  return (
+    <span
+      className={`text-xs px-2 py-0.5 rounded ${
+        s === "online" ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-600"
+      }`}
+    >
+      {s}
+    </span>
+  );
 }
 
 export default function PlayersClient() {
-  const [q, setQ] = useState('');
+  const apiClient = getApiClient();
+  const { user, isLoading: authLoading } = useAuth();
+  const isSuperAdmin = String(user?.role || "").toUpperCase() === "SUPER_ADMIN";
+
+  const [q, setQ] = useState("");
   const [selected, setSelected] = useState<string[]>([]);
-  const [rows, setRows] = useState<PlayerRow[]>(MOCK);
+  const [rows, setRows] = useState<PlayerRow[]>([]);
   const [addOpen, setAddOpen] = useState(false);
-  const [newName, setNewName] = useState('');
-  const [newDevice, setNewDevice] = useState('');
-  const [newLocation, setNewLocation] = useState('');
-  const [newClient, setNewClient] = useState('');
-  const [newIp, setNewIp] = useState('');
+  const [pageLoading, setPageLoading] = useState(true);
+  const [actionLoading, setActionLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [workspaceClients, setWorkspaceClients] = useState<WorkspaceClientOption[]>(
+    []
+  );
+  const [selectedWorkspaceClientId, setSelectedWorkspaceClientId] =
+    useState("");
+  const [workspaceTenantId, setWorkspaceTenantId] = useState<string | null>(null);
+
+  const clientNameByTenantId = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const c of workspaceClients) {
+      map[c.tenantId] = c.name;
+    }
+    return map;
+  }, [workspaceClients]);
+
+  useEffect(() => {
+    if (!isSuperAdmin || authLoading) return;
+
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await apiClient.listClients();
+        if (cancelled) return;
+        const eligible = toActiveWorkspaceClients(res?.clients ?? []);
+        setWorkspaceClients(eligible);
+        if (eligible.length > 0 && !selectedWorkspaceClientId) {
+          setSelectedWorkspaceClientId(eligible[0].id);
+          setWorkspaceTenantId(eligible[0].tenantId);
+        }
+      } catch (err: unknown) {
+        if (cancelled) return;
+        const ax = err as { response?: { data?: { error?: string } } };
+        setError(ax?.response?.data?.error || "Failed to load clients");
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      apiClient.clearWorkspaceTenant();
+    };
+  }, [apiClient, isSuperAdmin, authLoading]);
+
+  const loadPlayers = useCallback(async () => {
+    if (isSuperAdmin && !workspaceTenantId) {
+      setRows([]);
+      setPageLoading(false);
+      return;
+    }
+
+    if (isSuperAdmin && workspaceTenantId) {
+      apiClient.setWorkspaceTenant(workspaceTenantId);
+    }
+
+    setPageLoading(true);
+    setError(null);
+
+    try {
+      const res = await apiClient.getPlayers();
+      const clientLabel = isSuperAdmin
+        ? clientNameByTenantId[workspaceTenantId ?? ""] ??
+          workspaceClients.find((c) => c.tenantId === workspaceTenantId)?.name
+        : undefined;
+      const mapped = (res.players ?? []).map((p) =>
+        mapPlayerToRow(p, clientLabel)
+      );
+      setRows(mapped);
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(
+          new CustomEvent("akou:players-updated", { detail: { count: mapped.length } })
+        );
+      }
+    } catch (err: unknown) {
+      const ax = err as { response?: { data?: { error?: string } } };
+      setError(ax?.response?.data?.error || "Failed to load players");
+      setRows([]);
+    } finally {
+      setPageLoading(false);
+    }
+  }, [
+    apiClient,
+    isSuperAdmin,
+    workspaceTenantId,
+    clientNameByTenantId,
+    workspaceClients,
+  ]);
+
+  useEffect(() => {
+    if (authLoading) return;
+    void loadPlayers();
+  }, [authLoading, loadPlayers]);
+
+  const handleWorkspaceChange = (clientId: string) => {
+    const match = workspaceClients.find((c) => c.id === clientId);
+    if (!match) return;
+    setSelectedWorkspaceClientId(clientId);
+    setWorkspaceTenantId(match.tenantId);
+  };
+
+  const handleAddPlayer = async (data: {
+    name: string;
+    locationName?: string;
+    ipAddress?: string;
+    deviceId?: string;
+    tenantId?: string;
+    clientId?: string;
+  }) => {
+    if (isSuperAdmin) {
+      if (!data.tenantId) {
+        throw new Error("Select a client workspace before creating a player.");
+      }
+      apiClient.setWorkspaceTenant(data.tenantId);
+      if (data.clientId) {
+        setSelectedWorkspaceClientId(data.clientId);
+        setWorkspaceTenantId(data.tenantId);
+      }
+    }
+
+    setActionLoading(true);
+    try {
+      await apiClient.createPlayer({
+        name: data.name,
+        macAddress: "",
+        locationName: data.locationName,
+        ipAddress: data.ipAddress,
+        deviceId: data.deviceId,
+        tenantId: data.tenantId,
+        clientId: data.clientId,
+      });
+      await loadPlayers();
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleDeletePlayers = async (ids: string[]) => {
+    if (ids.length === 0) return;
+    setActionLoading(true);
+    setError(null);
+    try {
+      for (const id of ids) {
+        await apiClient.deletePlayer(id);
+      }
+      setSelected([]);
+      await loadPlayers();
+    } catch (err: unknown) {
+      const ax = err as { response?: { data?: { error?: string } } };
+      setError(ax?.response?.data?.error || "Failed to delete player");
+    } finally {
+      setActionLoading(false);
+    }
+  };
 
   const filtered = useMemo(() => {
     const t = q.trim().toLowerCase();
     if (!t) return rows;
-    return rows.filter(p => `${p.name} ${p.location}`.toLowerCase().includes(t));
+    return rows.filter((p) =>
+      `${p.name} ${p.location} ${p.client ?? ""} ${p.deviceId}`
+        .toLowerCase()
+        .includes(t)
+    );
   }, [q, rows]);
 
   const columns: Column<PlayerRow>[] = [
-    { key: 'name', label: 'Player Name', render: (r) => (<div className="truncate"><span className="font-medium text-gray-900">{r.name}</span></div>) },
-    { key: 'deviceId', label: 'Device ID', render: (r) => <span className="text-gray-600">{r.deviceId}</span> },
-    { key: 'location', label: 'Location', render: (r) => <span className="text-gray-600">{r.location}</span> },
-    { key: 'client', label: 'Client', render: (r) => <span className="text-gray-600">{r.client ?? '—'}</span> },
-    { key: 'status', label: 'Status', render: (r) => <StatusBadge s={r.status} /> },
-    { key: 'ip', label: 'IP Address', render: (r) => <span className="text-gray-600">{r.ip ?? '—'}</span> },
-    { key: 'currentAudio', label: 'Current Audio', render: (r) => <span className="text-gray-600">{r.currentAudio ?? '—'}</span> },
-    { key: 'lastActive', label: 'Last Active', render: (r) => <span className="text-gray-600">{r.lastActive ?? '—'}</span> },
-    { key: 'actions', label: 'Actions', className: 'w-32', render: (r) => (
-      <div className="flex items-center justify-end gap-2">
-        <a href={`/admin/players/${r.id}`} title="View player" aria-label={`View ${r.name}`} className="inline-flex items-center justify-center h-8 w-8 rounded-md text-gray-600 hover:text-[#1f2d3d] hover:bg-gray-100 focus:outline-none">
-          <FileText size={16} />
-        </a>
-        <a href={`/admin/players/${r.id}/edit`} title="Edit player" aria-label={`Edit ${r.name}`} className="inline-flex items-center justify-center h-8 w-8 rounded-md text-gray-600 hover:text-[#1f2d3d] hover:bg-gray-100 focus:outline-none">
-          <Edit3 size={16} />
-        </a>
-        <a href="#" title="Lock player" aria-label={`Lock ${r.name}`} className="inline-flex items-center justify-center h-8 w-8 rounded-md text-red-600 hover:bg-red-50 focus:outline-none">
-          <Lock size={16} />
-        </a>
-        <a href="#" title="More" aria-label={`More actions for ${r.name}`} className="inline-flex items-center justify-center h-8 w-8 rounded-md text-gray-400 hover:bg-gray-100 focus:outline-none">
-          <MoreHorizontal size={16} />
-        </a>
-      </div>
-    ) },
+    {
+      key: "name",
+      label: "Player Name",
+      render: (r) => (
+        <div className="truncate">
+          <span className="font-medium text-gray-900">{r.name}</span>
+        </div>
+      ),
+    },
+    { key: "deviceId", label: "Device ID", render: (r) => <span className="text-gray-600">{r.deviceId}</span> },
+    { key: "location", label: "Location", render: (r) => <span className="text-gray-600">{r.location}</span> },
+    { key: "client", label: "Client", render: (r) => <span className="text-gray-600">{r.client ?? "—"}</span> },
+    { key: "status", label: "Status", render: (r) => <StatusBadge s={r.status} /> },
+    { key: "ip", label: "IP Address", render: (r) => <span className="text-gray-600">{r.ip ?? "—"}</span> },
+    {
+      key: "currentAudio",
+      label: "Current Audio",
+      render: (r) => <span className="text-gray-600">{r.currentAudio ?? "—"}</span>,
+    },
+    {
+      key: "lastActive",
+      label: "Last Active",
+      render: (r) => <span className="text-gray-600">{r.lastActive ?? "—"}</span>,
+    },
+    {
+      key: "actions",
+      label: "Actions",
+      className: "w-24",
+      render: (r) => (
+        <div className="flex items-center justify-end gap-2">
+          <button
+            type="button"
+            title="View player"
+            className="inline-flex items-center justify-center h-8 w-8 rounded-md text-gray-600 hover:bg-gray-100"
+          >
+            <FileText size={16} />
+          </button>
+          <button
+            type="button"
+            title="Edit player"
+            className="inline-flex items-center justify-center h-8 w-8 rounded-md text-gray-600 hover:bg-gray-100"
+          >
+            <Edit3 size={16} />
+          </button>
+        </div>
+      ),
+    },
   ];
+
+  const workspaceBlocked = isSuperAdmin && !workspaceTenantId;
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-white">
-      <AdminHeader title="Players" subtitle="Manage playback endpoints" onAdd={() => setAddOpen(true)} searchValue={q} setSearchValue={setQ} />
+      <AdminHeader
+        title="Players"
+        subtitle="Manage playback endpoints via live API"
+        onAdd={() => setAddOpen(true)}
+        searchValue={q}
+        setSearchValue={setQ}
+      />
 
-      <div className="flex-1 overflow-auto">
+      {isSuperAdmin && (
+        <div className="px-6 py-3 border-b border-gray-100 flex items-center gap-2">
+          <label
+            htmlFor="admin-players-workspace"
+            className="text-xs font-semibold uppercase tracking-wide text-gray-500 shrink-0"
+          >
+            Client Workspace
+          </label>
+          <select
+            id="admin-players-workspace"
+            value={selectedWorkspaceClientId}
+            onChange={(e) => handleWorkspaceChange(e.target.value)}
+            className="max-w-md flex-1 text-sm px-3 py-1.5 rounded-md bg-violet-50 border border-violet-100"
+          >
+            <option value="" disabled>
+              Choose a client…
+            </option>
+            {workspaceClients.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+
+      {error && (
+        <div className="mx-6 mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+          {error}
+        </div>
+      )}
+
+      <div className="flex-1 overflow-auto relative">
+        {(pageLoading || actionLoading) && (
+          <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/60">
+            <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
+          </div>
+        )}
         <div className="px-6 py-4">
-          <AdminTable columns={columns} rows={filtered} selected={selected} onSelect={(id, checked) => setSelected(s => checked ? [...s, id] : s.filter(x => x !== id))} onSelectAll={(checked) => setSelected(checked ? filtered.map(r=>r.id) : [])} onRowClick={(r) => window.location.href = `/admin/players/${r.id}`} onDeleteSelected={(ids) => setRows(prev => prev.filter(p => !ids.includes(p.id)))} />
+          {workspaceBlocked ? (
+            <p className="text-sm text-gray-500 py-12 text-center">
+              Select a client workspace to load and manage players.
+            </p>
+          ) : (
+            <AdminTable
+              columns={columns}
+              rows={filtered}
+              selected={selected}
+              onSelect={(id, checked) =>
+                setSelected((s) =>
+                  checked ? [...s, id] : s.filter((x) => x !== id)
+                )
+              }
+              onSelectAll={(checked) =>
+                setSelected(checked ? filtered.map((r) => r.id) : [])
+              }
+              onRowClick={() => {}}
+              onDeleteSelected={(ids) => void handleDeletePlayers(ids)}
+            />
+          )}
         </div>
       </div>
 
-      <AdminAddModal open={addOpen} onClose={() => setAddOpen(false)} title="Add player" saveDisabled={!newName || !newDevice} onSave={() => {
-        const id = `p${Date.now().toString(36)}`;
-        setRows(prev => [{ id, name: newName, deviceId: newDevice, location: newLocation || 'Unknown', client: newClient || undefined, status: 'offline', ip: newIp || undefined, currentAudio: '—', lastActive: 'now' }, ...prev]);
-        setAddOpen(false);
-        setNewName(''); setNewDevice(''); setNewLocation(''); setNewClient(''); setNewIp('');
-      }}>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Player name" className="w-full px-3 py-2 border border-gray-100 rounded-md" />
-          <input value={newDevice} onChange={(e) => setNewDevice(e.target.value)} placeholder="Device ID" className="w-full px-3 py-2 border border-gray-100 rounded-md" />
-          <input value={newLocation} onChange={(e) => setNewLocation(e.target.value)} placeholder="Location" className="w-full px-3 py-2 border border-gray-100 rounded-md" />
-          <input value={newClient} onChange={(e) => setNewClient(e.target.value)} placeholder="Client" className="w-full px-3 py-2 border border-gray-100 rounded-md" />
-          <input value={newIp} onChange={(e) => setNewIp(e.target.value)} placeholder="IP address" className="w-full px-3 py-2 border border-gray-100 rounded-md col-span-2" />
-        </div>
-      </AdminAddModal>
+      <AddPlayerModal
+        isOpen={addOpen}
+        onClose={() => setAddOpen(false)}
+        onSubmit={handleAddPlayer}
+        defaultClientId={selectedWorkspaceClientId}
+      />
     </div>
   );
 }

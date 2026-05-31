@@ -11,7 +11,8 @@ import type { ScheduleEventCard } from "./components/EventCard";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import { useAuth } from "@/app/context/AuthContext";
 import { getApiClient } from "@/lib/api-client";
-import type { ClientInfo, ScheduleEntry } from "@/types/api";
+import type { ScheduleEntry } from "@/types/api";
+import { toActiveWorkspaceClients } from "@/lib/workspace-clients";
 
 type AudioItem = {
   id: string;
@@ -77,25 +78,6 @@ function playlistDurationMinutes(trackCount: number) {
   return Math.max(15, trackCount * 4);
 }
 
-function normalizeScheduleClient(raw: Record<string, unknown>): ClientInfo {
-  return {
-    id: String(raw.id ?? ""),
-    tenantId: (raw.tenantId ?? raw.tenant_id) as string | undefined,
-    name: String(raw.name ?? "Untitled client"),
-    businessType: String(raw.businessType ?? raw.business_type ?? ""),
-    contactPerson: String(raw.contactPerson ?? raw.contact_person ?? ""),
-    email: String(raw.email ?? ""),
-    phone: String(raw.phone ?? ""),
-    status: (String(raw.status ?? "INACTIVE").toUpperCase() as ClientInfo["status"]),
-    subscriptionTier: (raw.subscriptionTier ??
-      raw.subscription_tier ??
-      "STARTER") as ClientInfo["subscriptionTier"],
-    maxPlayers: Number(raw.maxPlayers ?? raw.max_players ?? 0),
-    maxStorageGb: Number(raw.maxStorageGb ?? raw.max_storage_gb ?? 0),
-    createdAt: (raw.createdAt ?? raw.created_at) as string | undefined,
-  };
-}
-
 export default function ScheduleClientPage() {
   const apiClient = getApiClient();
   const { user, isLoading: authLoading } = useAuth();
@@ -137,18 +119,7 @@ export default function ScheduleClientPage() {
       try {
         const res = await apiClient.listClients();
         if (cancelled) return;
-        const eligible = (res?.clients ?? [])
-          .map((c: Record<string, unknown>) => normalizeScheduleClient(c))
-          .filter(
-            (c: ClientInfo) =>
-              c.status === "ACTIVE" &&
-              Boolean(c.tenantId && String(c.tenantId).trim())
-          )
-          .map((c: ClientInfo) => ({
-            id: c.id,
-            name: c.name,
-            tenantId: String(c.tenantId),
-          }));
+        const eligible = toActiveWorkspaceClients(res?.clients ?? []);
         setWorkspaceClients(eligible);
         if (eligible.length > 0 && !selectedWorkspaceClientId) {
           setSelectedWorkspaceClientId(eligible[0].id);
