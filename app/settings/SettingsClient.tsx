@@ -5,6 +5,7 @@ import React, { useState, useEffect } from "react";
 import { useAuth } from "@/app/context/AuthContext";
 import SettingsHeader, { type SettingsTab } from "./components/SettingsHeader";
 import MyDetailsTab from "./components/MyDetailsTab";
+import BillingTab from "./components/BillingTab";
 
 const USER_STORAGE_KEY = "akou.user";
 
@@ -261,6 +262,8 @@ export default function SettingsClient() {
               setAvatar={setAvatar}
               setDirty={setDirty}
             />
+          ) : activeTab === "billing" ? (
+            <BillingTab />
           ) : (
             <div className="text-sm text-gray-500">
               This feature is coming soon.

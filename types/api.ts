@@ -248,3 +248,33 @@ export interface SystemHealthMetrics {
   failedPlaybacks: number;
 }
 
+export interface AnalyticsTimelineEntry {
+  hour: string;
+  total: number;
+  successful: number;
+  failed: number;
+}
+
+export interface AnalyticsTimelineResponse {
+  ok: boolean;
+  tenantId: string;
+  timeline: AnalyticsTimelineEntry[];
+}
+
+export interface InvoiceInfo {
+  id: string;
+  tenantId: string;
+  invoiceNumber: string;
+  amount: number;
+  status: 'PAID' | 'UNPAID';
+  dueDate?: string | null;
+  downloadUrl?: string | null;
+  createdAt?: string | null;
+}
+
+export interface InvoicesListResponse {
+  ok: boolean;
+  tenantId: string;
+  invoices: InvoiceInfo[];
+}
+

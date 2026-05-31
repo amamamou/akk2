@@ -20,6 +20,9 @@ import type {
   AuthUser,
   ClientCreateInput,
   ClientResponse,
+  SystemHealthMetrics,
+  AnalyticsTimelineResponse,
+  InvoicesListResponse,
 } from '@/types/api';
 import {
   AUTH_META_KEY,
@@ -571,8 +574,16 @@ export class ApiClient {
    /**
     * GET /analytics/system-health - Get system health metrics
     */
-   async getSystemHealth(): Promise<any> {
-          const response = await this.instance.get('/analytics/system-health');
+   async getSystemHealth(): Promise<SystemHealthMetrics> {
+     const response = await this.instance.get<SystemHealthMetrics>('/analytics/system-health');
+     return response.data;
+   }
+
+   /**
+    * GET /analytics/timeline - Get 24h playback timeline
+    */
+   async getAnalyticsTimeline(): Promise<AnalyticsTimelineResponse> {
+     const response = await this.instance.get<AnalyticsTimelineResponse>('/analytics/timeline');
      return response.data;
    }
 
@@ -602,6 +613,16 @@ export class ApiClient {
      return response.data;
    }
 
+
+  // ============ Invoice Endpoints ============
+
+  /**
+   * GET /invoices/ - List invoices for the active tenant
+   */
+  async listInvoices(): Promise<InvoicesListResponse> {
+    const response = await this.instance.get<InvoicesListResponse>('/invoices/');
+    return response.data;
+  }
 
   // ============ Utility Methods ============
 
