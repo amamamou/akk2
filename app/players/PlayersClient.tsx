@@ -5,9 +5,12 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/app/context/AuthContext";
 import { getApiClient } from "@/lib/api-client";
 import {
+  ALL_CLIENTS_WORKSPACE_ID,
+  isAllClientsSelection,
   toActiveWorkspaceClients,
   type WorkspaceClientOption,
 } from "@/lib/workspace-clients";
+import { ChevronDown } from "lucide-react";
 import type { PlayerInfo } from "@/types/api";
 import { useRouter } from "next/navigation";
 import PlayersHeader from "./components/PlayersHeader";
@@ -34,6 +37,8 @@ export type PlayerType = {
   isPlaying?: boolean;
   nextEvent?: Upcoming;
   playingProgress?: number;
+  tenantId?: string;
+  clientName?: string;
 };
 
 const initialPlayers: PlayerType[] = [];
@@ -73,10 +78,16 @@ export default function PlayersClient() {
     []
   );
   const [selectedWorkspaceClientId, setSelectedWorkspaceClientId] =
-    useState("");
+    useState(ALL_CLIENTS_WORKSPACE_ID);
   const [workspaceTenantId, setWorkspaceTenantId] = useState<string | null>(null);
+  const [expandedClients, setExpandedClients] = useState<Record<string, boolean>>(
+    {}
+  );
   const [playersLoading, setPlayersLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+
+  const isAllClientsView =
+    isSuperAdmin && isAllClientsSelection(selectedWorkspaceClientId);
   // top filter removed, keep query only
   // pagination (reuse audio/playlist toolbar controls)
   const [page, setPage] = useState(1);
@@ -139,12 +150,13 @@ export default function PlayersClient() {
         if (cancelled) return;
         const eligible = toActiveWorkspaceClients(res?.clients ?? []);
         setWorkspaceClients(eligible);
-        if (eligible.length > 0 && !selectedWorkspaceClientId) {
-          const preferred =
-            eligible.find((c) => c.tenantId === user?.tenantId) ?? eligible[0];
-          setSelectedWorkspaceClientId(preferred.id);
-          setWorkspaceTenantId(preferred.tenantId);
-        }
+        setExpandedClients((prev) => {
+          const next = { ...prev };
+          for (const c of eligible) {
+            if (next[c.id] === undefined) next[c.id] = true;
+          }
+          return next;
+        });
       } catch (err: unknown) {
         if (cancelled) return;
         const ax = err as { response?: { data?: { error?: string } } };
@@ -160,6 +172,39 @@ export default function PlayersClient() {
   }, [apiClient, isSuperAdmin, authLoading, user?.tenantId]);
 
   const loadPlayersFromApi = useCallback(async () => {
+    if (isSuperAdmin && isAllClientsView) {
+      if (workspaceClients.length === 0) {
+        setPlayers([]);
+        setPlayersLoading(false);
+        return;
+      }
+
+      setPlayersLoading(true);
+      setLoadError(null);
+      try {
+        const combined: PlayerType[] = [];
+        for (const client of workspaceClients) {
+          apiClient.setWorkspaceTenant(client.tenantId);
+          const res = await apiClient.getPlayers();
+          const mapped = (res.players ?? []).map((p) => ({
+            ...mapApiPlayerToLocal(p),
+            tenantId: client.tenantId,
+            clientName: client.name,
+          }));
+          combined.push(...mapped);
+        }
+        setPlayers(combined);
+        notifyPlayersUpdated(combined.length);
+      } catch (err: unknown) {
+        const ax = err as { response?: { data?: { error?: string } } };
+        setLoadError(ax?.response?.data?.error || "Failed to load players");
+        setPlayers([]);
+      } finally {
+        setPlayersLoading(false);
+      }
+      return;
+    }
+
     if (isSuperAdmin && !workspaceTenantId) {
       setPlayers([]);
       setPlayersLoading(false);
@@ -175,8 +220,15 @@ export default function PlayersClient() {
 
     try {
       const res = await apiClient.getPlayers();
+      const client = workspaceClients.find(
+        (c) => c.id === selectedWorkspaceClientId
+      );
       if (res?.players && Array.isArray(res.players)) {
-        const mapped = res.players.map((p) => mapApiPlayerToLocal(p));
+        const mapped = res.players.map((p) => ({
+          ...mapApiPlayerToLocal(p),
+          tenantId: workspaceTenantId ?? undefined,
+          clientName: client?.name,
+        }));
         setPlayers(mapped);
         notifyPlayersUpdated(mapped.length);
         return;
@@ -190,7 +242,15 @@ export default function PlayersClient() {
     } finally {
       setPlayersLoading(false);
     }
-  }, [apiClient, isSuperAdmin, workspaceTenantId, notifyPlayersUpdated]);
+  }, [
+    apiClient,
+    isSuperAdmin,
+    isAllClientsView,
+    workspaceClients,
+    workspaceTenantId,
+    selectedWorkspaceClientId,
+    notifyPlayersUpdated,
+  ]);
 
   useEffect(() => {
     if (authLoading) return;
@@ -198,11 +258,24 @@ export default function PlayersClient() {
   }, [authLoading, loadPlayersFromApi]);
 
   const handleWorkspaceClientChange = (clientId: string) => {
+    if (isAllClientsSelection(clientId)) {
+      setSelectedWorkspaceClientId(ALL_CLIENTS_WORKSPACE_ID);
+      setWorkspaceTenantId(null);
+      setLoadError(null);
+      return;
+    }
     const match = workspaceClients.find((c) => c.id === clientId);
     if (!match) return;
     setSelectedWorkspaceClientId(clientId);
     setWorkspaceTenantId(match.tenantId);
     setLoadError(null);
+  };
+
+  const toggleClientAccordion = (clientId: string) => {
+    setExpandedClients((prev) => ({
+      ...prev,
+      [clientId]: !prev[clientId],
+    }));
   };
 
   // Simulate playback progress for all playing players
@@ -328,6 +401,12 @@ export default function PlayersClient() {
   async function deletePlayer(id: string) {
     setLoadError(null);
     try {
+      const target = players.find((p) => p.id === id);
+      if (target?.tenantId) {
+        apiClient.setWorkspaceTenant(target.tenantId);
+      } else if (workspaceTenantId) {
+        apiClient.setWorkspaceTenant(workspaceTenantId);
+      }
       await apiClient.deletePlayer(id);
       setEditingId(null);
       await loadPlayersFromApi();
@@ -376,6 +455,27 @@ export default function PlayersClient() {
     const start = (page - 1) * perPage;
     return filteredPlayers.slice(start, start + perPage);
   }, [filteredPlayers, page, perPage]);
+
+  const playersByClient = useMemo(() => {
+    const normalizedQuery = query.trim().toLowerCase();
+    return workspaceClients.map((client) => {
+      const clientPlayers = players.filter((p) => p.tenantId === client.tenantId);
+      const filtered = !normalizedQuery
+        ? clientPlayers
+        : clientPlayers.filter((player) => {
+            const haystack = [
+              player.roomName,
+              player.playerName,
+              player.nowPlaying?.title ?? "",
+              player.nextEvent?.title ?? "",
+            ]
+              .join(" ")
+              .toLowerCase();
+            return haystack.includes(normalizedQuery);
+          });
+      return { client, players: filtered };
+    });
+  }, [workspaceClients, players, query]);
 
   const gridCols = useMemo(
     () => "grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3",
@@ -446,7 +546,9 @@ export default function PlayersClient() {
               {loadError}
             </div>
           )}
-          {isSuperAdmin && !workspaceTenantId ? (
+          {isSuperAdmin &&
+          !isAllClientsView &&
+          !workspaceTenantId ? (
             <div className="flex flex-col items-center justify-center py-16">
               <div className="text-center space-y-2 max-w-sm">
                 <h2 className="text-sm font-semibold text-gray-900">
@@ -461,6 +563,87 @@ export default function PlayersClient() {
           ) : playersLoading ? (
             <div className="flex flex-col items-center justify-center py-16 text-sm text-gray-500">
               Loading players…
+            </div>
+          ) : isAllClientsView ? (
+            <div className="space-y-3">
+              {workspaceClients.length === 0 ? (
+                <p className="text-sm text-gray-500 py-12 text-center">
+                  No active client workspaces found.
+                </p>
+              ) : playersByClient.every((g) => g.players.length === 0) ? (
+                <p className="text-sm text-gray-500 py-12 text-center">
+                  No players found across client workspaces.
+                </p>
+              ) : (
+                playersByClient.map(({ client, players: groupPlayers }) => {
+                  if (groupPlayers.length === 0) return null;
+                  const expanded = expandedClients[client.id] ?? true;
+                  return (
+                    <div
+                      key={client.id}
+                      className="rounded-lg border border-gray-200 overflow-hidden bg-white shadow-sm"
+                    >
+                      <button
+                        type="button"
+                        onClick={() => toggleClientAccordion(client.id)}
+                        className="w-full flex items-center justify-between gap-3 px-4 py-3 bg-gradient-to-r from-violet-50 to-white hover:from-violet-100/80 transition-colors text-left"
+                      >
+                        <div>
+                          <span className="font-semibold text-gray-900">
+                            {client.name}
+                          </span>
+                          <span className="ml-2 text-xs text-gray-500">
+                            {groupPlayers.length}{" "}
+                            {groupPlayers.length === 1 ? "player" : "players"}
+                          </span>
+                        </div>
+                        <ChevronDown
+                          size={18}
+                          className={`text-gray-500 shrink-0 transition-transform duration-200 ${
+                            expanded ? "rotate-180" : ""
+                          }`}
+                        />
+                      </button>
+                      {expanded && (
+                        <div className="border-t border-gray-100 px-2 py-3">
+                          {view === "list" ? (
+                            <div className="space-y-2">
+                              {groupPlayers.map((p) => (
+                                <PlayerRow
+                                  key={p.id}
+                                  player={p}
+                                  onPlayPause={togglePlay}
+                                  onSkip={skip}
+                                  onRename={renamePlayer}
+                                  onDelete={deletePlayer}
+                                  onRequestEdit={(id) => setEditingId(id)}
+                                  editing={editingId === p.id}
+                                />
+                              ))}
+                            </div>
+                          ) : (
+                            <div className={`grid gap-4 ${gridCols}`}>
+                              {groupPlayers.map((p) => (
+                                <PlayerCard
+                                  key={p.id}
+                                  player={p}
+                                  onRename={renamePlayer}
+                                  onDelete={deletePlayer}
+                                  onRequestEdit={(id) => setEditingId(id)}
+                                  editing={editingId === p.id}
+                                  onOpenSchedule={() =>
+                                    openScheduleForRoom(p.roomId)
+                                  }
+                                />
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })
+              )}
             </div>
           ) : players.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16">
@@ -536,7 +719,11 @@ export default function PlayersClient() {
          isOpen={addPlayerModalOpen}
          onClose={() => setAddPlayerModalOpen(false)}
          onSubmit={handleAddPlayer}
-         defaultClientId={selectedWorkspaceClientId}
+         defaultClientId={
+           isAllClientsSelection(selectedWorkspaceClientId)
+             ? workspaceClients[0]?.id ?? ""
+             : selectedWorkspaceClientId
+         }
        />
      </div>
    );

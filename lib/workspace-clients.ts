@@ -1,11 +1,27 @@
 import type { ClientInfo } from "@/types/api";
-import { applyDemoEnterpriseLabels } from "@/lib/demo-workspaces";
+import {
+  ALL_CLIENTS_WORKSPACE_ID,
+  ALL_TENANTS_SENTINEL,
+} from "@/lib/demo-workspaces";
+
+export { ALL_CLIENTS_WORKSPACE_ID, ALL_TENANTS_SENTINEL };
 
 export type WorkspaceClientOption = {
   id: string;
   name: string;
   tenantId: string;
 };
+
+/** Prepended to super-admin workspace dropdowns (Players, etc.). */
+export const ALL_CLIENTS_OPTION: WorkspaceClientOption = {
+  id: ALL_CLIENTS_WORKSPACE_ID,
+  name: "All Clients",
+  tenantId: ALL_TENANTS_SENTINEL,
+};
+
+export function isAllClientsSelection(clientId: string): boolean {
+  return clientId === ALL_CLIENTS_WORKSPACE_ID;
+}
 
 export function normalizeClientRecord(raw: Record<string, unknown>): ClientInfo {
   return {
@@ -41,5 +57,11 @@ export function toActiveWorkspaceClients(
       tenantId: String(c.tenantId),
     }));
 
-  return applyDemoEnterpriseLabels(active);
+  return active;
+}
+
+export function workspaceSelectorOptions(
+  clients: WorkspaceClientOption[]
+): WorkspaceClientOption[] {
+  return [ALL_CLIENTS_OPTION, ...clients];
 }

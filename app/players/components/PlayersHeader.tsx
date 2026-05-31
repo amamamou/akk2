@@ -1,10 +1,13 @@
 "use client";
 
-import React from "react";
-import { useAuth } from '@/app/context/AuthContext';
+import React, { useMemo } from "react";
+import { useAuth } from "@/app/context/AuthContext";
 import { Plus } from "lucide-react";
 import ViewToggle from "./ViewToggle";
-import type { WorkspaceClientOption } from "@/lib/workspace-clients";
+import {
+  workspaceSelectorOptions,
+  type WorkspaceClientOption,
+} from "@/lib/workspace-clients";
 
 export default function PlayersHeader({
   view,
@@ -26,6 +29,11 @@ export default function PlayersHeader({
   const { user } = useAuth();
   const canAddPlayer = Boolean(user);
 
+  const selectorOptions = useMemo(
+    () => workspaceSelectorOptions(workspaceClients ?? []),
+    [workspaceClients]
+  );
+
   return (
     <div className="sticky top-0 z-10 bg-white border-gray-200">
       {showWorkspaceSelector && (
@@ -42,10 +50,7 @@ export default function PlayersHeader({
             onChange={(e) => onChangeWorkspaceClient?.(e.target.value)}
             className="flex-1 max-w-md text-sm px-3 py-1.5 rounded-md bg-violet-50 border border-violet-100 text-gray-900"
           >
-            <option value="" disabled>
-              Choose a client…
-            </option>
-            {(workspaceClients ?? []).map((c) => (
+            {selectorOptions.map((c) => (
               <option key={c.id} value={c.id}>
                 {c.name}
               </option>
@@ -57,7 +62,9 @@ export default function PlayersHeader({
       <div className="px-4 sm:px-8 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold text-gray-900">Players</h1>
-          <p className="mt-1 text-sm text-gray-500">Manage connected audio devices by location</p>
+          <p className="mt-1 text-sm text-gray-500">
+            Manage connected audio devices by location
+          </p>
         </div>
 
         <div className="flex items-center gap-3">

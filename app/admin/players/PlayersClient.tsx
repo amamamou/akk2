@@ -7,7 +7,10 @@ import {
   toActiveWorkspaceClients,
   type WorkspaceClientOption,
 } from "@/lib/workspace-clients";
-import { ALL_CLIENTS_WORKSPACE_ID } from "@/lib/demo-workspaces";
+import {
+  ALL_CLIENTS_WORKSPACE_ID,
+  isAllClientsSelection,
+} from "@/lib/workspace-clients";
 import type { PlayerInfo } from "@/types/api";
 import AdminHeader from "../components/AdminHeader";
 import AdminTable, { Column } from "../components/AdminTable";
@@ -98,7 +101,7 @@ export default function PlayersClient() {
   const [workspaceTenantId, setWorkspaceTenantId] = useState<string | null>(null);
 
   const showAllClients =
-    isSuperAdmin && selectedWorkspaceClientId === ALL_CLIENTS_WORKSPACE_ID;
+    isSuperAdmin && isAllClientsSelection(selectedWorkspaceClientId);
 
   useEffect(() => {
     if (!isSuperAdmin || authLoading) return;
@@ -250,7 +253,7 @@ export default function PlayersClient() {
   }, [authLoading, loadPlayers]);
 
   const handleWorkspaceChange = (clientId: string) => {
-    if (clientId === ALL_CLIENTS_WORKSPACE_ID) {
+    if (isAllClientsSelection(clientId)) {
       setSelectedWorkspaceClientId(ALL_CLIENTS_WORKSPACE_ID);
       setWorkspaceTenantId(null);
       setSelected([]);
