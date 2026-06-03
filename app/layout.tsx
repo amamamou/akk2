@@ -4,6 +4,7 @@ import "./globals.css";
 import SidebarWrapper from "./components/SidebarWrapper";
 import SuppressConsole from './components/SuppressConsole';
 import { AuthProvider } from "./context/AuthContext";
+import Navbar from "./components/Navbar";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -36,14 +37,21 @@ export default function RootLayout({
     >
       <body suppressHydrationWarning className="min-h-full">
         <SuppressConsole />
-        <AuthProvider>
-          <div className="flex h-screen bg-white text-gray-900 font-sans overflow-hidden">
-            <SidebarWrapper />
-            <main className="flex-1 min-w-0 bg-white  border-gray-200 shadow-sm flex flex-col">
-              {children}
-            </main>
-          </div>
-        </AuthProvider>
+<AuthProvider>
+  <div className="grid h-screen grid-rows-[72px_1fr]">
+
+    <Navbar />
+
+    <div className="flex overflow-hidden">
+      <SidebarWrapper />
+
+      <main className="flex-1 overflow-auto">
+        {children}
+      </main>
+    </div>
+
+  </div>
+</AuthProvider>
       </body>
     </html>
   );
