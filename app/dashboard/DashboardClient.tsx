@@ -10,6 +10,7 @@ import SystemAlerts from "./components/SystemAlerts";
 import { getApiClient } from "@/lib/api-client";
 import type { MediaInfo, PlayerInfo, ScheduleEntry, SystemHealthMetrics, ActivityLogEntry, ClientInfo } from "@/types/api";
 import type { QuickStat } from "./components/QuickStatsGrid";
+import { Loader2 } from "lucide-react";
 
 const dayLabel = new Intl.DateTimeFormat(undefined, { weekday: "short" });
 const timeLabel = new Intl.DateTimeFormat(undefined, {
@@ -217,16 +218,32 @@ export default function DashboardClient() {
   const upcomingBroadcasts = useMemo(() => mapUpcomingBroadcasts(schedules, players), [schedules, players]);
   const recentActivity = useMemo(() => mapRecentActivity(schedules, players, activityLogs), [schedules, players, activityLogs]);
 
-  if (isLoading) {
-    return (
-      <div className="flex-1 flex items-center justify-center bg-gray-50">
-        <div className="text-center text-sm text-gray-600">Loading dashboard…</div>
+if (isLoading) {
+  return (
+    <div className="flex-1 min-h-[calc(100vh-76px)] flex items-center justify-center bg-[#F4F4F5]">
+      <div className="flex flex-col items-center">
+
+        <Loader2
+          size={32}
+          strokeWidth={2}
+          className="animate-spin text-[#A473FF]"
+        />
+
+        <h3 className="mt-6 text-sm font-semibold text-zinc-900">
+          Loading dashboard
+        </h3>
+
+        <p className="mt-1 text-xs text-zinc-500">
+          Fetching your latest data...
+        </p>
+
       </div>
-    );
-  }
+    </div>
+  );
+}
 
   return (
-    <div className="flex-1 overflow-auto bg-gray-50/30">
+    <div className="flex-1 overflow-auto bg-[#F4F4F5]">
       {error && (
         <div className="mx-8 mt-6 p-3 rounded-lg bg-red-50 border border-red-200 text-sm text-red-800">
           {error}
@@ -235,7 +252,7 @@ export default function DashboardClient() {
 
       <DashboardHeader stats={quickStats} />
 
-      <div className="p-8 ">
+      <div className="p-4 ">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 space-y-6">
             <LivePlayerStatus players={livePlayers} />

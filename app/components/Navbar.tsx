@@ -8,8 +8,11 @@ import {
   Info,
   ChevronDown,
 } from "lucide-react";
+// removed unused BarChart3 import
+import { useAuth } from "@/app/context/AuthContext";
 
 export default function Navbar() {
+  const { user } = useAuth();
   return (
     <header className="h-[76px] bg-[#F4F4F5] px-5">
       <div className="grid h-full grid-cols-[300px_1fr_340px] items-center">
@@ -45,7 +48,14 @@ export default function Navbar() {
             <NavItem href="/players">Players</NavItem>
             <NavItem href="/library/playlists">Playlists</NavItem>
             <NavItem href="/library/audio">Audios</NavItem>
+            <NavItem href="/analytics">Analytics</NavItem>
             <NavItem href="/settings">Settings</NavItem>
+
+            {/* Admin-only: Clients (show for super admins) */}
+            {(() => {
+              const role = (user as { role?: string } | undefined)?.role || "";
+              return (user && String(role).toUpperCase() === "SUPER_ADMIN") ? <NavItem href="/clients">Clients</NavItem> : null;
+            })()}
 
           </nav>
         </div>
@@ -70,32 +80,8 @@ export default function Navbar() {
 
           </div>
 
-          {/* PROFILE CAPSULE */}
-          <div className="flex items-center gap-3 rounded-full bg-white px-3 py-1">
-
-            <img
-              src="https://i.pravatar.cc/40"
-              alt=""
-              className="h-8 w-8 rounded-full object-cover"
-            />
-
-            <div className="leading-tight">
-              <div className="text-[13px] font-medium text-zinc-900">
-                Sajibur Rahman
-              </div>
-
-              <div className="text-[11px] text-zinc-400">
-                sajibur.rahman@gmail...
-              </div>
-            </div>
-
-            <ChevronDown
-              size={14}
-              strokeWidth={1.9}
-              className="text-zinc-500"
-            />
-
-          </div>
+            {/* PROFILE CAPSULE */}
+            <UserProfile />
 
         </div>
       </div>
@@ -162,5 +148,33 @@ function IconButton({
     >
       {children}
     </button>
+  );
+}
+
+function UserProfile() {
+  const { user } = useAuth();
+
+  type SimpleUser = { name?: string; email?: string; avatar?: string | null };
+  const u = user as SimpleUser | undefined;
+  const name = u?.name || u?.email || "User";
+  const email = u?.email || "";
+  const avatar = u?.avatar || "https://i.pravatar.cc/40";
+
+  return (
+    <div className="flex items-center gap-3 rounded-full bg-white px-3 py-1">
+    {typeof avatar === "string" && (avatar.startsWith("http://") || avatar.startsWith("https://")) ? (
+  // eslint-disable-next-line @next/next/no-img-element
+  <img src={avatar} alt="" className="h-8 w-8 rounded-full object-cover" />
+      ) : (
+        <Image src={avatar} alt="" width={32} height={32} className="h-8 w-8 rounded-full object-cover" />
+      )}
+
+      <div className="leading-tight">
+        <div className="text-[13px] font-medium text-zinc-900">{name}</div>
+        <div className="text-[11px] text-zinc-400">{email}</div>
+      </div>
+
+      <ChevronDown size={14} strokeWidth={1.9} className="text-zinc-500" />
+    </div>
   );
 }

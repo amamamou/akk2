@@ -35,7 +35,7 @@ export default function RootLayout({
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body suppressHydrationWarning className="min-h-full">
+      <body suppressHydrationWarning className="min-h-full ">
         <SuppressConsole />
 <AuthProvider>
   <div className="grid h-screen grid-rows-[72px_1fr]">
@@ -45,7 +45,7 @@ export default function RootLayout({
     <div className="flex overflow-hidden">
       <SidebarWrapper />
 
-      <main className="flex-1 overflow-auto">
+      <main className="flex-1 overflow-auto bg-[#F4F4F5]">
         {children}
       </main>
     </div>
