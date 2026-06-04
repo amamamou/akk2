@@ -19,7 +19,7 @@ export default function AudioHeader({
   setUploadOpen: React.Dispatch<React.SetStateAction<boolean>>;
 }) {
   return (
-    <div className="sticky top-0 z-10 bg-white border-gray-200">
+    <div className="sticky top-0 z-10  bg-[#F4F4F5] border-gray-200">
   <div className="px-4 sm:px-8 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold text-gray-900">All Audio</h1>
@@ -31,9 +31,13 @@ export default function AudioHeader({
             <button
               type="button"
               onClick={() => setColsOpen((s) => !s)}
-              className="inline-flex items-center gap-2 rounded-md bg-white text-gray-700 px-3 py-2 text-sm font-medium border border-gray-200 hover:bg-gray-50"
+              className={
+                `group inline-flex items-center gap-2 h-12 px-4 bg-white text-gray-700 text-sm font-medium rounded-2xl border border-gray-100 shadow-[0_8px_30px_rgba(0,0,0,0.04)] transition-all hover:shadow-lg hover:translate-y-0.5 cursor-pointer`
+              }
             >
-              <List size={16} />
+              <span className="inline-flex items-center justify-center transition-colors">
+                <List size={16} className="text-zinc-500 group-hover:text-[#A473FF] transition-colors" />
+              </span>
               <span className="hidden sm:inline">Columns</span>
             </button>
 
@@ -68,9 +72,14 @@ export default function AudioHeader({
           <button
             type="button"
             onClick={() => setUploadOpen(true)}
-            className="inline-flex items-center gap-2 rounded-md bg-[#F3F4F6] text-gray-900 px-4 py-2 text-sm font-medium hover:bg-[#E7E7E7]"
+            className={
+              `group inline-flex items-center gap-3 h-12 px-5 bg-white text-gray-900 font-medium text-sm rounded-2xl border border-gray-100 shadow-[0_8px_30px_rgba(0,0,0,0.04)] transition-all hover:shadow-lg hover:translate-y-0.5 cursor-pointer`
+            }
           >
-            <Plus size={16} />
+            <span className="inline-flex items-center justify-center transition-colors">
+              <Plus size={16} strokeWidth={1.9} className="text-zinc-500 group-hover:text-[#A473FF] transition-colors" />
+            </span>
+
             <span>New audio</span>
           </button>
         </div>

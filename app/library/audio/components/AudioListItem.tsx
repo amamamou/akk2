@@ -36,48 +36,58 @@ export default function AudioListItem({
         }
       }}
       className={cn(
-          "group grid grid-cols-[48px_1fr] md:grid-cols-[48px_1fr_140px] gap-4 items-center p-3 rounded-md border border-gray-100 bg-white transition-all duration-150",
-          // match triage buttons: subtle shadow, no heavy transform
-          isSelected ? "shadow-sm" : "hover:shadow-sm",
-          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-blue-400"
-        )}
+        "group grid grid-cols-[56px_1fr] md:grid-cols-[56px_1fr_auto] gap-5 items-center px-5 py-4 rounded-2xl bg-[#FAFAFB] border border-transparent transition-all duration-200",
+        // hover and selection states
+        isSelected
+          ? "bg-white border-[#A473FF]/20 shadow-[0_8px_30px_rgba(164,115,255,0.08)]"
+          : "hover:bg-white hover:border-gray-100 hover:shadow-[0_8px_24px_rgba(0,0,0,0.04)]",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-blue-400"
+      )}
     >
-      <div className={cn("flex items-center justify-center rounded-md w-12 h-12", "transition-transform") }>
-        <AudioVisual size={36} color={item.color ?? "#A473FF"} src={item.url} />
+      <div className={cn("flex items-center justify-center rounded-2xl w-14 h-14 bg-white", "transition-transform")}>
+        <AudioVisual size={44} color={item.color ?? "#A473FF"} src={item.url} />
       </div>
 
       <div className="min-w-0">
-        <div className="text-sm font-medium text-gray-900 truncate">{item.title}</div>
-        <div className="mt-1 text-xs text-gray-500 flex items-center gap-2">
-          <span>{item.singer ?? "Unknown Artist"}</span>
+        <div className="text-[15px] font-semibold text-zinc-900 truncate">{item.title}</div>
+        <div className="mt-1 flex items-center gap-2 text-xs text-zinc-500">
+          <span className="truncate">{item.singer ?? "Unknown Artist"}</span>
           {visibleCols.size && typeof item.size === 'number' && (
-            <span className="text-xs text-gray-400">• {(item.size / 1024 / 1024).toFixed(1)}MB</span>
+            <>
+              <span className="h-1 w-1 rounded-full bg-zinc-300" />
+              <span className="text-xs text-zinc-400">{(item.size / 1024 / 1024).toFixed(1)}MB</span>
+            </>
           )}
+        </div>
+
+        <div className="mt-2 flex items-center gap-2">
+          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+          <span className="text-[11px] text-zinc-400">{(((item as Record<string, unknown>)['status']) as string | undefined) ?? "Ready for playback"}</span>
         </div>
       </div>
 
       <div className="md:col-auto col-span-2 flex items-center md:justify-end justify-start gap-3 w-full">
         {visibleCols.duration && (
           <div className="hidden md:block text-right">
-            <div className="text-gray-700 px-3 py-1 rounded-full text-xs font-medium">{item.duration}</div>
+            <div className="bg-[#F4F4F5] rounded-full px-3 py-1 text-xs font-medium text-zinc-600">{item.duration}</div>
           </div>
         )}
         {visibleCols.added && (
           <div className="hidden md:block text-right">
-            <div className="text-gray-600 px-3 py-1 rounded-full text-xs">{item.addedAt ?? "-"}</div>
+            <div className="text-zinc-600 px-3 py-1 rounded-full text-xs">{item.addedAt ?? "-"}</div>
           </div>
         )}
         {visibleCols.modified && (
           <div className="hidden md:block text-right">
-            <div className="text-gray-600 px-3 py-1 rounded-full text-xs">{item.modifiedAt ?? "-"}</div>
+            <div className="text-zinc-600 px-3 py-1 rounded-full text-xs">{item.modifiedAt ?? "-"}</div>
           </div>
         )}
         {visibleCols.addedBy && (
           <div className="flex items-center gap-2">
-            <div className="h-6 w-6 rounded-md bg-gray-100 flex items-center justify-center text-xs font-semibold text-gray-700">
+            <div className="h-8 w-8 rounded-full bg-[#F3F0FF] text-[#A473FF] flex items-center justify-center text-xs font-semibold">
               {(item.addedBy ?? "U").toString().split(" ").map((s: string) => s.charAt(0)).slice(0,2).join("")}
             </div>
-            <div className="hidden md:block text-sm text-gray-600">{item.addedBy ?? "Unknown"}</div>
+            <div className="hidden md:block text-sm text-zinc-600">{item.addedBy ?? "Unknown"}</div>
           </div>
         )}
 
@@ -86,21 +96,21 @@ export default function AudioListItem({
           <button
             onClick={(e) => { e.stopPropagation(); onView(item); }}
             title="View"
-            className="p-1.5 rounded hover:bg-emerald-50 text-emerald-600 hover:text-emerald-800 transition-colors focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-emerald-200"
+            className="p-1.5 rounded text-zinc-400 hover:bg-[#FAFAFB] hover:text-zinc-800 transition-colors focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-zinc-200"
           >
             <Eye size={16} />
           </button>
           <button
             onClick={(e) => { e.stopPropagation(); onEdit(item.id); }}
             title="Edit"
-            className="p-1.5 rounded hover:bg-amber-50 text-amber-600 hover:text-amber-800 transition-colors focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-amber-200"
+            className="p-1.5 rounded text-zinc-400 hover:bg-[#FAFAFB] hover:text-zinc-800 transition-colors focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-zinc-200"
           >
             <Edit size={16} />
           </button>
           <button
             onClick={(e) => { e.stopPropagation(); onDelete(item.id); }}
             title="Delete"
-            className="p-1.5 rounded text-rose-600 hover:bg-rose-50 hover:text-rose-800 transition-colors focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-rose-200"
+            className="p-1.5 rounded text-zinc-400 hover:bg-[#FAFAFB] hover:text-zinc-800 hover:text-rose-600 transition-colors focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-rose-200"
           >
             <Trash size={16} />
           </button>
