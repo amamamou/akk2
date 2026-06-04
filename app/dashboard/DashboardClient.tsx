@@ -12,7 +12,6 @@ import SystemAlerts from "./components/SystemAlerts";
 import { getApiClient } from "@/lib/api-client";
 import type { MediaInfo, PlayerInfo, ScheduleEntry, SystemHealthMetrics, ActivityLogEntry, ClientInfo } from "@/types/api";
 import type { QuickStat } from "./components/QuickStatsGrid";
-import { Loader2 } from "lucide-react";
 
 const dayLabel = new Intl.DateTimeFormat(undefined, { weekday: "short" });
 const timeLabel = new Intl.DateTimeFormat(undefined, {
@@ -225,26 +224,50 @@ export default function DashboardClient() {
 if (isLoading) {
   return (
     <div className="flex-1 overflow-auto bg-[#F4F4F5]">
-  {/* Keep header visible while loading so users still see greeting, search and actions */}
-  <DashboardHeader stats={quickStats} showStats={false} />
+      {/* Full-page skeleton header */}
+      <div className="mt-6 top-0 z-10 bg-[#F4F4F5]">
+        <div className="px-4 py-6">
+          <div className="flex items-center justify-between gap-4 mb-5">
+            <div className="flex items-start gap-4 min-w-0">
+              <div className="flex flex-col gap-2 min-w-0">
+                <div className="w-56 h-8 bg-gray-200 rounded-md" aria-hidden="true" />
+                <div className="w-96 h-4 bg-gray-200 rounded-md" aria-hidden="true" />
+              </div>
+            </div>
 
-      <div className="flex-1 min-h-[calc(100vh-450px)] flex items-center justify-center p-4">
-        <div className="flex flex-col items-center">
+            <div className="flex items-center gap-3 shrink-0">
+              <div className="hidden sm:block">
+                <div className="w-72 h-12 bg-gray-200 rounded-2xl border border-gray-200" aria-hidden="true" />
+              </div>
+              <div className="w-36 h-12 bg-gray-200 rounded-2xl border border-gray-200" aria-hidden="true" />
+            </div>
+          </div>
+        </div>
+      </div>
 
-          <Loader2
-            size={32}
-            strokeWidth={2}
-            className="animate-spin text-[#A473FF]"
-          />
+      {/* Quick stats skeleton row */}
+      <div className="px-4 pb-4">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 animate-pulse">
+          <div className="h-20 bg-gray-200 rounded-lg border border-gray-200" aria-hidden="true" />
+          <div className="h-20 bg-gray-200 rounded-lg border border-gray-200" aria-hidden="true" />
+          <div className="h-20 bg-gray-200 rounded-lg border border-gray-200" aria-hidden="true" />
+          <div className="h-20 bg-gray-200 rounded-lg border border-gray-200" aria-hidden="true" />
+        </div>
+      </div>
 
-          <h3 className="mt-6 text-sm font-semibold text-zinc-900">
-            Loading dashboard
-          </h3>
+      {/* Skeleton / wireframe grid */}
+      <div className="p-4">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-pulse">
+          <div className="lg:col-span-2 space-y-6">
+            <div className="h-40 bg-gray-200 rounded-[12px] border border-gray-200" aria-hidden="true" />
+            <div className="h-60 bg-gray-200 rounded-[12px] border border-gray-200" aria-hidden="true" />
+          </div>
 
-          <p className="mt-1 text-xs text-zinc-500">
-            Fetching your latest data...
-          </p>
-
+          <div className="space-y-6">
+            <div className="h-24 bg-gray-200 rounded-[12px] border border-gray-200" aria-hidden="true" />
+            <div className="h-40 bg-gray-200 rounded-[12px] border border-gray-200" aria-hidden="true" />
+            <div className="h-20 bg-gray-200 rounded-[12px] border border-gray-200" aria-hidden="true" />
+          </div>
         </div>
       </div>
     </div>

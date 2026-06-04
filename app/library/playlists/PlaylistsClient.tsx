@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Plus, Music, Loader2, AlertCircle } from "lucide-react";
+import { Plus, Music, AlertCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
 import PlaylistCard from "../components/PlaylistCard";
 import PlaylistModal from "../components/PlaylistModal";
@@ -157,27 +157,14 @@ export default function LibraryPlaylistsClient() {
                 </div>
               )}
 
-           {loading ? (
-  <div className="flex h-full min-h-[400px] items-center justify-center">
-    <div className="flex flex-col items-center">
-
-      <Loader2
-        size={30}
-        strokeWidth={2}
-        className="animate-spin text-[#A473FF]"
-      />
-
-      <h3 className=" text-sm font-semibold text-zinc-900">
-        Loading playlists
-      </h3>
-
-      <p className="mt-1 text-xs text-zinc-500">
-        Fetching your audio library...
-      </p>
-
-    </div>
-  </div>
-
+              {loading ? (
+                <div className="animate-pulse">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+                    {Array.from({ length: perPage || 6 }).map((_, i) => (
+                      <div key={i} className="h-36 bg-gray-200 rounded-xl border border-gray-200" aria-hidden="true" />
+                    ))}
+                  </div>
+                </div>
               ) : paginatedPlaylists.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-16">
                   <div className="text-center space-y-4 max-w-sm">
@@ -231,19 +218,25 @@ export default function LibraryPlaylistsClient() {
             </div>
 
             <div className="border-t border-gray-100">
-              <AudioToolbar
-                query={query}
-                setQuery={setQuery}
-                filteredCount={filteredCount}
-                totalCount={playlists.length}
-                page={page}
-                setPage={setPage}
-                perPage={perPage}
-                setPerPage={setPerPage}
-                perPageOptions={perPageOptions}
-                totalPages={totalPages}
-                placeholder="Search by title, track."
-              />
+              {loading ? (
+                <div className="p-4">
+                  <div className="h-12 bg-gray-200 rounded-2xl border border-gray-200 w-full animate-pulse" aria-hidden="true" />
+                </div>
+              ) : (
+                <AudioToolbar
+                  query={query}
+                  setQuery={setQuery}
+                  filteredCount={filteredCount}
+                  totalCount={playlists.length}
+                  page={page}
+                  setPage={setPage}
+                  perPage={perPage}
+                  setPerPage={setPerPage}
+                  perPageOptions={perPageOptions}
+                  totalPages={totalPages}
+                  placeholder="Search by title, track."
+                />
+              )}
             </div>
           </div>
         </div>
