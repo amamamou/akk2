@@ -64,78 +64,80 @@ export default function SettingsHeader({
   const activeLabel = tabs.find((t) => t.key === activeTab)?.label ?? "";
 
   return (
-    <div className="sticky top-0 z-10 bg-white border-b border-gray-200">
-      <div className="px-8 py-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-semibold text-gray-900">Settings</h1>
-            <p className="mt-1 text-sm text-gray-600">{activeLabel}</p>
-          </div>
+    <div className="flex-1 flex flex-col overflow-hidden bg-[#F4F4F5]">
+      <div className="sticky top-0 z-10 bg-[#F4F4F5]">
+        <div className="px-8 py-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-2xl font-semibold text-gray-900">Settings</h1>
+              <p className="mt-1 text-sm text-gray-500">{activeLabel}</p>
+            </div>
 
-          <div className="flex items-center gap-2">
-            {dirty && (
-              <>
+            <div className="flex items-center gap-2">
+              {dirty && (
                 <div className="flex items-center justify-end gap-3">
-          <button
-            onClick={onCancel}
-            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-md hover:bg-gray-50 transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-blue-400"
-          >
-            <X size={16} /> Cancel
-          </button>
-          <button
-            onClick={onSave}
-            className={"px-4 py-2 text-sm font-medium rounded-md transition-all duration-150 flex items-center justify-center gap-2 bg-[#A473FF] text-white hover:bg-[#7A42FF] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-blue-400"}
-          >
-            <Check size={16} /> Save changes
-          </button>
-        </div>
-              </>
-            )}
+                  <button
+                    onClick={onCancel}
+                    className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-md hover:bg-gray-50 transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-blue-400"
+                  >
+                    <X size={16} /> Cancel
+                  </button>
+                  <button
+                    onClick={onSave}
+                    className={"px-4 py-2 text-sm font-medium rounded-md transition-all duration-150 flex items-center justify-center gap-2 bg-[#A473FF] text-white hover:bg-[#7A42FF] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-blue-400"}
+                  >
+                    <Check size={16} /> Save changes
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
 
-      <nav className="px-8 py-3 border-t border-gray-200 overflow-x-auto scrollbar-hide">
-        <div className="relative w-max">
-          {/* Hover highlight */}
-          <div
-            className="absolute top-1 h-8 rounded-[6px] bg-gray-100 transition-all duration-300 ease-out flex items-center"
-            style={{
-              ...hoverStyle,
-              opacity: hoveredIndex !== null ? 1 : 0,
-            }}
-          />
+      <nav className="px-8 py-3 overflow-x-auto scrollbar-hide">
+        <div className="inline-block bg-white rounded-xl border border-gray-100 shadow-[0_8px_30px_rgba(0,0,0,0.04)] p-2">
+          <div className="relative w-max">
+            {/* Hover highlight */}
+            <div
+              className="absolute top-1 h-8 rounded-[6px] bg-gray-100 transition-all duration-300 ease-out flex items-center"
+              style={{
+                ...hoverStyle,
+                opacity: hoveredIndex !== null ? 1 : 0,
+              }}
+            />
 
-          {/* Active underline */}
-          <div
-            className="absolute bottom-0 h-[2px] bg-gray-900 transition-all duration-300 ease-out"
-            style={activeStyle}
-          />
+            {/* Active underline */}
+            <div
+              className="absolute bottom-0 h-[2px] bg-gray-900 transition-all duration-300 ease-out"
+              style={activeStyle}
+            />
 
-          <div className="relative flex space-x-[6px] items-center">
-            {tabs.map((t, index) => {
-              const isActive = activeTab === t.key;
-              return (
-                <button
-                  key={t.key}
-                  ref={(el) => {
-                    tabRefs.current[index] = el;
-                  }}
-                  onMouseEnter={() => setHoveredIndex(index)}
-                  onMouseLeave={() => setHoveredIndex(null)}
-                  onClick={() => {
-                    onTabChange(t.key);
-                  }}
-                  className={`px-4 py-2 text-sm font-medium whitespace-nowrap transition-colors duration-300 h-10 flex items-center justify-center ${
-                    isActive
-                      ? "text-gray-900"
-                      : "text-gray-600 hover:text-gray-900"
-                  }`}
-                >
-                  {t.label}
-                </button>
-              );
-            })}
+            <div className="relative flex space-x-[6px] items-center">
+              {tabs.map((t, index) => {
+                const isActive = activeTab === t.key;
+                return (
+                  <button
+                    key={t.key}
+                    ref={(el) => {
+                      tabRefs.current[index] = el;
+                    }}
+                    onMouseEnter={() => setHoveredIndex(index)}
+                    onMouseLeave={() => setHoveredIndex(null)}
+                    onClick={() => {
+                      onTabChange(t.key);
+                    }}
+                    className={`px-4 py-2 text-sm font-medium whitespace-nowrap transition-colors duration-300 h-10 flex items-center justify-center ${
+                      isActive
+                        ? "text-gray-900"
+                        : "text-gray-600 hover:text-gray-900"
+                    }`}
+                  >
+                    {t.label}
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </div>
       </nav>

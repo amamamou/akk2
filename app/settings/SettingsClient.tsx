@@ -1,4 +1,3 @@
-/* eslint-disable react-hooks/set-state-in-effect */
 "use client";
 
 import React, { useState, useEffect } from "react";
@@ -30,7 +29,6 @@ const TABS: SettingsTab[] = [
   { key: "my-details", label: "My details" },
   { key: "plan", label: "Plan" },
   { key: "billing", label: "Billing" },
-  { key: "integrations", label: "Integrations" },
 ];
 
 const defaultProfile: UserProfile = {
@@ -229,7 +227,7 @@ export default function SettingsClient() {
   }, []);
 
   return (
-    <div className="flex-1 overflow-auto bg-white">
+    <div className="flex-1 overflow-auto bg-[#F4F4F5]">
       <div className="">
         <SettingsHeader
           tabs={TABS}
@@ -297,42 +295,38 @@ export default function SettingsClient() {
           }}
         />
 
-        <div className="px-8 py-8">
-          {activeTab === "my-details" ? (
-            <MyDetailsTab
-              initial={initialProfile}
-              firstName={firstName}
-              lastName={lastName}
-              email={email}
-              role={role}
-              country={country}
-              timezone={timezone}
-              bio={bio}
-              countries={countries}
-              avatar={avatar}
-              setFirstName={setFirstName}
-              setLastName={setLastName}
-              setEmail={setEmail}
-              setRole={setRole}
-              setCountry={setCountry}
-              setTimezone={setTimezone}
-              setBio={setBio}
-              setAvatar={setAvatar}
-              setDirty={setDirty}
-            />
-          ) : activeTab === "plan" ? (
-            <PlanTab />
-          ) : activeTab === "billing" ? (
-            <BillingTab />
-          ) : (
-            <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-6 text-sm text-gray-600">
-              <p className="font-medium text-gray-900">Integrations</p>
-              <p className="mt-2">
-                Third-party integrations are not configured for this environment yet.
-                Use the Plan and Billing tabs for subscription and invoice details.
-              </p>
+        <div className="px-6 py-6">
+          <div className="bg-white rounded-[28px] border border-gray-100 shadow-[0_8px_30px_rgba(0,0,0,0.04)] flex flex-col min-h-[calc(100vh-220px)] overflow-hidden">
+            <div className="p-8 flex-1 overflow-auto">
+              {activeTab === "my-details" ? (
+                <MyDetailsTab
+                  initial={initialProfile}
+                  firstName={firstName}
+                  lastName={lastName}
+                  email={email}
+                  role={role}
+                  country={country}
+                  timezone={timezone}
+                  bio={bio}
+                  countries={countries}
+                  avatar={avatar}
+                  setFirstName={setFirstName}
+                  setLastName={setLastName}
+                  setEmail={setEmail}
+                  setRole={setRole}
+                  setCountry={setCountry}
+                  setTimezone={setTimezone}
+                  setBio={setBio}
+                  setAvatar={setAvatar}
+                  setDirty={setDirty}
+                />
+              ) : activeTab === "plan" ? (
+                <PlanTab />
+              ) : (
+                <BillingTab />
+              )}
             </div>
-          )}
+          </div>
         </div>
       </div>
     </div>
