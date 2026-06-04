@@ -11,7 +11,7 @@ import Link from "next/link";
 import { CalendarDays, Search, X } from "lucide-react";
 import QuickStatsGrid, { QuickStat } from "./QuickStatsGrid";
 
-export default function DashboardHeader({ stats }: { stats: QuickStat[] }) {
+export default function DashboardHeader({ stats, showStats = true }: { stats: QuickStat[]; showStats?: boolean }) {
 	const { user } = useAuth();
 
 	const u = user as StoredUser | undefined;
@@ -75,7 +75,7 @@ export default function DashboardHeader({ stats }: { stats: QuickStat[] }) {
 				</div>
 
 				{/* Stats grid */}
-				<QuickStatsGrid stats={stats} />
+				{showStats ? <QuickStatsGrid stats={stats} /> : null}
 			</div>
 		</div>
 	);

@@ -1,3 +1,5 @@
+/* eslint-disable prefer-const */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
@@ -116,7 +118,9 @@ function mapRecentActivity(schedules: ScheduleEntry[], players: PlayerInfo[], ac
 export default function DashboardClient() {
   const apiClient = getApiClient();
   const [players, setPlayers] = useState<PlayerInfo[]>([]);
-  const [media, setMedia] = useState<MediaInfo[]>([]);
+  // _media is reserved for future use (fetched media) — keep setter for API response
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [_media, setMedia] = useState<MediaInfo[]>([]);
   const [schedules, setSchedules] = useState<ScheduleEntry[]>([]);
   const [clients, setClients] = useState<ClientInfo[]>([]);
   const [systemHealth, setSystemHealth] = useState<SystemHealthMetrics | null>(null);
@@ -212,7 +216,7 @@ export default function DashboardClient() {
       { label: "Players", value: String(players.length), icon: "Cast", trend: "registered" },
       { label: "System Health", value: String(healthValue) + "%", icon: "Activity", trend: healthStatus },
     ];
-  }, [media.length, players, schedules.length, clients.length, systemHealth]);
+  }, [players, clients.length, systemHealth]);
 
   const livePlayers = useMemo(() => mapPlayerStatus(players), [players]);
   const upcomingBroadcasts = useMemo(() => mapUpcomingBroadcasts(schedules, players), [schedules, players]);
@@ -220,23 +224,28 @@ export default function DashboardClient() {
 
 if (isLoading) {
   return (
-    <div className="flex-1 min-h-[calc(100vh-76px)] flex items-center justify-center bg-[#F4F4F5]">
-      <div className="flex flex-col items-center">
+    <div className="flex-1 overflow-auto bg-[#F4F4F5]">
+  {/* Keep header visible while loading so users still see greeting, search and actions */}
+  <DashboardHeader stats={quickStats} showStats={false} />
 
-        <Loader2
-          size={32}
-          strokeWidth={2}
-          className="animate-spin text-[#A473FF]"
-        />
+      <div className="flex-1 min-h-[calc(100vh-450px)] flex items-center justify-center p-4">
+        <div className="flex flex-col items-center">
 
-        <h3 className="mt-6 text-sm font-semibold text-zinc-900">
-          Loading dashboard
-        </h3>
+          <Loader2
+            size={32}
+            strokeWidth={2}
+            className="animate-spin text-[#A473FF]"
+          />
 
-        <p className="mt-1 text-xs text-zinc-500">
-          Fetching your latest data...
-        </p>
+          <h3 className="mt-6 text-sm font-semibold text-zinc-900">
+            Loading dashboard
+          </h3>
 
+          <p className="mt-1 text-xs text-zinc-500">
+            Fetching your latest data...
+          </p>
+
+        </div>
       </div>
     </div>
   );
@@ -250,7 +259,7 @@ if (isLoading) {
         </div>
       )}
 
-      <DashboardHeader stats={quickStats} />
+  <DashboardHeader stats={quickStats} showStats={true} />
 
       <div className="p-4 ">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
