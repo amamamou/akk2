@@ -46,12 +46,18 @@ import {
   type ListenerSegmentation,
 } from "@/lib/analytics-metrics";
 import {
+  FRENCH_DEMO_ENTERPRISES,
   FRENCH_DEMO_PLAYER_REGISTRY,
   frenchDemoMediaTitle,
   frenchDemoPlayerIdsForTenant,
   frenchDemoPlayerName,
   frenchDemoTenantSlug,
+  mergeEnterpriseWorkspaceClients,
 } from "@/lib/french-demo-seed";
+import {
+  toActiveWorkspaceClients,
+  type WorkspaceClientOption,
+} from "@/lib/workspace-clients";
 
 type TimeRange = "today" | "7d" | "month";
 
@@ -103,23 +109,73 @@ export default function AnalyticsClient() {
   const isSuperAdmin = isSuperAdminRole(user?.role);
   const sessionTenantId =
     user?.tenantId || apiClient.getTenantId() || apiClient.getEffectiveTenantId();
+  const [workspaceClients, setWorkspaceClients] = useState<WorkspaceClientOption[]>([]);
+  const [selectedWorkspaceClientId, setSelectedWorkspaceClientId] = useState("");
+  const [workspaceTenantId, setWorkspaceTenantId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [health, setHealth] = useState<SystemHealthMetrics | null>(null);
   const [logs, setLogs] = useState<PlaybackLogEntry[]>([]);
   const [players, setPlayers] = useState<PlayerInfo[]>([]);
   const [selectedPlayerId, setSelectedPlayerId] = useState<string>("all");
-  const [timeRange, setTimeRange] = useState<TimeRange>("today");
+  const [timeRange, setTimeRange] = useState<TimeRange>("7d");
+
+  const activeAnalyticsTenantId = useMemo(() => {
+    if (isManager) return sessionTenantId;
+    if (isSuperAdmin && workspaceTenantId) return workspaceTenantId;
+    return sessionTenantId;
+  }, [isManager, isSuperAdmin, workspaceTenantId, sessionTenantId]);
+
+  useEffect(() => {
+    if (!isSuperAdmin) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await apiClient.listClients();
+        if (cancelled) return;
+        const merged = mergeEnterpriseWorkspaceClients(
+          toActiveWorkspaceClients(res?.clients ?? [])
+        );
+        setWorkspaceClients(merged);
+        if (!selectedWorkspaceClientId && merged.length > 0) {
+          const preferred =
+            merged.find((c) => c.tenantId === FRENCH_DEMO_ENTERPRISES[0]?.tenantId) ??
+            merged[0];
+          setSelectedWorkspaceClientId(preferred.id);
+          setWorkspaceTenantId(preferred.tenantId);
+        }
+      } catch {
+        if (cancelled) return;
+        const fallback = FRENCH_DEMO_ENTERPRISES.map((e) => ({
+          id: e.clientId,
+          name: e.name,
+          tenantId: e.tenantId,
+        }));
+        setWorkspaceClients(fallback);
+        if (fallback[0]) {
+          setSelectedWorkspaceClientId(fallback[0].id);
+          setWorkspaceTenantId(fallback[0].tenantId);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [apiClient, isSuperAdmin, selectedWorkspaceClientId]);
 
   useEffect(() => {
     let cancelled = false;
 
-    if (isManager && sessionTenantId) {
-      apiClient.setWorkspaceTenant(
-        sessionTenantId,
-        frenchDemoTenantSlug(sessionTenantId) ?? user?.tenantSlug
-      );
+    const tenantForFetch = activeAnalyticsTenantId;
+    if (!tenantForFetch || (isSuperAdmin && !workspaceTenantId)) {
+      setIsLoading(false);
+      return;
     }
+
+    apiClient.setWorkspaceTenant(
+      tenantForFetch,
+      frenchDemoTenantSlug(tenantForFetch) ?? user?.tenantSlug
+    );
 
     const load = async () => {
       try {
@@ -132,24 +188,21 @@ export default function AnalyticsClient() {
         ]);
         if (cancelled) return;
 
-        const tenantPlayerIds =
-          isManager && sessionTenantId
-            ? frenchDemoPlayerIdsForTenant(sessionTenantId)
-            : null;
+        const tenantPlayerIds = frenchDemoPlayerIdsForTenant(tenantForFetch);
+        const shouldScope = isManager || Boolean(activeAnalyticsTenantId);
 
         const scopedLogs = (logsRes.logs ?? []).filter((log) => {
-          if (!tenantPlayerIds || tenantPlayerIds.size === 0) return true;
-          const pid = normalizePlayerId(log.playerId);
+          if (!shouldScope || tenantPlayerIds.size === 0) return true;
           return (
             tenantPlayerIds.has(log.playerId) ||
             Array.from(tenantPlayerIds).some(
-              (id) => normalizePlayerId(id) === pid
+              (id) => normalizePlayerId(id) === normalizePlayerId(log.playerId)
             )
           );
         });
 
         const scopedPlayers = (playersRes.players ?? []).filter((p) => {
-          if (!tenantPlayerIds || tenantPlayerIds.size === 0) return true;
+          if (!shouldScope || tenantPlayerIds.size === 0) return true;
           return (
             tenantPlayerIds.has(p.id) ||
             Array.from(tenantPlayerIds).some(
@@ -159,8 +212,8 @@ export default function AnalyticsClient() {
         });
 
         setHealth(healthRes);
-        setLogs(isManager ? scopedLogs : logsRes.logs ?? []);
-        setPlayers(isManager ? scopedPlayers : playersRes.players ?? []);
+        setLogs(scopedLogs);
+        setPlayers(scopedPlayers);
       } catch (err: unknown) {
         if (!cancelled) {
           const ax = err as { response?: { data?: { error?: string } }; message?: string };
@@ -173,11 +226,18 @@ export default function AnalyticsClient() {
     void load();
     return () => {
       cancelled = true;
-      if (isManager) {
+      if (isManager || isSuperAdmin) {
         apiClient.clearWorkspaceTenant();
       }
     };
-  }, [apiClient, isManager, sessionTenantId, user?.tenantSlug]);
+  }, [
+    apiClient,
+    isManager,
+    isSuperAdmin,
+    activeAnalyticsTenantId,
+    user?.tenantSlug,
+    workspaceTenantId,
+  ]);
 
   const resolveDeviceLabel = useCallback(
     (playerId: string | null | undefined, apiName?: string | null) => {
@@ -204,25 +264,17 @@ export default function AnalyticsClient() {
   );
 
   const tenantScopedPlayerIds = useMemo(() => {
-    if (!isManager || !sessionTenantId) return null;
-    return frenchDemoPlayerIdsForTenant(sessionTenantId);
-  }, [isManager, sessionTenantId]);
+    if (!activeAnalyticsTenantId) return null;
+    return frenchDemoPlayerIdsForTenant(activeAnalyticsTenantId);
+  }, [activeAnalyticsTenantId]);
 
   const playerOptions = useMemo(() => {
     const byId = new Map<string, PlayerInfo>();
+    const scopeTenant = activeAnalyticsTenantId;
 
-    if (isSuperAdmin) {
+    if (scopeTenant) {
       for (const [playerId, meta] of Object.entries(FRENCH_DEMO_PLAYER_REGISTRY)) {
-        byId.set(playerId, {
-          id: playerId,
-          playerName: meta.name,
-          roomName: meta.name,
-          status: "online",
-        } as PlayerInfo);
-      }
-    } else if (sessionTenantId) {
-      for (const [playerId, meta] of Object.entries(FRENCH_DEMO_PLAYER_REGISTRY)) {
-        if (meta.tenantId !== sessionTenantId) continue;
+        if (meta.tenantId !== scopeTenant) continue;
         byId.set(playerId, {
           id: playerId,
           playerName: meta.name,
@@ -269,7 +321,7 @@ export default function AnalyticsClient() {
     return Array.from(byId.values()).sort((a, b) =>
       (a.roomName || a.playerName || "").localeCompare(b.roomName || b.playerName || "")
     );
-  }, [players, logs, isSuperAdmin, sessionTenantId, tenantScopedPlayerIds]);
+  }, [players, logs, activeAnalyticsTenantId, tenantScopedPlayerIds]);
 
   const filteredLogs = useMemo(() => {
     let rows = filterLogsByPlayerId(logs, selectedPlayerId);
@@ -391,7 +443,33 @@ export default function AnalyticsClient() {
               <p className="text-xs text-gray-500 mt-0.5">Playback verification and listening metrics</p>
             </div>
 
-            <div className="flex gap-2 items-center">
+            <div className="flex gap-2 items-center flex-wrap justify-end">
+              {isSuperAdmin && workspaceClients.length > 0 && (
+                <div className="relative">
+                  <select
+                    value={selectedWorkspaceClientId}
+                    onChange={(e) => {
+                      const match = workspaceClients.find((c) => c.id === e.target.value);
+                      if (!match) return;
+                      setSelectedWorkspaceClientId(match.id);
+                      setWorkspaceTenantId(match.tenantId);
+                      setSelectedPlayerId("all");
+                    }}
+                    className="border border-violet-100 rounded-lg text-sm px-3 py-1.5 bg-violet-50 text-gray-900 outline-none focus:border-violet-200 appearance-none pr-8"
+                    aria-label="Client workspace"
+                  >
+                    {workspaceClients.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown
+                    size={14}
+                    className="absolute right-2.5 top-1/2 transform -translate-y-1/2 pointer-events-none text-gray-400"
+                  />
+                </div>
+              )}
               <div className="relative">
                 <select
                   value={selectedPlayerId}
@@ -452,6 +530,15 @@ export default function AnalyticsClient() {
           {error && (
             <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-sm text-red-800">
               {error}
+            </div>
+          )}
+
+          {!error && logs.length === 0 && (
+            <div className="p-3 rounded-lg bg-amber-50 border border-amber-200 text-sm text-amber-900">
+              No playback logs returned for this workspace. API calls are active (
+              <code className="text-xs">/analytics/playback-logs</code>,{" "}
+              <code className="text-xs">/analytics/system-health</code>
+              ).{isSuperAdmin ? " Select a French demo client above or re-run seed SQL." : " Confirm PlaybackLog rows exist for your tenant."}
             </div>
           )}
 
