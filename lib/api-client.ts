@@ -22,6 +22,7 @@ import type {
   ClientResponse,
   SystemHealthMetrics,
   AnalyticsTimelineResponse,
+  PlaybackLogsResponse,
   InvoicesListResponse,
   InvoiceCreateInput,
   InvoiceDetailResponse,
@@ -477,12 +478,16 @@ export class ApiClient {
     duration: number,
     category: string = 'Audio',
     onUploadProgress?: (progressPercent: number, event: AxiosProgressEvent) => void,
+    tags?: string[],
   ): Promise<MediaResponse> {
     const formData = new FormData();
     formData.append('file', file);
     formData.append('title', title);
     formData.append('duration', duration.toString());
     formData.append('category', category);
+    if (tags && tags.length > 0) {
+      formData.append('tags', tags.map((t) => `TAG:${t}`).join(','));
+    }
 
     // Use multipart content type
     const response = await this.instance.post<MediaResponse>('/media/upload', formData, {
@@ -673,6 +678,16 @@ export class ApiClient {
     */
    async getAnalyticsTimeline(): Promise<AnalyticsTimelineResponse> {
      const response = await this.instance.get<AnalyticsTimelineResponse>('/analytics/timeline');
+     return response.data;
+   }
+
+   /**
+    * GET /analytics/playback-logs - Recent playback verification rows
+    */
+   async getPlaybackLogs(limit: number = 50): Promise<PlaybackLogsResponse> {
+     const response = await this.instance.get<PlaybackLogsResponse>(
+       `/analytics/playback-logs?limit=${limit}`
+     );
      return response.data;
    }
 

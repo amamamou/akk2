@@ -10,16 +10,10 @@ import { FileText, Edit3, Mail, Lock, MoreHorizontal } from 'lucide-react';
 
 type UserRow = { id: string; firstName: string; lastName: string; email: string; role: string; status: string; client?: string; created: string };
 
-const MOCK: UserRow[] = [
-  { id: 'u1', firstName: 'Alice', lastName: 'Nguyen', email: 'alice@example.com', role: 'Admin', status: 'Active', client: 'Zen Yoga Studio', created: '2024-11-02' },
-  { id: 'u2', firstName: 'Ben', lastName: 'Kaur', email: 'ben@example.com', role: 'Content Manager', status: 'Active', client: 'Retail Space Co', created: '2025-01-10' },
-  { id: 'u3', firstName: 'Carmen', lastName: 'Diaz', email: 'carmen@example.com', role: 'Client', status: 'Inactive', client: 'Wellness Center', created: '2023-09-05' },
-];
-
 export default function UsersClient() {
   const [q, setQ] = useState('');
   const [selected, setSelected] = useState<string[]>([]);
-  const [rows, setRows] = useState<UserRow[]>(MOCK);
+  const [rows, setRows] = useState<UserRow[]>([]);
   const [addOpen, setAddOpen] = useState(false);
   const [newFirst, setNewFirst] = useState('');
   const [newLast, setNewLast] = useState('');
@@ -34,7 +28,7 @@ export default function UsersClient() {
     return rows.filter(u => `${u.firstName} ${u.lastName} ${u.email} ${u.role}`.toLowerCase().includes(t));
   }, [q, rows]);
 
-    const columns: Column<typeof MOCK[0]>[] = [
+    const columns: Column<UserRow>[] = [
       {
         key: 'name',
         label: 'Name',

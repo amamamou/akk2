@@ -1,4 +1,5 @@
 import type { AudioItem } from "./../app/library/components/AudioTile";
+import { categoryMatchesTag, parseMediaTags } from "@/lib/media-tags";
 
 type Playlist = { id: string; title?: string; trackIds?: string[]; tracks?: string[]; items?: string[] };
 
@@ -35,8 +36,14 @@ export function filterLibrary(audios: AudioItem[], query: string, activeCategory
         if (ids.length > 0) return ids.includes(item.id);
         if (pl.title && item.category !== pl.title) return false;
       }
+    } else if (activeCategory !== "All" && activeCategory.startsWith("tag:")) {
+      const tagQ = activeCategory.replace("tag:", "");
+      const { tags } = parseMediaTags(item.category);
+      const merged = [...tags, ...(item.tags ?? [])];
+      if (!merged.some((t) => t.toLowerCase() === tagQ.toLowerCase())) return false;
     } else if (activeCategory !== "All" && item.category !== activeCategory) {
-      return false;
+      const { baseCategory } = parseMediaTags(item.category);
+      if (baseCategory !== activeCategory) return false;
     }
 
     if (tokens.length === 0) return true;
@@ -59,11 +66,14 @@ export function filterLibrary(audios: AudioItem[], query: string, activeCategory
         if (key === 'creator' || key === 'addedby' || key === 'creator' || key === 'c') {
           return (String(item.addedBy ?? '')).toLowerCase().includes(val);
         }
-        const haystack = `${item.title} ${item.category} ${item.duration} ${item.singer ?? ''} ${item.addedBy ?? ''} ${(audioToPlaylists[item.id] ?? []).join(' ')}`.toLowerCase();
+        if (key === 'tag' || key === 'tags') {
+          return categoryMatchesTag(item.category, val);
+        }
+        const haystack = `${item.title} ${item.category} ${(item.tags ?? []).join(' ')} ${item.duration} ${item.singer ?? ''} ${item.addedBy ?? ''} ${(audioToPlaylists[item.id] ?? []).join(' ')}`.toLowerCase();
         return haystack.includes(tok.toLowerCase());
       }
 
-      const hay = `${item.title} ${item.category} ${item.duration} ${item.singer ?? ''} ${item.addedBy ?? ''} ${(audioToPlaylists[item.id] ?? []).join(' ')}`.toLowerCase();
+      const hay = `${item.title} ${item.category} ${(item.tags ?? []).join(' ')} ${item.duration} ${item.singer ?? ''} ${item.addedBy ?? ''} ${(audioToPlaylists[item.id] ?? []).join(' ')}`.toLowerCase();
       return hay.includes(tok.toLowerCase());
     });
   });

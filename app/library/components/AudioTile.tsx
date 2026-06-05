@@ -10,6 +10,7 @@ export type AudioItem = {
   duration: string;
   durationMinutes: number;
   category: string;
+  tags?: string[];
   usageCount: number;
   spacesCount: number;
   lastPlayed?: string;

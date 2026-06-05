@@ -15,6 +15,7 @@ import AudioList from "./components/AudioList";
 import { filterLibrary } from "@/lib/audioFilters";
 import { sortAndFilterByDate, paginate } from "@/lib/audioSortPaginate";
 import { getApiClient } from "@/lib/api-client";
+import { parseMediaTags } from "@/lib/media-tags";
 
 export default function LibraryAudioClient() {
   const apiClient = getApiClient();
@@ -57,45 +58,35 @@ export default function LibraryAudioClient() {
   };
 
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem("aa_playlists");
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed)) startTransition(() => setPlaylists(parsed as Playlist[]));
-      }
-    } catch {
-      // ignore malformed data
-    }
-
-    const handler = (e: StorageEvent) => {
-      if (e.key === "aa_playlists") {
-        try {
-          if (!e.newValue) {
-            startTransition(() => setPlaylists([]));
-            return;
-          }
-          const parsed = JSON.parse(e.newValue);
-          if (Array.isArray(parsed)) startTransition(() => setPlaylists(parsed as Playlist[]));
-        } catch {
-          // ignore
-        }
+    const loadPlaylists = async () => {
+      try {
+        const res = await apiClient.listPlaylists();
+        const mapped = (res.playlists ?? []).map((p) => ({
+          id: String(p.id),
+          title: String(p.title ?? "Untitled"),
+          trackIds: p.tracks?.map((t) => t.mediaId) ?? [],
+        }));
+        startTransition(() => setPlaylists(mapped));
+      } catch {
+        startTransition(() => setPlaylists([]));
       }
     };
-
-    globalThis.addEventListener("storage", handler);
-    return () => globalThis.removeEventListener("storage", handler);
-  }, []);
+    void loadPlaylists();
+  }, [apiClient]);
 
   useEffect(() => {
     const loadMedia = async () => {
       try {
         const response = await apiClient.listMedia();
-        const mapped = response.media.map((item) => ({
+        const mapped = response.media.map((item) => {
+          const { baseCategory, tags } = parseMediaTags(item.category);
+          return {
           id: item.id,
           title: item.title,
           duration: item.duration,
           durationMinutes: item.durationMinutes,
-          category: item.category,
+          category: baseCategory,
+          tags: item.tags ?? tags,
           usageCount: 0,
           spacesCount: 0,
           lastPlayed: undefined,
@@ -103,7 +94,8 @@ export default function LibraryAudioClient() {
           singer: undefined,
           url: item.url,
           size: item.fileSize,
-        }));
+        };
+        });
         startTransition(() => setAudios(mapped));
       } catch (err) {
         console.error("Failed to load media library", err);

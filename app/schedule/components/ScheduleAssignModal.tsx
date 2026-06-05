@@ -5,6 +5,7 @@ import { ListMusic, Music, X } from "lucide-react";
 import { getApiClient } from "@/lib/api-client";
 import type { PlaylistApiInfo } from "@/types/api";
 import { apiPlaylistToUi } from "@/lib/playlist-mapper";
+import { frenchDemoTenantSlug } from "@/lib/french-demo-seed";
 
 type AudioItem = { id: string; title: string; duration: number; type: string; url?: string };
 
@@ -26,18 +27,74 @@ export default function ScheduleAssignModal({
 }: {
   open: boolean;
   onClose: () => void;
-  /** Active client workspace tenant — required for scoped media/playlist fetch. */
+  /** Active client workspace tenant UUID — required for scoped media/playlist fetch. */
   workspaceTenantId: string | null;
-  onSelectAudio: (item: AudioItem) => void;
-  onSelectPlaylist: (item: PlaylistPick) => void;
+  onSelectAudio: (item: AudioItem, loopPlayback: boolean) => void;
+  onSelectPlaylist: (item: PlaylistPick, loopPlayback: boolean) => void;
 }) {
   const [tab, setTab] = useState<Tab>("audio");
+  const [loopPlayback, setLoopPlayback] = useState(false);
   const [audio, setAudio] = useState<AudioItem[]>([]);
   const [playlists, setPlaylists] = useState<PlaylistPick[]>([]);
   const [loadingAudio, setLoadingAudio] = useState(false);
   const [loadingPlaylists, setLoadingPlaylists] = useState(false);
   const [audioError, setAudioError] = useState<string | null>(null);
   const [playlistError, setPlaylistError] = useState<string | null>(null);
+
+  const fetchWorkspaceCatalog = React.useCallback(async (tenantId: string) => {
+    const api = getApiClient();
+    const slug = frenchDemoTenantSlug(tenantId);
+    api.setWorkspaceTenant(tenantId, slug);
+
+    setLoadingAudio(true);
+    setLoadingPlaylists(true);
+    setAudioError(null);
+    setPlaylistError(null);
+
+    try {
+      const mediaRes = await api.listMedia();
+      setAudio(
+        (mediaRes.media ?? []).map((m) => ({
+          id: m.id,
+          title: m.title,
+          duration:
+            m.durationMinutes && m.durationMinutes > 0 ? m.durationMinutes : 60,
+          type: m.category || "Audio",
+          url: m.url,
+        }))
+      );
+    } catch (err) {
+      setAudio([]);
+      setAudioError(
+        err instanceof Error ? err.message : "Failed to load audio for workspace"
+      );
+    } finally {
+      setLoadingAudio(false);
+    }
+
+    try {
+      const res = await api.listPlaylists();
+      const picks: PlaylistPick[] = [];
+      for (const row of res.playlists ?? []) {
+        const ui = apiPlaylistToUi(row as PlaylistApiInfo);
+        if (!ui) continue;
+        picks.push({
+          playlistId: ui.id,
+          title: ui.title,
+          trackCount: ui.trackCount,
+          totalDuration: ui.totalDuration,
+        });
+      }
+      setPlaylists(picks);
+    } catch (err) {
+      setPlaylists([]);
+      setPlaylistError(
+        err instanceof Error ? err.message : "Failed to load playlists for workspace"
+      );
+    } finally {
+      setLoadingPlaylists(false);
+    }
+  }, []);
 
   useEffect(() => {
     if (!open || !workspaceTenantId) {
@@ -47,74 +104,14 @@ export default function ScheduleAssignModal({
     }
 
     let cancelled = false;
-    const api = getApiClient();
-    api.setWorkspaceTenant(workspaceTenantId);
-
-    setLoadingAudio(true);
-    setLoadingPlaylists(true);
-    setAudioError(null);
-    setPlaylistError(null);
-
-    void (async () => {
-      try {
-        const mediaRes = await api.listAudios();
-        if (cancelled) return;
-        setAudio(
-          (mediaRes.media ?? []).map((m) => ({
-            id: m.id,
-            title: m.title,
-            duration:
-              m.durationMinutes && m.durationMinutes > 0
-                ? m.durationMinutes
-                : 60,
-            type: m.category || "Audio",
-            url: m.url,
-          }))
-        );
-      } catch (err) {
-        if (!cancelled) {
-          setAudio([]);
-          setAudioError(
-            err instanceof Error ? err.message : "Failed to load audio for workspace"
-          );
-        }
-      } finally {
-        if (!cancelled) setLoadingAudio(false);
-      }
-    })();
-
-    void (async () => {
-      try {
-        const res = await api.listPlaylists();
-        if (cancelled) return;
-        const picks: PlaylistPick[] = [];
-        for (const row of res.playlists ?? []) {
-          const ui = apiPlaylistToUi(row as PlaylistApiInfo);
-          if (!ui) continue;
-          picks.push({
-            playlistId: ui.id,
-            title: ui.title,
-            trackCount: ui.trackCount,
-            totalDuration: ui.totalDuration,
-          });
-        }
-        setPlaylists(picks);
-      } catch (err) {
-        if (!cancelled) {
-          setPlaylists([]);
-          setPlaylistError(
-            err instanceof Error ? err.message : "Failed to load playlists for workspace"
-          );
-        }
-      } finally {
-        if (!cancelled) setLoadingPlaylists(false);
-      }
-    })();
+    void fetchWorkspaceCatalog(workspaceTenantId).finally(() => {
+      if (cancelled) return;
+    });
 
     return () => {
       cancelled = true;
     };
-  }, [open, workspaceTenantId]);
+  }, [open, workspaceTenantId, fetchWorkspaceCatalog]);
 
   if (!open) return null;
 
@@ -141,6 +138,19 @@ export default function ScheduleAssignModal({
           </p>
         ) : (
           <>
+            <label className="flex items-center justify-between gap-3 mb-4 p-3 rounded-lg border border-gray-100 bg-gray-50">
+              <div>
+                <p className="text-sm font-medium text-gray-900">Loop playback</p>
+                <p className="text-xs text-gray-500">Repeat audio continuously within this time slot</p>
+              </div>
+              <input
+                type="checkbox"
+                checked={loopPlayback}
+                onChange={(e) => setLoopPlayback(e.target.checked)}
+                className="h-4 w-4 rounded border-gray-300 text-[#A473FF] focus:ring-[#A473FF]"
+                aria-label="Loop playback"
+              />
+            </label>
             <div className="flex gap-2 mb-4 border-b border-gray-100 pb-2">
               <button
                 type="button"
@@ -192,7 +202,7 @@ export default function ScheduleAssignModal({
                     </div>
                     <button
                       type="button"
-                      onClick={() => onSelectAudio(a)}
+                      onClick={() => onSelectAudio(a, loopPlayback)}
                       className="px-3 py-1 rounded-md bg-gray-900 text-white text-sm hover:bg-gray-800"
                     >
                       Select
@@ -235,7 +245,7 @@ export default function ScheduleAssignModal({
                     <button
                       type="button"
                       disabled={pl.trackCount < 1}
-                      onClick={() => onSelectPlaylist(pl)}
+                      onClick={() => onSelectPlaylist(pl, loopPlayback)}
                       className="px-3 py-1 rounded-md bg-[#A473FF] text-white text-sm hover:bg-[#7A42FF] disabled:opacity-50"
                     >
                       Assign

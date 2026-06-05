@@ -20,6 +20,7 @@ import AddPlayerModal from "./components/AddPlayerModal";
 // top toolbar removed per UX request
 import AudioToolbar from "../library/components/AudioToolbar";
 import PlayersTriageBar from "./components/PlayersTriageBar";
+import { canProvisionPlayers, isManagerRole } from "@/lib/rbac";
 
 export type Track = { id: string; title: string; duration: number };
 
@@ -314,6 +315,10 @@ export default function PlayersClient() {
     clientId?: string;
     tenantId?: string;
   }) {
+    if (!canProvisionPlayers(user?.role) || isManagerRole(user?.role)) {
+      throw new Error("Operation restricted to Super Admins only");
+    }
+
     const { name, locationName, ipAddress, deviceId, tenantId } = playerData;
 
     if (isSuperAdmin) {
@@ -716,7 +721,7 @@ export default function PlayersClient() {
 
        {/* Add Player Modal */}
        <AddPlayerModal
-         isOpen={addPlayerModalOpen}
+         isOpen={addPlayerModalOpen && canProvisionPlayers(user?.role)}
          onClose={() => setAddPlayerModalOpen(false)}
          onSubmit={handleAddPlayer}
          defaultClientId={

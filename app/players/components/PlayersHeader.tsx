@@ -2,6 +2,7 @@
 
 import React, { useMemo } from "react";
 import { useAuth } from "@/app/context/AuthContext";
+import { canProvisionPlayers } from "@/lib/rbac";
 import { Plus } from "lucide-react";
 import ViewToggle from "./ViewToggle";
 import {
@@ -27,7 +28,7 @@ export default function PlayersHeader({
   onChangeWorkspaceClient?: (clientId: string) => void;
 }) {
   const { user } = useAuth();
-  const canAddPlayer = Boolean(user);
+  const canAddPlayer = canProvisionPlayers(user?.role);
 
   const selectorOptions = useMemo(
     () => workspaceSelectorOptions(workspaceClients ?? []),
