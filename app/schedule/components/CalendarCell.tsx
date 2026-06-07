@@ -19,6 +19,7 @@ export default function CalendarCell({
   roomId,
   day,
   time,
+  calendarDate,
   events,
   onDropEvent,
   onDropPlaylist,
@@ -29,17 +30,30 @@ export default function CalendarCell({
   roomId: string;
   day: string;
   time: string;
+  calendarDate?: string;
   events: ScheduleEventCard[];
-  onDropEvent: (item: AudioItem, roomId: string, day: string, time: string) => void;
+  onDropEvent: (
+    item: AudioItem,
+    roomId: string,
+    day: string,
+    time: string,
+    calendarDate?: string
+  ) => void;
   onDropPlaylist?: (
     item: PlaylistDrop,
     roomId: string,
     day: string,
-    time: string
+    time: string,
+    calendarDate?: string
   ) => void;
   onEventDelete?: (evt: ScheduleEventCard) => void;
   compact?: boolean;
-  onQuickCreate?: (roomId: string, day: string, time: string) => void;
+  onQuickCreate?: (
+    roomId: string,
+    day: string,
+    time: string,
+    calendarDate?: string
+  ) => void;
 }) {
   const [{ isOver }, dropRef] = useDrop(() => ({
     accept: [ITEM_TYPES.AUDIO, ITEM_TYPES.PLAYLIST],
@@ -50,10 +64,10 @@ export default function CalendarCell({
         typeof maybe.trackCount === "number" &&
         typeof maybe.playlistId === "string"
       ) {
-        onDropPlaylist?.(maybe, roomId, day, time);
+        onDropPlaylist?.(maybe, roomId, day, time, calendarDate);
         return;
       }
-      onDropEvent(item as AudioItem, roomId, day, time);
+      onDropEvent(item as AudioItem, roomId, day, time, calendarDate);
     },
     collect: (monitor) => ({ isOver: !!monitor.isOver() }),
   }));
@@ -78,7 +92,7 @@ export default function CalendarCell({
         <button
           type="button"
           aria-label="Add item"
-          onClick={() => onQuickCreate?.(roomId, day, time)}
+          onClick={() => onQuickCreate?.(roomId, day, time, calendarDate)}
           className="flex-1 min-h-[64px] w-full flex items-center justify-center rounded-lg border-2 border-dashed border-gray-200 text-gray-300 hover:border-[#A473FF]/50 hover:text-[#A473FF] hover:bg-purple-50/30 transition-colors"
         >
           <Plus size={20} strokeWidth={1.5} />

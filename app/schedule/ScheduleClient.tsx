@@ -4,15 +4,45 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { DndProvider } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
 import { AlertCircle, Loader } from "lucide-react";
+import { cn } from "@/utils/cn";
 import ScheduleToolbar from "./components/ScheduleToolbar";
 import CalendarCell from "./components/CalendarCell";
 import ScheduleAssignModal, { type PlaylistPick } from "./components/ScheduleAssignModal";
-import type { ScheduleEventCard } from "./components/EventCard";
+import EventCard, { type ScheduleEventCard } from "./components/EventCard";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import { useAuth } from "@/app/context/AuthContext";
 import { getApiClient } from "@/lib/api-client";
-import type { ScheduleEntry } from "@/types/api";
-import { toActiveWorkspaceClients } from "@/lib/workspace-clients";
+import {
+  toActiveWorkspaceClients,
+  workspaceSelectorOptions,
+  isAllClientsSelection,
+} from "@/lib/workspace-clients";
+import { Plus } from "lucide-react";
+import {
+  buildWeekDays,
+  buildMonthGrid,
+  buildDateForDayAndTime,
+  buildDateForIsoAndTime,
+  shortDayFromDate,
+  HOUR_SLOTS,
+  eventMatchesHour,
+  type ScheduleViewMode,
+  type DayColumn,
+} from "@/lib/schedule-calendar";
+import {
+  loadAllClientScheduleSegments,
+  resolveAllClientsEnterpriseRows,
+  scheduleEntryToEventCard,
+  type TenantScheduleSegment,
+} from "@/lib/schedule-all-clients";
+import {
+  FRENCH_DEMO_PLAYER_REGISTRY,
+  frenchDemoPlayerName,
+  frenchDemoTenantForPlayer,
+  frenchDemoTenantSlug,
+  mergeEnterpriseWorkspaceClients,
+} from "@/lib/french-demo-seed";
+import { ALL_CLIENTS_WORKSPACE_ID } from "@/lib/demo-workspaces";
 
 type AudioItem = {
   id: string;
@@ -21,58 +51,6 @@ type AudioItem = {
   type: string;
   url?: string;
 };
-
-const weekDays = [
-  { short: "Mon", full: "Monday", date: "01" },
-  { short: "Tue", full: "Tuesday", date: "02" },
-  { short: "Wed", full: "Wednesday", date: "03" },
-  { short: "Thu", full: "Thursday", date: "04" },
-  { short: "Fri", full: "Friday", date: "05" },
-  { short: "Sat", full: "Saturday", date: "06" },
-  { short: "Sun", full: "Sunday", date: "07" },
-];
-
-const shortDays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-
-function buildDateForDayAndTime(day: string, time: string) {
-  const [hours, minutes] = time.split(":").map(Number);
-  const dayIndex = shortDays.indexOf(day);
-  const date = new Date();
-  const current = date.getDay();
-  const diff = dayIndex === -1 ? 0 : (dayIndex - current + 7) % 7;
-  date.setDate(date.getDate() + diff);
-  date.setHours(hours || 0, minutes || 0, 0, 0);
-  return date;
-}
-
-function shortDayFromDate(date: Date) {
-  return shortDays[date.getDay()] || "Mon";
-}
-
-function scheduleEntryToEvent(entry: ScheduleEntry): ScheduleEventCard {
-  const startDate = new Date(entry.startsAt);
-  const endDate = new Date(entry.endsAt);
-  const durationMinutes = Math.max(
-    1,
-    Math.round((endDate.getTime() - startDate.getTime()) / 60000)
-  );
-
-  return {
-    id: entry.id,
-    audioId: entry.mediaId ?? undefined,
-    playlistId: entry.playlistId ?? undefined,
-    title: entry.title,
-    duration: durationMinutes,
-    trackCount: entry.trackCount ?? undefined,
-    roomId: entry.playerId,
-    day: shortDayFromDate(startDate),
-    time: startDate.toLocaleTimeString("en-US", {
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: false,
-    }),
-  };
-}
 
 function playlistDurationMinutes(trackCount: number) {
   return Math.max(15, trackCount * 4);
@@ -103,22 +81,40 @@ export default function ScheduleClientPage() {
   const [pendingDeleteEvent, setPendingDeleteEvent] =
     useState<ScheduleEventCard | null>(null);
   const [assignModalOpen, setAssignModalOpen] = useState(false);
+  const [tenantSegments, setTenantSegments] = useState<TenantScheduleSegment[]>([]);
   const [pickerCell, setPickerCell] = useState<{
     roomId: string;
     day: string;
     time: string;
+    calendarDate?: string;
+    tenantId?: string;
   } | null>(null);
+  const [viewMode, setViewMode] = useState<ScheduleViewMode>("week");
+  const [calendarAnchor] = useState(() => new Date());
 
-  const workspaceReady = !isSuperAdmin || Boolean(workspaceTenantId);
+  const weekDays = useMemo(() => buildWeekDays(calendarAnchor), [calendarAnchor]);
+  const monthWeeks = useMemo(() => buildMonthGrid(calendarAnchor), [calendarAnchor]);
 
-  /** Tenant scope for ScheduleAssignModal (super admin workspace or session tenant). */
-  const assignModalTenantId = useMemo(
-    () =>
-      isSuperAdmin
-        ? workspaceTenantId
-        : user?.tenantId || apiClient.getEffectiveTenantId() || null,
-    [isSuperAdmin, workspaceTenantId, user?.tenantId, apiClient]
-  );
+  const isAllClientsWorkspace = isAllClientsSelection(selectedWorkspaceClientId);
+  const allClientRooms = useMemo(() => {
+    if (!isAllClientsWorkspace) return rooms;
+    const merged: { id: string; name: string }[] = [];
+    for (const seg of tenantSegments) {
+      for (const r of seg.rooms) {
+        merged.push({
+          id: r.id,
+          name: `${seg.clientName} — ${r.name}`,
+        });
+      }
+    }
+    return merged;
+  }, [isAllClientsWorkspace, rooms, tenantSegments]);
+
+  const assignModalTenantId = useMemo(() => {
+    if (pickerCell?.tenantId) return pickerCell.tenantId;
+    if (isSuperAdmin) return workspaceTenantId;
+    return user?.tenantId || apiClient.getEffectiveTenantId() || null;
+  }, [pickerCell?.tenantId, isSuperAdmin, workspaceTenantId, user?.tenantId, apiClient]);
 
   useEffect(() => {
     if (!isSuperAdmin || authLoading) return;
@@ -129,12 +125,20 @@ export default function ScheduleClientPage() {
         const res = await apiClient.listClients();
         if (cancelled) return;
         const eligible = toActiveWorkspaceClients(res?.clients ?? []);
-        setWorkspaceClients(eligible);
-        if (eligible.length > 0 && !selectedWorkspaceClientId) {
+        const merged = mergeEnterpriseWorkspaceClients(eligible);
+        const options = workspaceSelectorOptions(merged);
+        setWorkspaceClients(options);
+        if (options.length > 0 && !selectedWorkspaceClientId) {
           const preferred =
-            eligible.find((c) => c.tenantId === user?.tenantId) ?? eligible[0];
-          setSelectedWorkspaceClientId(preferred.id);
-          setWorkspaceTenantId(preferred.tenantId);
+            options.find((c) => !isAllClientsSelection(c.id) && c.tenantId === user?.tenantId) ??
+            options.find((c) => !isAllClientsSelection(c.id)) ??
+            options[0];
+          if (!isAllClientsSelection(preferred.id)) {
+            setSelectedWorkspaceClientId(preferred.id);
+            setWorkspaceTenantId(preferred.tenantId);
+          } else {
+            setSelectedWorkspaceClientId(preferred.id);
+          }
         }
       } catch (err: unknown) {
         if (cancelled) return;
@@ -152,8 +156,39 @@ export default function ScheduleClientPage() {
 
   useEffect(() => {
     if (authLoading) return;
+
+    if (isSuperAdmin && isAllClientsWorkspace) {
+      let cancelled = false;
+      void (async () => {
+        try {
+          setIsLoading(true);
+          setError(null);
+          const enterpriseRows = resolveAllClientsEnterpriseRows(workspaceClients);
+          const segments = await loadAllClientScheduleSegments(
+            apiClient,
+            enterpriseRows
+          );
+          if (cancelled) return;
+          setTenantSegments(segments);
+          setRooms([]);
+          setAudio([]);
+          setEvents([]);
+        } catch (err: unknown) {
+          if (cancelled) return;
+          const ax = err as { response?: { data?: { error?: string } } };
+          setError(ax?.response?.data?.error || "Failed to load schedules for all clients");
+        } finally {
+          if (!cancelled) setIsLoading(false);
+        }
+      })();
+      return () => {
+        cancelled = true;
+      };
+    }
+
     if (isSuperAdmin && !workspaceTenantId) {
       setIsLoading(false);
+      setTenantSegments([]);
       setRooms([]);
       setAudio([]);
       setEvents([]);
@@ -161,7 +196,10 @@ export default function ScheduleClientPage() {
     }
 
     if (isSuperAdmin && workspaceTenantId) {
-      apiClient.setWorkspaceTenant(workspaceTenantId);
+      apiClient.setWorkspaceTenant(
+        workspaceTenantId,
+        frenchDemoTenantSlug(workspaceTenantId)
+      );
     }
 
     let cancelled = false;
@@ -170,6 +208,7 @@ export default function ScheduleClientPage() {
       try {
         setIsLoading(true);
         setError(null);
+        setTenantSegments([]);
         const [playersRes, mediaRes, schedulesRes] = await Promise.all([
           apiClient.listPlayers(),
           apiClient.listMedia(),
@@ -180,7 +219,11 @@ export default function ScheduleClientPage() {
         setRooms(
           playersRes.players.map((p) => ({
             id: p.id,
-            name: p.roomName || p.playerName || "Unnamed",
+            name:
+              p.roomName ||
+              p.playerName ||
+              frenchDemoPlayerName(p.id) ||
+              "Unnamed",
           }))
         );
 
@@ -198,7 +241,7 @@ export default function ScheduleClientPage() {
         );
 
         setEvents(
-          (schedulesRes.schedules ?? []).map((s) => scheduleEntryToEvent(s))
+          (schedulesRes.schedules ?? []).map((s) => scheduleEntryToEventCard(s))
         );
       } catch (err: unknown) {
         if (cancelled) return;
@@ -214,25 +257,117 @@ export default function ScheduleClientPage() {
     return () => {
       cancelled = true;
     };
-  }, [apiClient, authLoading, isSuperAdmin, workspaceTenantId]);
+  }, [
+    apiClient,
+    authLoading,
+    isSuperAdmin,
+    workspaceTenantId,
+    isAllClientsWorkspace,
+    workspaceClients,
+  ]);
 
   const handleWorkspaceClientChange = (clientId: string) => {
     const match = workspaceClients.find((c) => c.id === clientId);
     if (!match) return;
     setSelectedWorkspaceClientId(clientId);
-    setWorkspaceTenantId(match.tenantId);
     setSelectedRoom("all");
     setSelectedDay("all");
     setError(null);
+    if (clientId === ALL_CLIENTS_WORKSPACE_ID || isAllClientsSelection(clientId)) {
+      apiClient.clearWorkspaceTenant();
+      setWorkspaceTenantId(null);
+      setRooms([]);
+      setAudio([]);
+      setEvents([]);
+      setTenantSegments([]);
+      return;
+    }
+    setTenantSegments([]);
+    setWorkspaceTenantId(match.tenantId);
   };
+
+  const activeRooms = isAllClientsWorkspace ? allClientRooms : rooms;
 
   const roomsToShow = useMemo(
     () =>
       selectedRoom === "all"
-        ? rooms
-        : rooms.filter((r) => r.id === selectedRoom),
-    [rooms, selectedRoom]
+        ? activeRooms
+        : activeRooms.filter((r) => r.id === selectedRoom),
+    [activeRooms, selectedRoom]
   );
+
+  const renderScheduleBody = () => {
+    if (isAllClientsWorkspace) {
+      const fallbackSegments: TenantScheduleSegment[] =
+        resolveAllClientsEnterpriseRows(workspaceClients).map((client) => ({
+          clientId: client.id,
+          clientName: client.name,
+          tenantId: client.tenantId,
+          rooms: Object.entries(FRENCH_DEMO_PLAYER_REGISTRY)
+            .filter(([, m]) => m.tenantId === client.tenantId)
+            .map(([id, m]) => ({ id, name: m.name })),
+          events: [],
+        }));
+      const segmentsToRender =
+        tenantSegments.length > 0 ? tenantSegments : fallbackSegments;
+      return (
+        <div className="min-w-0 divide-y divide-gray-200">
+          {segmentsToRender.map((seg) => {
+            const segRooms =
+              selectedRoom === "all"
+                ? seg.rooms
+                : seg.rooms.filter((r) => r.id === selectedRoom);
+            if (segRooms.length === 0) return null;
+            return (
+              <section key={seg.tenantId} className="py-2">
+                <h3 className="px-4 py-2 text-sm font-semibold text-violet-900 bg-violet-50/60 border-b border-violet-100">
+                  {seg.clientName}
+                </h3>
+                <div className="min-w-0">
+                  {viewMode === "month"
+                    ? renderMonthGrid(seg.events, segRooms, seg.tenantId)
+                    : viewMode === "hour"
+                      ? renderHourGrid(seg.events, segRooms, seg.tenantId)
+                      : renderWeekGrid(seg.events, segRooms, seg.tenantId)}
+                </div>
+              </section>
+            );
+          })}
+        </div>
+      );
+    }
+
+    if (rooms.length === 0) {
+      return (
+        <div className="flex items-center justify-center h-full min-h-[240px]">
+          <div className="text-center">
+            <h2 className="font-semibold text-gray-900">No players yet</h2>
+            <p className="text-sm text-gray-500 mt-1">
+              Create a player in the Players page to get started
+            </p>
+          </div>
+        </div>
+      );
+    }
+
+    if (roomsToShow.length === 0) {
+      return (
+        <div className="flex items-center justify-center h-full min-h-[240px] text-sm text-gray-500">
+          No room matches the selected filter.
+        </div>
+      );
+    }
+
+    return (
+      <div className="min-w-0">
+        {viewMode === "month"
+          ? renderMonthGrid(events, roomsToShow, workspaceTenantId ?? undefined)
+          : viewMode === "hour"
+            ? renderHourGrid(events, roomsToShow, workspaceTenantId ?? undefined)
+            : renderWeekGrid(events, roomsToShow, workspaceTenantId ?? undefined)}
+      </div>
+    );
+  };
 
   const daysToShow = useMemo(
     () =>
@@ -243,19 +378,38 @@ export default function ScheduleClientPage() {
   );
 
   const appendEventFromResponse = useCallback(
-    (schedule: ScheduleEntry, roomId: string, day: string, time: string) => {
-      const mapped = scheduleEntryToEvent(schedule);
-      setEvents((prev) => [
-        ...prev,
-        {
-          ...mapped,
-          roomId,
-          day,
-          time,
-        },
-      ]);
+    (
+      schedule: Parameters<typeof scheduleEntryToEventCard>[0],
+      roomId: string,
+      day: string,
+      time: string,
+      calendarDate?: string,
+      loopPlayback?: boolean,
+      tenantId?: string
+    ) => {
+      const mapped = scheduleEntryToEventCard(schedule);
+      const next: ScheduleEventCard = {
+        ...mapped,
+        roomId,
+        day,
+        time,
+        calendarDate: calendarDate ?? mapped.calendarDate,
+        loopPlayback: loopPlayback ?? mapped.loopPlayback,
+        tenantId,
+      };
+      if (isAllClientsWorkspace && tenantId) {
+        setTenantSegments((prev) =>
+          prev.map((seg) =>
+            seg.tenantId === tenantId
+              ? { ...seg, events: [...seg.events, next] }
+              : seg
+          )
+        );
+      } else {
+        setEvents((prev) => [...prev, next]);
+      }
     },
-    []
+    [isAllClientsWorkspace]
   );
 
   const handleScheduleError = (err: unknown) => {
@@ -274,13 +428,48 @@ export default function ScheduleClientPage() {
     }
   };
 
+  const resolveStartDate = (
+    day: string,
+    time: string,
+    calendarDate?: string
+  ) => {
+    if (calendarDate) return buildDateForIsoAndTime(calendarDate, time);
+    return buildDateForDayAndTime(day, time, calendarAnchor);
+  };
+
+  const resolvePickerTenantId = useCallback(
+    (roomId: string, segmentTenantId?: string) =>
+      segmentTenantId ??
+      workspaceTenantId ??
+      frenchDemoTenantForPlayer(roomId) ??
+      user?.tenantId ??
+      apiClient.getEffectiveTenantId() ??
+      null,
+    [workspaceTenantId, user?.tenantId, apiClient]
+  );
+
+  const withScheduleTenant = async (tenantId?: string | null) => {
+    const tid =
+      tenantId ||
+      workspaceTenantId ||
+      user?.tenantId ||
+      apiClient.getEffectiveTenantId();
+    if (tid) {
+      apiClient.setWorkspaceTenant(tid, frenchDemoTenantSlug(tid));
+    }
+  };
+
   const createAudioSchedule = async (
     item: AudioItem,
     roomId: string,
     day: string,
-    time: string
+    time: string,
+    calendarDate?: string,
+    loopPlayback = false,
+    tenantId?: string
   ) => {
-    const start = buildDateForDayAndTime(day, time);
+    await withScheduleTenant(tenantId ?? pickerCell?.tenantId);
+    const start = resolveStartDate(day, time, calendarDate);
     const end = new Date(start);
     end.setMinutes(end.getMinutes() + Math.max(1, item.duration));
     if (start >= end) {
@@ -292,18 +481,31 @@ export default function ScheduleClientPage() {
       mediaId: item.id,
       startTime: start.toISOString(),
       endTime: end.toISOString(),
-      recurrence: "ONCE",
+      recurrence: loopPlayback ? "DAILY" : "ONCE",
+      loopPlayback,
     });
-    appendEventFromResponse(res.schedule, roomId, day, time);
+    appendEventFromResponse(
+      res.schedule,
+      roomId,
+      day,
+      time,
+      calendarDate ?? start.toISOString().slice(0, 10),
+      loopPlayback,
+      tenantId ?? pickerCell?.tenantId
+    );
   };
 
   const createPlaylistSchedule = async (
     playlist: PlaylistPick,
     roomId: string,
     day: string,
-    time: string
+    time: string,
+    calendarDate?: string,
+    loopPlayback = false,
+    tenantId?: string
   ) => {
-    const start = buildDateForDayAndTime(day, time);
+    await withScheduleTenant(tenantId ?? pickerCell?.tenantId);
+    const start = resolveStartDate(day, time, calendarDate);
     const end = new Date(start);
     const minutes = playlistDurationMinutes(playlist.trackCount);
     end.setMinutes(end.getMinutes() + minutes);
@@ -316,20 +518,51 @@ export default function ScheduleClientPage() {
       playlistId: playlist.playlistId,
       startTime: start.toISOString(),
       endTime: end.toISOString(),
-      recurrence: "ONCE",
+      recurrence: loopPlayback ? "DAILY" : "ONCE",
+      loopPlayback,
     });
-    appendEventFromResponse(res.schedule, roomId, day, time);
+    appendEventFromResponse(
+      res.schedule,
+      roomId,
+      day,
+      time,
+      calendarDate ?? start.toISOString().slice(0, 10),
+      loopPlayback,
+      tenantId ?? pickerCell?.tenantId
+    );
   };
+
+  const openAssignPicker = useCallback(
+    (
+      roomId: string,
+      day: string,
+      time: string,
+      calendarDate?: string,
+      tenantId?: string
+    ) => {
+      const scopedTenant = resolvePickerTenantId(roomId, tenantId);
+      setPickerCell({
+        roomId,
+        day,
+        time,
+        calendarDate,
+        tenantId: scopedTenant ?? undefined,
+      });
+      setAssignModalOpen(true);
+    },
+    [resolvePickerTenantId]
+  );
 
   const handleDropEvent = async (
     item: AudioItem,
     roomId: string,
     day: string,
-    time: string
+    time: string,
+    calendarDate?: string
   ) => {
     try {
       setError(null);
-      await createAudioSchedule(item, roomId, day, time);
+      await createAudioSchedule(item, roomId, day, time, calendarDate, false);
     } catch (err: unknown) {
       handleScheduleError(err);
     }
@@ -339,17 +572,18 @@ export default function ScheduleClientPage() {
     item: PlaylistPick,
     roomId: string,
     day: string,
-    time: string
+    time: string,
+    calendarDate?: string
   ) => {
     try {
       setError(null);
-      await createPlaylistSchedule(item, roomId, day, time);
+      await createPlaylistSchedule(item, roomId, day, time, calendarDate, false);
     } catch (err: unknown) {
       handleScheduleError(err);
     }
   };
 
-  const handleSelectAudio = async (item: AudioItem) => {
+  const handleSelectAudio = async (item: AudioItem, loopPlayback: boolean) => {
     if (!pickerCell) return;
     try {
       setError(null);
@@ -357,7 +591,9 @@ export default function ScheduleClientPage() {
         item,
         pickerCell.roomId,
         pickerCell.day,
-        pickerCell.time
+        pickerCell.time,
+        pickerCell.calendarDate,
+        loopPlayback
       );
       setAssignModalOpen(false);
       setPickerCell(null);
@@ -366,7 +602,7 @@ export default function ScheduleClientPage() {
     }
   };
 
-  const handleSelectPlaylist = async (playlist: PlaylistPick) => {
+  const handleSelectPlaylist = async (playlist: PlaylistPick, loopPlayback: boolean) => {
     if (!pickerCell) return;
     try {
       setError(null);
@@ -374,7 +610,9 @@ export default function ScheduleClientPage() {
         playlist,
         pickerCell.roomId,
         pickerCell.day,
-        pickerCell.time
+        pickerCell.time,
+        pickerCell.calendarDate,
+        loopPlayback
       );
       setAssignModalOpen(false);
       setPickerCell(null);
@@ -397,7 +635,265 @@ export default function ScheduleClientPage() {
 
   const normalizedQuery = query.trim().toLowerCase();
 
-  if (authLoading || (isLoading && workspaceReady)) {
+  const hourDayColumns = useMemo((): DayColumn[] => {
+    if (selectedDay === "all") return weekDays;
+    return weekDays.filter((d) => d.short === selectedDay);
+  }, [weekDays, selectedDay]);
+
+  const filterEvents = useCallback(
+    (
+      source: ScheduleEventCard[],
+      opts: {
+        roomId?: string;
+        day?: string;
+        time?: string;
+        calendarDate?: string;
+      }
+    ) => {
+      return source.filter((e) => {
+        if (opts.roomId && e.roomId !== opts.roomId) return false;
+        if (selectedRoom !== "all" && e.roomId !== selectedRoom) return false;
+        if (opts.calendarDate && e.calendarDate !== opts.calendarDate) return false;
+        if (opts.day && e.day !== opts.day) return false;
+        if (opts.time && !eventMatchesHour(e.time, opts.time)) return false;
+        if (!normalizedQuery) return true;
+        return e.title.toLowerCase().includes(normalizedQuery);
+      });
+    },
+    [normalizedQuery, selectedRoom]
+  );
+
+  const defaultRoomId = useCallback(
+    (segmentRooms: { id: string; name: string }[]) =>
+      selectedRoom !== "all"
+        ? selectedRoom
+        : segmentRooms[0]?.id ?? "",
+    [selectedRoom]
+  );
+
+  const formatDayHeader = (day: DayColumn) => (
+    <>
+      <div>{day.full}</div>
+      <div className="text-[10px] text-gray-400 font-normal normal-case">
+        {day.date}
+      </div>
+    </>
+  );
+
+  const renderWeekGrid = (
+    segmentEvents: ScheduleEventCard[],
+    segmentRooms: { id: string; name: string }[],
+    segmentTenantId?: string
+  ) => {
+    const roomsForGrid =
+      selectedRoom === "all"
+        ? segmentRooms
+        : segmentRooms.filter((r) => r.id === selectedRoom);
+    if (roomsForGrid.length === 0) return null;
+
+    return (
+    <>
+      {daysToShow.length > 0 && (
+        <div
+          className="grid border-b border-gray-200 bg-gray-50 sticky top-0 z-20"
+          style={{
+            gridTemplateColumns: `repeat(${daysToShow.length}, minmax(0, 1fr))`,
+          }}
+        >
+          {daysToShow.map((day) => (
+            <div
+              key={day.short}
+              className="px-3 py-2 text-center text-xs font-semibold uppercase tracking-wide text-gray-600 border-r border-gray-200 last:border-r-0"
+            >
+              {formatDayHeader(day)}
+            </div>
+          ))}
+        </div>
+      )}
+      {roomsForGrid.map((room) => (
+        <div key={room.id} className="border-b border-gray-200">
+          <div className="font-medium px-4 py-2.5 bg-white text-sm text-gray-900 border-b border-gray-100">
+            {room.name}
+          </div>
+          <div
+            className="grid w-full"
+            style={{
+              gridTemplateColumns: `repeat(${Math.max(1, daysToShow.length)}, minmax(0, 1fr))`,
+            }}
+          >
+            {daysToShow.map((day) => (
+              <CalendarCell
+                key={`${room.id}-${day.short}`}
+                roomId={room.id}
+                day={day.short}
+                time="09:00"
+                calendarDate={day.date}
+                events={filterEvents(segmentEvents, {
+                  roomId: room.id,
+                  day: day.short,
+                })}
+                onDropEvent={handleDropEvent}
+                onDropPlaylist={handleDropPlaylist}
+                onEventDelete={setPendingDeleteEvent}
+                compact={daysToShow.length > 3}
+                onQuickCreate={(roomId, day, time, cal) =>
+                  openAssignPicker(roomId, day, time, cal, segmentTenantId)
+                }
+              />
+            ))}
+          </div>
+        </div>
+      ))}
+    </>
+    );
+  };
+
+  const renderMonthGrid = (
+    segmentEvents: ScheduleEventCard[],
+    segmentRooms: { id: string; name: string }[],
+    segmentTenantId?: string
+  ) => (
+    <div className="p-2">
+      <div className="grid grid-cols-7 border-b border-gray-200 bg-gray-50 text-xs font-semibold text-gray-600 uppercase">
+        {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => (
+          <div key={d} className="px-2 py-2 text-center">
+            {d}
+          </div>
+        ))}
+      </div>
+      {monthWeeks.map((week, wi) => (
+        <div key={wi} className="grid grid-cols-7 border-b border-gray-100 min-h-[120px]">
+          {week.map((cell, ci) => {
+            const cellEvents =
+              cell.inMonth && cell.date
+                ? filterEvents(segmentEvents, { calendarDate: cell.date })
+                : [];
+            const dayShort =
+              cell.date && cell.inMonth
+                ? shortDayFromDate(new Date(cell.date))
+                : "Mon";
+            const slotTime = cellEvents[0]?.time?.slice(0, 5) || "09:00";
+            const roomId = defaultRoomId(segmentRooms);
+
+            return (
+              <div
+                key={`${wi}-${ci}`}
+                className={cn(
+                  "border-r border-gray-100 p-2 min-h-[120px] flex flex-col",
+                  !cell.inMonth && "bg-gray-50/50"
+                )}
+              >
+                {cell.day != null && cell.inMonth && (
+                  <>
+                    <div className="text-[10px] font-medium text-gray-500 mb-1">{cell.day}</div>
+                    <div className="flex-1 space-y-1 overflow-y-auto max-h-[200px]">
+                      {cellEvents.map((evt) => (
+                        <EventCard
+                          key={evt.id}
+                          evt={evt}
+                          compact
+                          onDelete={setPendingDeleteEvent}
+                        />
+                      ))}
+                    </div>
+                    {roomId && (
+                      <button
+                        type="button"
+                        aria-label="Add schedule item"
+                        onClick={() =>
+                          openAssignPicker(
+                            roomId,
+                            dayShort,
+                            slotTime,
+                            cell.date,
+                            segmentTenantId
+                          )
+                        }
+                        className="mt-1 w-full flex items-center justify-center rounded border border-dashed border-gray-200 py-1 text-gray-400 hover:border-[#A473FF]/50 hover:text-[#A473FF]"
+                      >
+                        <Plus size={16} />
+                      </button>
+                    )}
+                  </>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      ))}
+    </div>
+  );
+
+  const renderHourGrid = (
+    segmentEvents: ScheduleEventCard[],
+    segmentRooms: { id: string; name: string }[],
+    segmentTenantId?: string
+  ) => (
+    <>
+      <div
+        className="grid border-b border-gray-200 bg-gray-50 sticky top-0 z-20"
+        style={{
+          gridTemplateColumns: `80px repeat(${Math.max(1, hourDayColumns.length)}, minmax(0, 1fr))`,
+        }}
+      >
+        <div className="px-2 py-2 text-xs font-semibold text-gray-500 border-r border-gray-200">
+          Hour
+        </div>
+        {hourDayColumns.map((day) => (
+          <div
+            key={day.short}
+            className="px-3 py-2 text-center text-xs font-semibold uppercase tracking-wide text-gray-600 border-r border-gray-200 last:border-r-0"
+          >
+            <div>{day.short}</div>
+            <div className="text-[10px] text-gray-400 font-normal normal-case">
+              {day.date}
+            </div>
+          </div>
+        ))}
+      </div>
+      {HOUR_SLOTS.map((slot) => (
+        <div
+          key={slot}
+          className="grid border-b border-gray-100"
+          style={{
+            gridTemplateColumns: `80px repeat(${Math.max(1, hourDayColumns.length)}, minmax(0, 1fr))`,
+          }}
+        >
+          <div className="px-2 py-3 text-xs text-gray-500 border-r border-gray-100 bg-gray-50/80">
+            {slot}
+          </div>
+          {hourDayColumns.map((day) => {
+            const roomId = defaultRoomId(segmentRooms);
+            if (!roomId) return <div key={day.short} />;
+            const cellEvents = filterEvents(segmentEvents, {
+              day: day.short,
+              time: slot,
+              calendarDate: day.date,
+            });
+            return (
+              <CalendarCell
+                key={`${slot}-${day.short}`}
+                roomId={roomId}
+                day={day.short}
+                time={slot}
+                calendarDate={day.date}
+                events={cellEvents}
+                onDropEvent={handleDropEvent}
+                onDropPlaylist={handleDropPlaylist}
+                onEventDelete={setPendingDeleteEvent}
+                compact
+                onQuickCreate={(r, d, t, cal) =>
+                  openAssignPicker(r, d, t, cal, segmentTenantId)
+                }
+              />
+            );
+          })}
+        </div>
+      ))}
+    </>
+  );
+
+  if (authLoading || isLoading) {
     return (
       <div className="flex-1 flex items-center justify-center bg-gray-50">
         <div className="text-center">
@@ -418,7 +914,9 @@ export default function ScheduleClientPage() {
           onChangeRoom={setSelectedRoom}
           selectedDay={selectedDay}
           onChangeDay={setSelectedDay}
-          rooms={rooms}
+          viewMode={viewMode}
+          onChangeViewMode={setViewMode}
+          rooms={activeRooms}
           days={weekDays}
           showWorkspaceSelector={isSuperAdmin}
           workspaceClients={workspaceClients}
@@ -441,97 +939,19 @@ export default function ScheduleClientPage() {
             </div>
           )}
 
-          {isSuperAdmin && !workspaceTenantId ? (
+          {isSuperAdmin && !workspaceTenantId && !isAllClientsWorkspace ? (
             <div className="flex items-center justify-center h-full min-h-[240px]">
               <div className="text-center max-w-md px-4">
                 <h2 className="font-semibold text-gray-900">
                   Select a client workspace
                 </h2>
                 <p className="text-sm text-gray-500 mt-1">
-                  Choose an active client from the dropdown above to view and
-                  manage that tenant&apos;s weekly schedule.
+                  Choose an active client or All Clients from the dropdown above.
                 </p>
               </div>
-            </div>
-          ) : rooms.length === 0 ? (
-            <div className="flex items-center justify-center h-full min-h-[240px]">
-              <div className="text-center">
-                <h2 className="font-semibold text-gray-900">No players yet</h2>
-                <p className="text-sm text-gray-500 mt-1">
-                  Create a player in the Players page to get started
-                </p>
-              </div>
-            </div>
-          ) : roomsToShow.length === 0 ? (
-            <div className="flex items-center justify-center h-full min-h-[240px] text-sm text-gray-500">
-              No room matches the selected filter.
             </div>
           ) : (
-            <div className="min-w-0">
-              {daysToShow.length > 0 && (
-                <div
-                  className="grid border-b border-gray-200 bg-gray-50 sticky top-0 z-20"
-                  style={{
-                    gridTemplateColumns: `repeat(${daysToShow.length}, minmax(0, 1fr))`,
-                  }}
-                >
-                  {daysToShow.map((day) => (
-                    <div
-                      key={day.short}
-                      className="px-3 py-2 text-center text-xs font-semibold uppercase tracking-wide text-gray-600 border-r border-gray-200 last:border-r-0"
-                    >
-                      {day.full}
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {roomsToShow.map((room) => (
-                <div key={room.id} className="border-b border-gray-200">
-                  <div className="font-medium px-4 py-2.5 bg-white text-sm text-gray-900 border-b border-gray-100">
-                    {room.name}
-                    {selectedRoom !== "all" ? null : (
-                      <span className="text-gray-400 font-normal ml-2">
-                        · {daysToShow.map((d) => d.short).join(", ")}
-                      </span>
-                    )}
-                  </div>
-                  <div
-                    className="grid w-full"
-                    style={{
-                      gridTemplateColumns: `repeat(${Math.max(1, daysToShow.length)}, minmax(0, 1fr))`,
-                    }}
-                  >
-                    {daysToShow.map((day) => {
-                      const cellEvents = events.filter((e) => {
-                        if (e.roomId !== room.id || e.day !== day.short) {
-                          return false;
-                        }
-                        if (!normalizedQuery) return true;
-                        return e.title.toLowerCase().includes(normalizedQuery);
-                      });
-                      return (
-                        <CalendarCell
-                          key={`${room.id}-${day.short}`}
-                          roomId={room.id}
-                          day={day.short}
-                          time="09:00"
-                          events={cellEvents}
-                          onDropEvent={handleDropEvent}
-                          onDropPlaylist={handleDropPlaylist}
-                          onEventDelete={setPendingDeleteEvent}
-                          compact={daysToShow.length > 3}
-                          onQuickCreate={(r, d, t) => {
-                            setPickerCell({ roomId: r, day: d, time: t });
-                            setAssignModalOpen(true);
-                          }}
-                        />
-                      );
-                    })}
-                  </div>
-                </div>
-              ))}
-            </div>
+            renderScheduleBody()
           )}
         </div>
 
