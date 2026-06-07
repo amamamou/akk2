@@ -1,3 +1,4 @@
+/* eslint-disable react/no-unescaped-entities */
 "use client"
 
 import { useState } from "react"
@@ -58,7 +59,7 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex font-sans">
+    <div className="min-h-screen flex font-sans bg-white">
       {/* Left purple panel with logo */}
       <div className="hidden lg:flex lg:w-1/2 items-stretch bg-gradient-to-br from-[#8b58ff] via-[#A473FF] to-[#5e3cff] text-white rounded-tr-[72px] rounded-br-[72px] overflow-hidden">
         {/* content margin inside rounded panel */}
@@ -75,7 +76,7 @@ export default function LoginPage() {
             <p className="text-white/90 text-lg leading-relaxed max-w-lg">Sign in to manage audio assets, playlists and live players for your locations.</p>
           </div>
 
-          <div className="text-white/70 text-sm">Copyright © 2025 Akoustic Arts.</div>
+          <div className="text-white/70 text-sm">Copyright © 2026 Akoustic Arts.</div>
         </div>
       </div>
 

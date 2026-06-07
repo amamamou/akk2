@@ -2,12 +2,7 @@
 
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
-import {
-  Search,
-  Bell,
-  Info,
-  ChevronDown,
-} from "lucide-react";
+import { ChevronDown } from "lucide-react";
 // removed unused BarChart3 import
 import { useAuth } from "@/app/context/AuthContext";
 
@@ -63,21 +58,23 @@ export default function Navbar() {
         {/* RIGHT SIDE */}
         <div className="flex items-center justify-end gap-3">
 
-          {/* ACTIONS CAPSULE */}
-          <div className="flex items-center gap-1 rounded-full bg-white px-2 py-1">
+          {/* LANGUAGE SELECTOR */}
+          <div className="flex items-center gap-2 rounded-full bg-white px-2 py-1">
+            <button
+              type="button"
+              aria-label="Switch to English"
+              className="flex h-8 w-8 items-center justify-center rounded-full text-zinc-500 transition-all duration-200 hover:bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-[#A473FF]"
+            >
+              <span role="img" aria-hidden className="text-sm">🇬🇧</span>
+            </button>
 
-            <IconButton>
-              <Search size={15} strokeWidth={1.9} />
-            </IconButton>
-
-            <IconButton>
-              <Bell size={15} strokeWidth={1.9} />
-            </IconButton>
-
-            <IconButton>
-              <Info size={15} strokeWidth={1.9} />
-            </IconButton>
-
+            <button
+              type="button"
+              aria-label="Switch to French"
+              className="flex h-8 w-8 items-center justify-center rounded-full text-zinc-500 transition-all duration-200 hover:bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-[#A473FF]"
+            >
+              <span role="img" aria-hidden className="text-sm">🇫🇷</span>
+            </button>
           </div>
 
             {/* PROFILE CAPSULE */}
@@ -130,26 +127,7 @@ function NavItem({
   );
 }
 
-function IconButton({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      className="
-        flex h-8 w-8 items-center justify-center
-        rounded-full
-        text-zinc-500
-        transition-all duration-200
-        hover:bg-zinc-50
-        hover:text-zinc-800
-      "
-    >
-      {children}
-    </button>
-  );
-}
+// IconButton removed — language selector uses standalone buttons
 
 function UserProfile() {
   const { user } = useAuth();

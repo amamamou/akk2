@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import SidebarWrapper from "./components/SidebarWrapper";
+// SidebarWrapper moved into LayoutShell
 import SuppressConsole from './components/SuppressConsole';
 import { AuthProvider } from "./context/AuthContext";
-import Navbar from "./components/Navbar";
+import LayoutShell from "./components/LayoutShell";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -37,21 +37,9 @@ export default function RootLayout({
     >
       <body suppressHydrationWarning className="min-h-full ">
         <SuppressConsole />
-<AuthProvider>
-  <div className="grid h-screen grid-rows-[72px_1fr]">
-
-    <Navbar />
-
-    <div className="flex overflow-hidden">
-      <SidebarWrapper />
-
-      <main className="flex-1 overflow-auto bg-[#F4F4F5]">
-        {children}
-      </main>
-    </div>
-
-  </div>
-</AuthProvider>
+        <AuthProvider>
+          <LayoutShell>{children}</LayoutShell>
+        </AuthProvider>
       </body>
     </html>
   );
