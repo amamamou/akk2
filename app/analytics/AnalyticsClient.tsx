@@ -2,18 +2,6 @@
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip as RechartsTooltip,
-  ResponsiveContainer,
-  BarChart,
-  Bar,
-  PieChart,
-  Pie,
-  Cell,
-} from "recharts";
-import {
   PlayCircle,
   Clock,
   CheckCircle,
@@ -22,9 +10,7 @@ import {
   TrendingUp,
   Users,
   Activity,
-  Loader,
 } from "lucide-react";
-import type { PieLabelRenderProps } from "recharts";
 import { cn } from "@/utils/cn";
 import { useAuth } from "@/app/context/AuthContext";
 import { getApiClient } from "@/lib/api-client";
@@ -58,6 +44,10 @@ import {
   toActiveWorkspaceClients,
   type WorkspaceClientOption,
 } from "@/lib/workspace-clients";
+
+import KpiGrid from "./components/KpiGrid";
+import ChartsPanel from "./components/ChartsPanel";
+import PlaybackTable from "./components/PlaybackTable";
 
 type TimeRange = "today" | "7d" | "month";
 
@@ -424,23 +414,66 @@ export default function AnalyticsClient() {
 
   if (isLoading) {
     return (
-      <div className="flex-1 flex items-center justify-center bg-white">
-        <div className="text-center">
-          <Loader className="h-8 w-8 animate-spin text-gray-400 mx-auto mb-3" />
-          <p className="text-sm text-gray-600">Loading analytics…</p>
+      <div className="flex-1 flex flex-col overflow-hidden bg-[#F4F4F5]">
+        <div className="sticky top-0 z-10 bg-[#F4F4F5]">
+          <div className="px-8 py-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="w-56 h-8 bg-gray-200 rounded-md" aria-hidden="true" />
+                <div className="w-96 h-4 bg-gray-200 rounded-md mt-2" aria-hidden="true" />
+              </div>
+              <div className="flex items-center gap-3 shrink-0">
+                <div className="hidden sm:block">
+                  <div className="w-72 h-12 bg-gray-200 rounded-2xl  border-gray-200" aria-hidden="true" />
+                </div>
+                <div className="w-36 h-12 bg-gray-200 rounded-2xl  border-gray-200" aria-hidden="true" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex-1 overflow-auto bg-[#F4F4F5]">
+          <div className="px-6 py-6">
+            {/* Quick stats skeleton row */}
+            <div className="mb-6">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 animate-pulse">
+                <div className="h-20 bg-gray-200 rounded-2xl shadow-[0_8px_30px_rgba(0,0,0,0.04)] border border-gray-200" aria-hidden="true" />
+                <div className="h-20 bg-gray-200 rounded-2xl shadow-[0_8px_30px_rgba(0,0,0,0.04)] border border-gray-200" aria-hidden="true" />
+                <div className="h-20 bg-gray-200 rounded-2xl shadow-[0_8px_30px_rgba(0,0,0,0.04)] border border-gray-200" aria-hidden="true" />
+                <div className="h-20 bg-gray-200 rounded-2xl shadow-[0_8px_30px_rgba(0,0,0,0.04)] border border-gray-200" aria-hidden="true" />
+              </div>
+            </div>
+
+            {/* Skeleton / wireframe grid */}
+            <div className="animate-pulse">
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                  <div className="lg:col-span-2 space-y-6">
+                  <div className="h-40 bg-gray-200 rounded-2xl shadow-[0_8px_30px_rgba(0,0,0,0.04)] border border-gray-200" aria-hidden="true" />
+                  <div className="h-60 bg-gray-200 rounded-2xl shadow-[0_8px_30px_rgba(0,0,0,0.04)] border border-gray-200" aria-hidden="true" />
+                </div>
+
+                <div className="space-y-6">
+                  <div className="h-24 bg-gray-200 rounded-2xl shadow-[0_8px_30px_rgba(0,0,0,0.04)] border border-gray-200" aria-hidden="true" />
+                  <div className="h-40 bg-gray-200 rounded-2xl shadow-[0_8px_30px_rgba(0,0,0,0.04)] border border-gray-200" aria-hidden="true" />
+                  <div className="h-20 bg-gray-200 rounded-2xl shadow-[0_8px_30px_rgba(0,0,0,0.04)] border border-gray-200" aria-hidden="true" />
+                </div>
+              </div>
+            </div>
+
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden bg-white">
-      <div className="sticky top-0 z-10 bg-white border-b border-gray-50">
-        <div className="px-8 py-4">
-          <div className="flex items-center justify-between gap-8">
-            <div className="flex-1">
-              <h1 className="text-lg font-semibold text-gray-950 tracking-tight">Analytics</h1>
-              <p className="text-xs text-gray-500 mt-0.5">Playback verification and listening metrics</p>
+    <div className="flex-1 flex flex-col overflow-hidden bg-[#F4F4F5]">
+      <div className="sticky top-0 z-10 ] ">
+        <div className="px-8 py-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-2xl font-semibold text-gray-900">Analytics</h1>
+              <p className="mt-1 text-sm text-gray-500">Playback verification and listening metrics</p>
             </div>
 
             <div className="flex gap-2 items-center flex-wrap justify-end">
@@ -525,16 +558,16 @@ export default function AnalyticsClient() {
         </div>
       </div>
 
-      <div className="flex-1 overflow-auto bg-white">
+      <div className="flex-1 overflow-auto">
         <div className="px-8 py-6 space-y-6">
           {error && (
-            <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-sm text-red-800">
+            <div className="p-3 rounded-2xl bg-red-50 border border-red-200 text-sm text-red-800">
               {error}
             </div>
           )}
 
           {!error && logs.length === 0 && (
-            <div className="p-3 rounded-lg bg-amber-50 border border-amber-200 text-sm text-amber-900">
+            <div className="p-3 rounded-2xl bg-amber-50 border border-amber-200 text-sm text-amber-900">
               No playback logs returned for this workspace. API calls are active (
               <code className="text-xs">/analytics/playback-logs</code>,{" "}
               <code className="text-xs">/analytics/system-health</code>
@@ -542,282 +575,21 @@ export default function AnalyticsClient() {
             </div>
           )}
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
-            {kpiCards.map((stat, i) => (
-              <div
-                key={i}
-                className="group bg-white border border-gray-100 rounded-lg p-3 transition-all hover:border-gray-200 hover:bg-gray-50"
-              >
-                <div className="flex items-start justify-between mb-2">
-                  <div className="flex-1">
-                    <p className="text-xs font-medium text-gray-500 uppercase tracking-tight leading-tight">
-                      {stat.title}
-                    </p>
-                  </div>
-                  <div className="w-6 h-6 rounded flex items-center justify-center ml-1 flex-shrink-0 group-hover:bg-[#F3EEFF] transition-colors">
-                    <stat.icon size={13} className="text-[#6B46FF]" />
-                  </div>
-                </div>
-                <div className="space-y-1">
-                  <div className="flex items-baseline gap-1.5">
-                    <h3 className="text-xl font-bold text-gray-950 leading-tight">{stat.value}</h3>
-                    <span className="text-xs font-medium text-gray-500">{stat.trend}</span>
-                  </div>
-                  <p className="text-xs text-gray-500 leading-snug">{stat.meta}</p>
-                </div>
-              </div>
-            ))}
-          </div>
+          <KpiGrid stats={kpiCards} />
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div className="bg-white border border-gray-100 rounded-lg p-5">
-              <div className="mb-5">
-                <h3 className="text-sm font-semibold text-gray-950 leading-tight">
-                  Listener Distribution
-                </h3>
-                <p className="text-xs text-gray-500 mt-0.5">Engagement tier segmentation</p>
-              </div>
-              <div className="h-60 flex items-center justify-center">
-                {engagementData.length === 0 ? (
-                  <p className="text-sm text-gray-400">No playback data in range</p>
-                ) : (
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={engagementData}
-                        nameKey="segment"
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={55}
-                        outerRadius={90}
-                        paddingAngle={1.5}
-                        dataKey="count"
-                        label={(props: PieLabelRenderProps) =>
-                          `${props.name} ${props.percent ? (props.percent * 100).toFixed(0) : "0"}%`
-                        }
-                        labelLine={false}
-                      >
-                        <Cell fill="#A473FF" />
-                        <Cell fill="#7C56E6" />
-                        <Cell fill="#C4B3FF" />
-                        <Cell fill="#EDEBFF" />
-                      </Pie>
-                      <RechartsTooltip
-                        contentStyle={{
-                          borderRadius: "6px",
-                          border: "1px solid #e2e8f0",
-                          backgroundColor: "#ffffff",
-                          boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
-                          padding: "6px 10px",
-                          fontSize: "12px",
-                        }}
-                      />
-                    </PieChart>
-                  </ResponsiveContainer>
-                )}
-              </div>
-            </div>
+          <ChartsPanel engagementData={engagementData} hourlyTraffic={hourlyTraffic} />
 
-            <div className="bg-white border border-gray-100 rounded-lg p-5">
-              <div className="mb-5">
-                <h3 className="text-sm font-semibold text-gray-950 leading-tight">
-                  Traffic Patterns
-                </h3>
-                <p className="text-xs text-gray-500 mt-0.5">
-                  Hourly activity by engagement tier (same filtered logs)
-                </p>
-              </div>
-              <div className="h-60">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart
-                    data={hourlyTraffic}
-                    margin={{ top: 0, right: 8, left: -20, bottom: 0 }}
-                  >
-                    <CartesianGrid strokeDasharray="0" vertical={false} stroke="#f1f5f9" />
-                    <XAxis
-                      dataKey="hour"
-                      axisLine={false}
-                      tickLine={false}
-                      tick={{ fill: "#a1a5af", fontSize: 10 }}
-                      dy={4}
-                    />
-                    <YAxis
-                      axisLine={false}
-                      tickLine={false}
-                      tick={{ fill: "#a1a5af", fontSize: 10 }}
-                      dx={-4}
-                    />
-                    <RechartsTooltip
-                      cursor={{ fill: "#f8fafc" }}
-                      contentStyle={{
-                        borderRadius: "6px",
-                        border: "1px solid #e2e8f0",
-                        backgroundColor: "#ffffff",
-                        boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
-                        padding: "6px 10px",
-                        fontSize: "12px",
-                      }}
-                    />
-                    <Bar
-                      dataKey="engaged"
-                      stackId="a"
-                      fill="#A473FF"
-                      radius={[2, 2, 0, 0]}
-                      isAnimationActive={false}
-                    />
-                    <Bar dataKey="deep" stackId="a" fill="#7C56E6" isAnimationActive={false} />
-                    <Bar dataKey="moderate" stackId="a" fill="#C4B3FF" isAnimationActive={false} />
-                    <Bar dataKey="light" stackId="a" fill="#EDEBFF" isAnimationActive={false} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white border border-gray-100 rounded-lg overflow-hidden">
-            <div className="px-5 py-3 border-b border-gray-100 bg-gradient-to-r from-gray-50 to-white">
-              <h3 className="text-sm font-semibold text-gray-950">Playback Verification</h3>
-              <p className="text-xs text-gray-500 mt-0.5">
-                Recent broadcast activity and performance metrics
-              </p>
-            </div>
-
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-gray-50 border-b border-gray-100">
-                  <tr>
-                    <th className="text-left px-5 py-2 font-medium text-gray-700 text-xs uppercase tracking-wide">
-                      File
-                    </th>
-                    <th className="text-left px-5 py-2 font-medium text-gray-700 text-xs uppercase tracking-wide">
-                      Device
-                    </th>
-                    <th className="text-left px-5 py-2 font-medium text-gray-700 text-xs uppercase tracking-wide">
-                      Status
-                    </th>
-                    <th className="text-left px-5 py-2 font-medium text-gray-700 text-xs uppercase tracking-wide">
-                      Latency
-                    </th>
-                    <th className="text-left px-5 py-2 font-medium text-gray-700 text-xs uppercase tracking-wide">
-                      Duration
-                    </th>
-                    <th className="text-left px-5 py-2 font-medium text-gray-700 text-xs uppercase tracking-wide">
-                      Quality
-                    </th>
-                    <th className="text-left px-5 py-2 font-medium text-gray-700 text-xs uppercase tracking-wide">
-                      Session
-                    </th>
-                    <th className="text-left px-5 py-2 font-medium text-gray-700 text-xs uppercase tracking-wide">
-                      Time
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredLogs.length === 0 ? (
-                    <tr>
-                      <td colSpan={8} className="px-5 py-8 text-center text-gray-500 text-sm">
-                        No playback logs for this filter.
-                      </td>
-                    </tr>
-                  ) : (
-                    filteredLogs.map((log) => {
-                      const tier = isEngagementTier(log.status);
-                      const label = tier
-                        ? tierDisplayLabel(log.status)
-                        : log.status;
-                      const Icon = logIconForStatus(log.status);
-                      const statusUpper = log.status.toUpperCase();
-                      const isCompleted = statusUpper === "COMPLETED" || statusUpper === "DEEP" || statusUpper === "ENGAGED";
-                      const isFailed = statusUpper === "FAILED" || statusUpper === "LIGHT";
-                      const isPlaying = statusUpper === "STARTED" || statusUpper === "MODERATE";
-                      return (
-                        <tr
-                          key={log.id}
-                          className="border-b border-gray-50 hover:bg-gray-50/60 transition-colors"
-                        >
-                          <td className="px-5 py-2.5">
-                            <div className="flex items-center gap-2.5">
-                              <div
-                                className={cn(
-                                  "w-7 h-7 rounded flex items-center justify-center flex-shrink-0",
-                                  isCompleted
-                                    ? "bg-emerald-100"
-                                    : isPlaying
-                                      ? "bg-blue-50"
-                                      : "bg-red-50"
-                                )}
-                              >
-                                <Icon
-                                  size={14}
-                                  className={cn(
-                                    isCompleted
-                                      ? "text-emerald-700"
-                                      : isPlaying
-                                        ? "text-blue-600"
-                                        : "text-red-600"
-                                  )}
-                                />
-                              </div>
-                              <div>
-                                <p className="font-medium text-gray-900 text-sm">
-                                  {resolveMediaLabel(log.mediaId, log.mediaTitle)}
-                                </p>
-                                <p className="text-xs text-gray-500">
-                                  {resolveDeviceLabel(log.playerId, log.playerName)}
-                                </p>
-                              </div>
-                            </div>
-                          </td>
-                          <td className="px-5 py-2.5">
-                            <p className="text-gray-700 text-xs font-medium">
-                              {resolveDeviceLabel(log.playerId, log.playerName)}
-                            </p>
-                          </td>
-                          <td className="px-5 py-2.5">
-                            <span
-                              className={cn(
-                                "inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium",
-                                tierChipClass(log.status)
-                              )}
-                            >
-                              <span className="w-1 h-1 rounded-full bg-current opacity-60" />
-                              {tier ? label : statusUpper === "COMPLETED" ? "Successful" : label}
-                            </span>
-                          </td>
-                          <td className="px-5 py-2.5">
-                            <p className="text-gray-600 text-xs font-mono">—</p>
-                          </td>
-                          <td className="px-5 py-2.5">
-                            <p className="text-gray-600 text-xs">
-                              {formatDuration(log.durationSeconds)}
-                            </p>
-                          </td>
-                          <td className="px-5 py-2.5">
-                            <span
-                              className={cn(
-                                "inline-flex px-2 py-0.5 rounded text-xs font-medium",
-                                tier ? tierChipClass(log.status) : "text-gray-600"
-                              )}
-                            >
-                              {tier ? label : (log.durationSeconds ?? 0) >= 600 ? "HD" : "SD"}
-                            </span>
-                          </td>
-                          <td className="px-5 py-2.5">
-                            <p className="text-gray-500 text-xs font-mono">{log.id.slice(0, 12)}</p>
-                          </td>
-                          <td className="px-5 py-2.5">
-                            <p className="text-gray-600 text-xs whitespace-nowrap">
-                              {formatLogTime(log.startedAt || log.createdAt)}
-                            </p>
-                          </td>
-                        </tr>
-                      );
-                    })
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
+          <PlaybackTable
+            filteredLogs={filteredLogs}
+            resolveMediaLabel={resolveMediaLabel}
+            resolveDeviceLabel={resolveDeviceLabel}
+            logIconForStatus={logIconForStatus}
+            isEngagementTier={isEngagementTier}
+            tierDisplayLabel={tierDisplayLabel}
+            tierChipClass={tierChipClass}
+            formatDuration={formatDuration}
+            formatLogTime={formatLogTime}
+          />
         </div>
       </div>
     </div>

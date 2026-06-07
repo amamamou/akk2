@@ -223,16 +223,13 @@ export default function DashboardClient() {
 
 if (isLoading) {
   return (
-    <div className="flex-1 overflow-auto bg-[#F4F4F5]">
-      {/* Full-page skeleton header */}
-      <div className="mt-6 top-0 z-10 bg-[#F4F4F5]">
-        <div className="px-4 py-6">
-          <div className="flex items-center justify-between gap-4 mb-5">
-            <div className="flex items-start gap-4 min-w-0">
-              <div className="flex flex-col gap-2 min-w-0">
-                <div className="w-56 h-8 bg-gray-200 rounded-md" aria-hidden="true" />
-                <div className="w-96 h-4 bg-gray-200 rounded-md" aria-hidden="true" />
-              </div>
+    <div className="flex-1 flex flex-col overflow-hidden bg-[#F4F4F5]">
+      <div className="sticky top-0 z-10 bg-[#F4F4F5]">
+        <div className="px-8 py-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="w-56 h-8 bg-gray-200 rounded-md" aria-hidden="true" />
+              <div className="w-96 h-4 bg-gray-200 rounded-md mt-2" aria-hidden="true" />
             </div>
 
             <div className="flex items-center gap-3 shrink-0">
@@ -245,29 +242,35 @@ if (isLoading) {
         </div>
       </div>
 
-      {/* Quick stats skeleton row */}
-      <div className="px-4 pb-4">
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 animate-pulse">
-          <div className="h-20 bg-gray-200 rounded-lg border border-gray-200" aria-hidden="true" />
-          <div className="h-20 bg-gray-200 rounded-lg border border-gray-200" aria-hidden="true" />
-          <div className="h-20 bg-gray-200 rounded-lg border border-gray-200" aria-hidden="true" />
-          <div className="h-20 bg-gray-200 rounded-lg border border-gray-200" aria-hidden="true" />
-        </div>
-      </div>
+      <div className="flex-1 overflow-auto bg-[#F4F4F5]">
+        <div className="px-6 py-6">
 
-      {/* Skeleton / wireframe grid */}
-      <div className="p-4">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-pulse">
-          <div className="lg:col-span-2 space-y-6">
-            <div className="h-40 bg-gray-200 rounded-[12px] border border-gray-200" aria-hidden="true" />
-            <div className="h-60 bg-gray-200 rounded-[12px] border border-gray-200" aria-hidden="true" />
+          {/* Quick stats skeleton row */}
+          <div className="mb-6">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 animate-pulse">
+              <div className="h-20 bg-gray-200 rounded-lg border border-gray-200" aria-hidden="true" />
+              <div className="h-20 bg-gray-200 rounded-lg border border-gray-200" aria-hidden="true" />
+              <div className="h-20 bg-gray-200 rounded-lg border border-gray-200" aria-hidden="true" />
+              <div className="h-20 bg-gray-200 rounded-lg border border-gray-200" aria-hidden="true" />
+            </div>
           </div>
 
-          <div className="space-y-6">
-            <div className="h-24 bg-gray-200 rounded-[12px] border border-gray-200" aria-hidden="true" />
-            <div className="h-40 bg-gray-200 rounded-[12px] border border-gray-200" aria-hidden="true" />
-            <div className="h-20 bg-gray-200 rounded-[12px] border border-gray-200" aria-hidden="true" />
+          {/* Skeleton / wireframe grid */}
+          <div className="animate-pulse">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <div className="lg:col-span-2 space-y-6">
+                <div className="h-40 bg-gray-200 rounded-[12px] border border-gray-200" aria-hidden="true" />
+                <div className="h-60 bg-gray-200 rounded-[12px] border border-gray-200" aria-hidden="true" />
+              </div>
+
+              <div className="space-y-6">
+                <div className="h-24 bg-gray-200 rounded-[12px] border border-gray-200" aria-hidden="true" />
+                <div className="h-40 bg-gray-200 rounded-[12px] border border-gray-200" aria-hidden="true" />
+                <div className="h-20 bg-gray-200 rounded-[12px] border border-gray-200" aria-hidden="true" />
+              </div>
+            </div>
           </div>
+
         </div>
       </div>
     </div>
