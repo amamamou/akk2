@@ -76,29 +76,33 @@ export default function ChartsPanel({
           <h3 className="text-sm font-semibold text-gray-950 leading-tight">Traffic Patterns</h3>
           <p className="text-xs text-gray-500 mt-0.5">Hourly activity by engagement tier (same filtered logs)</p>
         </div>
-        <div className="h-60">
+        <div className="h-60 flex items-center justify-center">
+          {hourlyTraffic.length === 0 ? (
+            <p className="text-sm text-gray-400">No playback data in range</p>
+          ) : (
             <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={hourlyTraffic} margin={{ top: 0, right: 8, left: -20, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="0" vertical={false} stroke="#f1f5f9" />
-              <XAxis dataKey="hour" axisLine={false} tickLine={false} tick={{ fill: "#a1a5af", fontSize: 10 }} dy={4} />
-              <YAxis axisLine={false} tickLine={false} tick={{ fill: "#a1a5af", fontSize: 10 }} dx={-4} />
-              <RechartsTooltip
-                cursor={{ fill: "#f8fafc" }}
-                contentStyle={{
-                  borderRadius: "6px",
-                  border: "1px solid #e2e8f0",
-                  backgroundColor: "#ffffff",
-                  boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
-                  padding: "6px 10px",
-                  fontSize: "12px",
-                }}
-              />
-              <Bar dataKey="engaged" stackId="a" fill="#A473FF" radius={[2, 2, 0, 0]} isAnimationActive={false} />
-              <Bar dataKey="deep" stackId="a" fill="#7C56E6" isAnimationActive={false} />
-              <Bar dataKey="moderate" stackId="a" fill="#C4B3FF" isAnimationActive={false} />
-              <Bar dataKey="light" stackId="a" fill="#EDEBFF" isAnimationActive={false} />
-            </BarChart>
-          </ResponsiveContainer>
+              <BarChart data={hourlyTraffic} margin={{ top: 0, right: 8, left: -20, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="0" vertical={false} stroke="#f1f5f9" />
+                <XAxis dataKey="hour" axisLine={false} tickLine={false} tick={{ fill: "#a1a5af", fontSize: 10 }} dy={4} />
+                <YAxis axisLine={false} tickLine={false} tick={{ fill: "#a1a5af", fontSize: 10 }} dx={-4} />
+                <RechartsTooltip
+                  cursor={{ fill: "#f8fafc" }}
+                  contentStyle={{
+                    borderRadius: "6px",
+                    border: "1px solid #e2e8f0",
+                    backgroundColor: "#ffffff",
+                    boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
+                    padding: "6px 10px",
+                    fontSize: "12px",
+                  }}
+                />
+                <Bar dataKey="engaged" stackId="a" fill="#A473FF" radius={[2, 2, 0, 0]} isAnimationActive={false} />
+                <Bar dataKey="deep" stackId="a" fill="#7C56E6" isAnimationActive={false} />
+                <Bar dataKey="moderate" stackId="a" fill="#C4B3FF" isAnimationActive={false} />
+                <Bar dataKey="light" stackId="a" fill="#EDEBFF" isAnimationActive={false} />
+              </BarChart>
+            </ResponsiveContainer>
+          )}
         </div>
       </div>
     </div>
