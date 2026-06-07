@@ -13,16 +13,11 @@ import type { ClientInfo } from '@/types/api';
 
 type ClientRow = { id: string; name: string; businessType?: string; contactName?: string; email?: string; phone?: string; status?: string; players?: number; created?: string };
 
-const MOCK: ClientRow[] = [
-  { id: 'c1', name: 'Zen Yoga Studio', businessType: 'Yoga Studio', contactName: 'Hannah Lee', email: 'contact@zenyoga.example', phone: '+1 555 1234', status: 'Active', players: 3, created: '2023-04-12' },
-  { id: 'c2', name: 'Retail Space Co', businessType: 'Retail Store', contactName: 'Tom Becker', email: 'info@retailspace.example', phone: '+1 555 9876', status: 'Active', players: 8, created: '2022-11-20' },
-];
-
 export default function ClientsClient() {
   const apiClient = getApiClient();
   const [q, setQ] = useState('');
   const [selected, setSelected] = useState<string[]>([]);
-  const [rows, setRows] = useState<ClientRow[]>(MOCK);
+  const [rows, setRows] = useState<ClientRow[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [addOpen, setAddOpen] = useState(false);
   const [newName, setNewName] = useState('');
@@ -55,13 +50,11 @@ export default function ClientsClient() {
           }));
           setRows(clientRows);
         } else {
-          // Fall back to mock data if API doesn't return clients
-          setRows(MOCK);
+          setRows([]);
         }
       } catch (error) {
         console.error('Failed to load clients:', error);
-        // Fall back to mock data on error
-        setRows(MOCK);
+        setRows([]);
       } finally {
         if (!cancelled) setIsLoading(false);
       }
