@@ -10,13 +10,13 @@ export default function AudioVisual({
   color = "indigo",
   src,
   onPlay,
+  loop = false,
 }: {
   size?: number;
   color?: string;
-  // optional audio source — if provided the component can play/pause it
   src?: string;
-  // optional callback when user requests play (useful when parent handles playback)
   onPlay?: () => void;
+  loop?: boolean;
 }) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [playing, setPlaying] = useState(false);
@@ -24,10 +24,13 @@ export default function AudioVisual({
   useEffect(() => {
     const a = audioRef.current;
     if (!a) return;
-    const onEnded = () => setPlaying(false);
+    a.loop = loop;
+    const onEnded = () => {
+      if (!loop) setPlaying(false);
+    };
     a.addEventListener("ended", onEnded);
     return () => a.removeEventListener("ended", onEnded);
-  }, []);
+  }, [loop]);
   // static mapping so Tailwind doesn't purge dynamic classes
   const gradientMap: Record<string, string> = {
     indigo: "from-indigo-500 to-indigo-700",
@@ -91,7 +94,7 @@ export default function AudioVisual({
         </button>
       </div>
 
-      {src && <audio ref={audioRef} src={src} className="hidden" />}
+      {src && <audio ref={audioRef} src={src} className="hidden" loop={loop} />}
     </div>
   );
 }
