@@ -12,50 +12,14 @@ import AddToPlaylistModal from "./components/AddToPlaylistModal";
 import DeleteConfirmDialog from "./components/DeleteConfirmDialog";
 import type { AudioItem } from "./components/AudioTile";
 import type { Playlist } from "./components/PlaylistModal";
+import { getApiClient } from "@/lib/api-client";
+import { apiPlaylistToUi } from "@/lib/playlist-mapper";
+import { parseMediaTags } from "@/lib/media-tags";
 
 const categories = ["All", "Yoga", "Meditation", "Lobby", "Retail"];
 
-const library: AudioItem[] = [
-  { id: "a1", title: "Morning Flow", duration: "60m", durationMinutes: 60, category: "Yoga", usageCount: 24, spacesCount: 3, lastPlayed: "today", isScheduled: true, color: "purple", size: 4 * 1024 * 1024 },
-  { id: "a2", title: "Deep Focus", duration: "120m", durationMinutes: 120, category: "Meditation", usageCount: 18, spacesCount: 2, lastPlayed: "2 days ago", isScheduled: true, color: "blue", size: 3 * 1024 * 1024 },
-  { id: "a3", title: "Lobby Ambience Loop", duration: "180m", durationMinutes: 180, category: "Lobby", usageCount: 5, spacesCount: 1, lastPlayed: undefined, isScheduled: false, color: "amber", size: 6 * 1024 * 1024 },
-  { id: "a4", title: "Upbeat Playlist", duration: "120m", durationMinutes: 120, category: "Retail", usageCount: 12, spacesCount: 2, lastPlayed: "yesterday", isScheduled: true, color: "orange", size: 5 * 1024 * 1024 },
-  { id: "a5", title: "Nature Walk", duration: "45m", durationMinutes: 45, category: "Meditation", usageCount: 3, spacesCount: 1, lastPlayed: "1 week ago", isScheduled: false, color: "green", size: 2 * 1024 * 1024 },
-  { id: "a6", title: "Evening Rest", duration: "90m", durationMinutes: 90, category: "Yoga", usageCount: 14, spacesCount: 2, lastPlayed: "3 days ago", isScheduled: true, color: "indigo", size: 3 * 1024 * 1024 },
-];
-
-// Mock sample playlists - playback programs
-const samplePlaylists: Playlist[] = [
-  {
-    id: "p1",
-    title: "Morning Yoga",
-    trackCount: 3,
-    totalDuration: "180m",
-    usedInSchedule: true,
-    spacesCount: 2,
-    lastModified: "2 days ago",
-  },
-  {
-    id: "p2",
-    title: "Evening Relaxation",
-    trackCount: 5,
-    totalDuration: "300m",
-    usedInSchedule: true,
-    spacesCount: 3,
-    lastModified: "1 week ago",
-  },
-  {
-    id: "p3",
-    title: "Meditation Session",
-    trackCount: 4,
-    totalDuration: "240m",
-    usedInSchedule: false,
-    spacesCount: 0,
-    lastModified: "3 days ago",
-  },
-];
-
 export default function LibraryClient() {
+  const apiClient = getApiClient();
   const [query, setQuery] = useState("");
   const [activeCategory, setActiveCategory] = useState<string>("All");
   const [audioView, setAudioView] = useState<"list" | "grid">("grid");
@@ -66,42 +30,58 @@ export default function LibraryClient() {
   const [selectedAudioForPlaylist, setSelectedAudioForPlaylist] = useState<AudioItem | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [selectedAudioForDelete, setSelectedAudioForDelete] = useState<AudioItem | null>(null);
-  const PLAYLISTS_STORAGE_KEY = "aa_playlists";
+  const [library, setLibrary] = useState<AudioItem[]>([]);
+  const [playlists, setPlaylists] = useState<Playlist[]>([]);
+  const [libraryLoading, setLibraryLoading] = useState(true);
 
-  // Server-safe initial value to avoid hydration mismatch
-  const [playlists, setPlaylists] = useState<Playlist[]>(samplePlaylists);
-
-  // On client mount, load persisted playlists (if any). We accept empty arrays as valid data.
   useEffect(() => {
-    try {
-      if (typeof window === "undefined") return;
-      const raw = window.localStorage.getItem(PLAYLISTS_STORAGE_KEY);
-      if (raw !== null) {
-        const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed)) Promise.resolve().then(() => setPlaylists(parsed));
+    let cancelled = false;
+    void (async () => {
+      try {
+        setLibraryLoading(true);
+        const [mediaRes, playlistsRes] = await Promise.all([
+          apiClient.listMedia(),
+          apiClient.listPlaylists(),
+        ]);
+        if (cancelled) return;
+        setLibrary(
+          mediaRes.media.map((item) => {
+            const { baseCategory } = parseMediaTags(item.category);
+            const mins = item.durationMinutes ?? 0;
+            return {
+              id: item.id,
+              title: item.title,
+              duration: mins > 0 ? `${mins}m` : item.duration,
+              durationMinutes: mins,
+              category: baseCategory,
+              usageCount: 0,
+              spacesCount: 0,
+              lastPlayed: undefined,
+              isScheduled: false,
+              color: "purple",
+              size: item.fileSize,
+            };
+          })
+        );
+        setPlaylists(
+          (playlistsRes.playlists ?? [])
+            .map((p) => apiPlaylistToUi(p))
+            .filter((p): p is Playlist => p !== null)
+        );
+      } catch (err) {
+        console.error("Failed to load library", err);
+        if (!cancelled) {
+          setLibrary([]);
+          setPlaylists([]);
+        }
+      } finally {
+        if (!cancelled) setLibraryLoading(false);
       }
-    } catch {
-      // ignore malformed data
-    }
-  }, []);
-
-  // Persist playlists to localStorage whenever they change so other views / tabs see updates.
-  // Important: don't seed storage with samplePlaylists automatically when storage is empty.
-  useEffect(() => {
-    try {
-      if (typeof window === "undefined") return;
-      const nextJson = JSON.stringify(playlists);
-      const existing = window.localStorage.getItem(PLAYLISTS_STORAGE_KEY);
-      // If storage is empty and we're still at the built-in sample playlists, don't write them.
-      if (existing === null && playlists === samplePlaylists) return;
-      if (existing !== nextJson) {
-        window.localStorage.setItem(PLAYLISTS_STORAGE_KEY, nextJson);
-        window.dispatchEvent(new CustomEvent("aa:playlists-updated", { detail: { count: playlists.length } }));
-      }
-    } catch {
-      // ignore
-    }
-  }, [playlists]);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [apiClient]);
 
   const filteredLibrary = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();

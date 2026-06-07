@@ -18,6 +18,7 @@ type UploadFile = {
   titleTouched?: boolean;
   artistTouched?: boolean;
   playlistId?: string | null;
+  tags?: string[];
   color?: string;
   previewUrl?: string | null;
   original?: File | null;
@@ -41,13 +42,31 @@ export default function UploadModal({
   const inputRef = useRef<HTMLInputElement | null>(null);
   const titleRef = useRef<HTMLInputElement | null>(null);
   const [headerDuration, setHeaderDuration] = useState<number | null>(null);
+  const [tagInput, setTagInput] = useState("");
+  const SUGGESTED_TAGS = ["Event", "Seasonal", "Lobby", "Retail", "Yoga", "Meditation"];
+
+  const loadPlaylistsFromApi = React.useCallback(async () => {
+    try {
+      const res = await getApiClient().listPlaylists();
+      const mapped = (res.playlists ?? []).map((p) => ({
+        id: String(p.id),
+        name: String(p.title ?? "Untitled playlist"),
+      }));
+      setPlaylists(mapped);
+    } catch (err) {
+      console.error("Failed to load playlists from API", err);
+      setPlaylists([]);
+    }
+  }, []);
 
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem("aa_playlists");
-      if (raw) setPlaylists(JSON.parse(raw));
-    } catch {}
-  }, []);
+    void loadPlaylistsFromApi();
+  }, [loadPlaylistsFromApi]);
+
+  useEffect(() => {
+    if (!open) return;
+    void loadPlaylistsFromApi();
+  }, [open, loadPlaylistsFromApi]);
 
   useEffect(() => {
     return () => {
@@ -73,6 +92,7 @@ export default function UploadModal({
       artist: "",
       artistTouched: false,
       playlistId: null,
+      tags: [],
       previewUrl: URL.createObjectURL(f),
       original: f,
     }));
@@ -150,14 +170,27 @@ export default function UploadModal({
 
         setFiles((prev) => prev.map((p) => (p.id === file.id ? { ...p, status: "uploading", progress: 0 } : p)));
 
+        const extMatch = original.name.match(/\.[^.]+$/);
+        const ext = extMatch ? extMatch[0] : ".mp3";
+        const sanitizedStem =
+          original.name.split(".").slice(0, -1).join(".").replace(/[^a-zA-Z0-9]/g, "_") ||
+          "audio";
+        const sanitizedTitle = (file.title?.trim() || sanitizedStem).replace(/[^a-zA-Z0-9]/g, "_");
+        const sanitizedFileName = `${sanitizedStem}${ext}`;
+        const uploadBlob =
+          original.name === sanitizedFileName
+            ? original
+            : new File([original], sanitizedFileName, { type: original.type || "audio/mpeg" });
+
         const response = await apiClient.uploadMedia(
-          original,
-          file.title?.trim() || file.name,
+          uploadBlob,
+          sanitizedTitle,
           Math.max(1, Math.round((file.size || 1) / (1024 * 1024))),
           "Audio",
           (progressPercent) => {
             setFiles((prev) => prev.map((p) => (p.id === file.id ? { ...p, progress: progressPercent } : p)));
           },
+          file.tags ?? [],
         );
 
         const completed: UploadFile = {
@@ -404,6 +437,76 @@ export default function UploadModal({
                                 <div className="text-xs text-gray-400 mt-1 flex justify-end">
                                   <span className="text-[11px]">{(f.artist ?? '').length}/60</span>
                                 </div>
+                              </div>
+                            </div>
+
+                            <div className="flex gap-2 items-start">
+                              <div className="w-8 h-8 rounded-md flex items-center justify-center shrink-0">
+                                <svg className="text-gray-600" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 7h18"/><path d="M3 12h18"/><path d="M3 17h18"/></svg>
+                              </div>
+                              <div className="flex-1 space-y-2">
+                                <div className="flex flex-wrap gap-1.5">
+                                  {(f.tags ?? []).map((tag) => (
+                                    <button
+                                      key={tag}
+                                      type="button"
+                                      onClick={() =>
+                                        setFiles((prev) =>
+                                          prev.map((p) =>
+                                            p.id === f.id
+                                              ? { ...p, tags: (p.tags ?? []).filter((t) => t !== tag) }
+                                              : p
+                                          )
+                                        )
+                                      }
+                                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-[#F3EEFF] text-[#6B46FF] border border-violet-100"
+                                    >
+                                      {tag}
+                                      <span aria-hidden>×</span>
+                                    </button>
+                                  ))}
+                                </div>
+                                <div className="flex flex-wrap gap-1">
+                                  {SUGGESTED_TAGS.filter((t) => !(f.tags ?? []).includes(t)).map((tag) => (
+                                    <button
+                                      key={tag}
+                                      type="button"
+                                      onClick={() =>
+                                        setFiles((prev) =>
+                                          prev.map((p) =>
+                                            p.id === f.id
+                                              ? { ...p, tags: [...(p.tags ?? []), tag] }
+                                              : p
+                                          )
+                                        )
+                                      }
+                                      className="px-2 py-0.5 text-xs rounded-full border border-gray-200 text-gray-600 hover:bg-gray-50"
+                                    >
+                                      + {tag}
+                                    </button>
+                                  ))}
+                                </div>
+                                <input
+                                  value={tagInput}
+                                  onChange={(e) => setTagInput(e.target.value)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter" && tagInput.trim()) {
+                                      e.preventDefault();
+                                      const next = tagInput.trim();
+                                      setFiles((prev) =>
+                                        prev.map((p) =>
+                                          p.id === f.id && !(p.tags ?? []).includes(next)
+                                            ? { ...p, tags: [...(p.tags ?? []), next] }
+                                            : p
+                                        )
+                                      );
+                                      setTagInput("");
+                                    }
+                                  }}
+                                  placeholder="Add tag and press Enter"
+                                  className="w-full p-1 bg-transparent border-b border-gray-100 focus:outline-none focus:border-blue-200 text-sm"
+                                  aria-label="Tags"
+                                />
                               </div>
                             </div>
 

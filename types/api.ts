@@ -65,6 +65,8 @@ export interface MediaInfo {
   duration: string;
   durationMinutes: number;
   category: string;
+  /** Parsed from category TAG: segments when present */
+  tags?: string[];
   fileSize?: number;
   url: string;
 }
@@ -101,6 +103,7 @@ export interface ScheduleEntry {
   startsAt: string;
   endsAt: string;
   recurrence: string;
+  loopPlayback?: boolean;
 }
 
 export interface ScheduleListResponse {
@@ -121,6 +124,7 @@ export interface ScheduleCreate {
   startTime: string;
   endTime: string;
   recurrence?: string;
+  loopPlayback?: boolean;
 }
 
 export interface ScheduleUpdate {
@@ -264,6 +268,24 @@ export interface AnalyticsTimelineResponse {
   ok: boolean;
   tenantId: string;
   timeline: AnalyticsTimelineEntry[];
+}
+
+export interface PlaybackLogEntry {
+  id: string;
+  playerId: string;
+  playerName?: string | null;
+  mediaId?: string | null;
+  mediaTitle?: string | null;
+  status: string;
+  durationSeconds?: number | null;
+  startedAt?: string | null;
+  createdAt?: string | null;
+}
+
+export interface PlaybackLogsResponse {
+  ok: boolean;
+  tenantId: string;
+  logs: PlaybackLogEntry[];
 }
 
 export interface InvoiceInfo {
@@ -415,4 +437,3 @@ export interface UserProfileUpdateInput {
   bio?: string;
   profilePhotoUrl?: string | null;
 }
-
