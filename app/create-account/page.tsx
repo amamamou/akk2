@@ -31,7 +31,7 @@ export default function CreateAccountPage() {
             <p className="text-white/90 text-lg leading-relaxed max-w-lg">Sign in to manage audio assets, playlists and live players for your locations.</p>
           </div>
 
-          <div className="text-white/70 text-sm">Copyright © 2025 Akoustic Arts.</div>
+          <div className="text-white/70 text-sm">Copyright © 2026 Akoustic Arts.</div>
         </div>
       </div>
 

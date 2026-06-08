@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { ExternalLink, Loader2 } from "lucide-react";
+import { ExternalLink } from "lucide-react";
 import { getApiClient } from "@/lib/api-client";
 import type { InvoiceInfo } from "@/types/api";
 import { cn } from "@/utils/cn";
@@ -59,9 +59,51 @@ export default function BillingTab() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center gap-2 text-sm text-gray-500 py-12 justify-center">
-        <Loader2 className="h-4 w-4 animate-spin" />
-        Loading invoices…
+      <div className="rounded-lg border border-gray-100 overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-gray-50 border-b border-gray-100">
+              <tr>
+                <th className="text-left px-4 py-3">
+                  <div className="h-3 bg-gray-200 rounded w-32" />
+                </th>
+                <th className="text-left px-4 py-3">
+                  <div className="h-3 bg-gray-200 rounded w-20" />
+                </th>
+                <th className="text-left px-4 py-3">
+                  <div className="h-3 bg-gray-200 rounded w-24" />
+                </th>
+                <th className="text-left px-4 py-3">
+                  <div className="h-3 bg-gray-200 rounded w-24" />
+                </th>
+                <th className="text-left px-4 py-3">
+                  <div className="h-3 bg-gray-200 rounded w-16" />
+                </th>
+              </tr>
+            </thead>
+            <tbody className="animate-pulse">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <tr key={i} className="border-b border-gray-50">
+                  <td className="px-4 py-3">
+                    <div className="h-4 bg-gray-200 rounded w-24" />
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="h-4 bg-gray-200 rounded w-16" />
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="h-4 bg-gray-200 rounded w-20" />
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="h-4 bg-gray-200 rounded w-20" />
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="h-4 bg-gray-200 rounded w-12" />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
     );
   }
@@ -76,7 +118,7 @@ export default function BillingTab() {
 
   if (invoices.length === 0) {
     return (
-      <div className="rounded-lg border border-gray-100 bg-gray-50 px-6 py-12 text-center">
+      <div className="px-6 py-8 text-center">
         <p className="text-sm font-medium text-gray-900">No invoices yet</p>
         <p className="text-xs text-gray-500 mt-1">
           Manual invoices for your tenant will appear here once registered.

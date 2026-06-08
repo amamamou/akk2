@@ -23,6 +23,7 @@ export default function LibraryAudioClient() {
   const [activeCategory, setActiveCategory] = useState<string>("All");
   const [uploadOpen, setUploadOpen] = useState(false);
   const [audios, setAudios] = useState<AudioItem[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
 
   type Playlist = { id: string; title?: string; trackIds?: string[]; tracks?: string[]; items?: string[] };
   // Start with an empty playlists array so server and client initial render match.
@@ -76,6 +77,7 @@ export default function LibraryAudioClient() {
 
   useEffect(() => {
     const loadMedia = async () => {
+      setLoading(true);
       try {
         const response = await apiClient.listMedia();
         const mapped = response.media.map((item) => {
@@ -100,6 +102,8 @@ export default function LibraryAudioClient() {
       } catch (err) {
         console.error("Failed to load media library", err);
         startTransition(() => setAudios([]));
+      } finally {
+        setLoading(false);
       }
     };
 
@@ -301,7 +305,7 @@ export default function LibraryAudioClient() {
   // deleteEdit removed — deletion handled directly via handleAudioAction
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden bg-white">
+    <div className="flex-1 flex flex-col overflow-hidden bg-[#F4F4F5]">
       <AudioHeader
         colsOpen={colsOpen}
         setColsOpen={setColsOpen}
@@ -355,32 +359,39 @@ export default function LibraryAudioClient() {
         setCreatorQuery={setCreatorQuery}
       />
 
-      <div className="flex-1 overflow-auto bg-white">
-        <div className="px-6 py-6">
-          <AudioList
-            items={paginatedLibrary}
-            selectedId={selectedId}
-            setSelectedId={(id) => setSelectedId(id)}
-            onView={(it) => setViewing(it)}
-            onEdit={(id) => handleAudioAction("edit", id)}
-            onDelete={(id) => handleAudioAction("delete", id)}
-            visibleCols={visibleCols}
-          />
+      <div className="px-6 py-6">
+        <div className="bg-white rounded-[28px] border border-gray-100 shadow-[0_8px_30px_rgba(0,0,0,0.04)] flex flex-col min-h-[calc(100vh-220px)] overflow-hidden">
+          <div className="flex-1 overflow-y-auto p-6">
+              <AudioList
+                items={paginatedLibrary}
+                selectedId={selectedId}
+                setSelectedId={(id) => setSelectedId(id)}
+                onView={(it) => setViewing(it)}
+                onEdit={(id) => handleAudioAction("edit", id)}
+                onDelete={(id) => handleAudioAction("delete", id)}
+                visibleCols={visibleCols}
+                loading={loading}
+              />
+          </div>
+
+          <div className="sticky bottom-0 bg-white border-t border-gray-100 p-3 z-10">
+            <AudioToolbar
+              query={query}
+              setQuery={setQuery}
+              filteredCount={filteredCount}
+              totalCount={totalCount}
+              page={page}
+              setPage={(n) => startTransition(() => setPage(n))}
+              perPage={perPage}
+              setPerPage={(n) => {
+                setPerPage(n);
+              }}
+              perPageOptions={perPageOptions}
+              totalPages={totalPages}
+            />
+          </div>
         </div>
       </div>
-
-      <AudioToolbar
-        query={query}
-        setQuery={setQuery}
-        filteredCount={filteredCount}
-        totalCount={totalCount}
-        page={page}
-        setPage={(n) => startTransition(() => setPage(n))}
-        perPage={perPage}
-        setPerPage={(n) => { setPerPage(n); }}
-        perPageOptions={perPageOptions}
-        totalPages={totalPages}
-      />
 
       <UploadModal
         open={uploadOpen}
@@ -455,4 +466,3 @@ export default function LibraryAudioClient() {
     </div>
   );
 }
-

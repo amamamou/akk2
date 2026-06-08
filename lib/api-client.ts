@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * API Client for Akoustic Arts Backend
  * Handles authentication, request/response interceptors, and all API endpoints
@@ -854,4 +855,3 @@ export function resetApiClient() {
 }
 
 export default getApiClient;
-

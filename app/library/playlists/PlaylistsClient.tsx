@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Plus, Music, Loader2, AlertCircle } from "lucide-react";
+import { Plus, Music, AlertCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
 import PlaylistCard from "../components/PlaylistCard";
 import PlaylistModal from "../components/PlaylistModal";
@@ -81,7 +81,7 @@ export default function LibraryPlaylistsClient() {
   }, [playlists, query]);
 
   const [page, setPage] = useState(1);
-  const [perPage, setPerPage] = useState(10);
+  const [perPage, setPerPage] = useState(5);
   const perPageOptions = [5, 10, 20, 50];
   const filteredCount = filteredPlaylists.length;
   const totalPages = Math.max(1, Math.ceil(filteredCount / perPage));
@@ -105,8 +105,8 @@ export default function LibraryPlaylistsClient() {
   };
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden bg-white">
-      <div className="sticky top-0 z-10 bg-white border-b border-gray-200">
+    <div className="flex-1 flex flex-col overflow-hidden bg-[#F4F4F5]">
+      <div className="sticky top-0 z-10 bg-[#F4F4F5] ">
         <div className="px-8 py-6">
           <div className="flex items-center justify-between">
             <div>
@@ -119,94 +119,128 @@ export default function LibraryPlaylistsClient() {
             <button
               type="button"
               onClick={() => setPlaylistModalOpen(true)}
-              className="inline-flex items-center gap-2 rounded-md bg-[#A473FF] px-4 py-2 text-sm font-medium text-white hover:bg-[#7A42FF]"
+              className={
+                `group inline-flex items-center gap-3 h-12 px-5 bg-white text-gray-900 font-medium text-sm rounded-2xl border border-gray-100 shadow-[0_8px_30px_rgba(0,0,0,0.04)] transition-all hover:shadow-lg hover:translate-y-0.5 cursor-pointer`
+              }
             >
-              <Plus size={16} />
+              <span className="inline-flex items-center justify-center transition-colors">
+                <Plus size={16} strokeWidth={1.9} className="text-zinc-500 group-hover:text-[#A473FF] transition-colors" />
+              </span>
+
               <span>New playlist</span>
             </button>
           </div>
         </div>
       </div>
 
-      <div className="flex-1 overflow-auto bg-white">
+      <div className="flex-1 overflow-auto bg-[#F4F4F5]">
         <div className="px-6 py-6">
-          {error && (
-            <div className="mb-4 flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-              <AlertCircle size={16} className="shrink-0" />
-              <span>{error}</span>
-            </div>
-          )}
+          <div
+            className="
+              bg-white
+              rounded-[28px]
+              border
+              border-gray-100
+              shadow-[0_8px_30px_rgba(0,0,0,0.04)]
+              flex
+              flex-col
+              min-h-[calc(100vh-220px)]
+              overflow-hidden
+            "
+          >
+            <div className="p-6 flex-1 overflow-auto">
 
-          {loading ? (
-            <div className="flex items-center justify-center py-16 text-sm text-gray-500">
-              <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-              Loading playlists…
-            </div>
-          ) : paginatedPlaylists.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-16">
-              <div className="text-center space-y-4 max-w-sm">
-                <div className="inline-flex items-center justify-center w-14 h-14 rounded-lg bg-gray-100">
-                  <Music size={28} className="text-gray-400" />
+              {error && (
+                <div className="mb-4 flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                  <AlertCircle size={16} className="shrink-0" />
+                  <span>{error}</span>
                 </div>
-                <h2 className="text-lg font-semibold text-gray-900">No playlists yet</h2>
-                <p className="text-sm text-gray-600">
-                  Create your first playlist to organize tracks for scheduling and playback.
-                </p>
-                <button
-                  type="button"
-                  onClick={() => setPlaylistModalOpen(true)}
-                  className="inline-flex items-center gap-2 rounded-md bg-[#A473FF] px-5 py-2.5 text-sm font-medium text-white hover:bg-[#7A42FF]"
-                >
-                  <Plus size={16} />
-                  Create playlist
-                </button>
-              </div>
+              )}
+
+              {loading ? (
+                <div className="animate-pulse">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+                    {Array.from({ length: perPage || 6 }).map((_, i) => (
+                      <div key={i} className="h-36 bg-gray-200 rounded-xl border border-gray-200" aria-hidden="true" />
+                    ))}
+                  </div>
+                </div>
+              ) : paginatedPlaylists.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-16">
+                  <div className="text-center space-y-4 max-w-sm">
+                    <div className="inline-flex items-center justify-center w-14 h-14 rounded-lg bg-gray-100">
+                      <Music size={28} className="text-gray-400" />
+                    </div>
+                    <h2 className="text-lg font-semibold text-gray-900">No playlists yet</h2>
+                    <p className="text-sm text-gray-600">
+                      Create your first playlist to organize tracks for scheduling and playback.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setPlaylistModalOpen(true)}
+                      className="inline-flex items-center gap-2 rounded-md bg-[#A473FF] px-5 py-2.5 text-sm font-medium text-white hover:bg-[#7A42FF]"
+                    >
+                      <Plus size={16} />
+                      Create playlist
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+                  {paginatedPlaylists.map((playlist) => (
+                    <PlaylistCard
+                      key={playlist.id}
+                      playlist={playlist}
+                      onClick={() => navigateToPlaylist(playlist)}
+                      onEdit={async (id, newTitle) => {
+                        if (!newTitle?.trim()) return;
+                        try {
+                          await apiClient.updatePlaylist(id, { title: newTitle.trim() });
+                          await loadPlaylists();
+                        } catch {
+                          setPlaylists((prev) =>
+                            prev.map((pl) =>
+                              pl.id === id ? { ...pl, title: newTitle.trim() } : pl
+                            )
+                          );
+                        }
+                      }}
+                      onDelete={(id) => {
+                        const p = playlists.find((pl) => pl.id === id) || null;
+                        setSelectedPlaylistForDelete(p);
+                        setDeleteOpen(true);
+                      }}
+                    />
+                  ))}
+                </div>
+              )}
+
             </div>
-          ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-              {paginatedPlaylists.map((playlist) => (
-                <PlaylistCard
-                  key={playlist.id}
-                  playlist={playlist}
-                  onClick={() => navigateToPlaylist(playlist)}
-                  onEdit={async (id, newTitle) => {
-                    if (!newTitle?.trim()) return;
-                    try {
-                      await apiClient.updatePlaylist(id, { title: newTitle.trim() });
-                      await loadPlaylists();
-                    } catch {
-                      setPlaylists((prev) =>
-                        prev.map((pl) =>
-                          pl.id === id ? { ...pl, title: newTitle.trim() } : pl
-                        )
-                      );
-                    }
-                  }}
-                  onDelete={(id) => {
-                    const p = playlists.find((pl) => pl.id === id) || null;
-                    setSelectedPlaylistForDelete(p);
-                    setDeleteOpen(true);
-                  }}
+
+            <div className="border-t border-gray-100">
+              {loading ? (
+                <div className="p-4">
+                  <div className="h-12 bg-gray-200 rounded-2xl border border-gray-200 w-full animate-pulse" aria-hidden="true" />
+                </div>
+              ) : (
+                <AudioToolbar
+                  query={query}
+                  setQuery={setQuery}
+                  filteredCount={filteredCount}
+                  totalCount={playlists.length}
+                  page={page}
+                  setPage={setPage}
+                  perPage={perPage}
+                  setPerPage={setPerPage}
+                  perPageOptions={perPageOptions}
+                  totalPages={totalPages}
+                  placeholder="Search by title, track."
                 />
-              ))}
+              )}
             </div>
-          )}
+          </div>
         </div>
       </div>
-
-      <AudioToolbar
-        query={query}
-        setQuery={setQuery}
-        filteredCount={filteredCount}
-        totalCount={playlists.length}
-        page={page}
-        setPage={setPage}
-        perPage={perPage}
-        setPerPage={setPerPage}
-        perPageOptions={perPageOptions}
-        totalPages={totalPages}
-        placeholder="Search by title, track."
-      />
 
       <PlaylistModal
         open={playlistModalOpen}

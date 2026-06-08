@@ -488,7 +488,7 @@ export default function PlayersClient() {
   );
 
    return (
-     <div className="flex-1 flex flex-col overflow-hidden bg-white">
+     <div className="flex-1 flex flex-col overflow-hidden bg-[#F4F4F5]">
        <PlayersHeader
          view={view}
          onToggleView={(v) => setView(v)}
@@ -544,180 +544,151 @@ export default function PlayersClient() {
         setCreatorQuery={setCreatorQuery}
       />
 
-      <div className="flex-1 overflow-auto">
-  <div className="px-6 py-6">
-          {loadError && (
-            <div className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
-              {loadError}
-            </div>
-          )}
-          {isSuperAdmin &&
-          !isAllClientsView &&
-          !workspaceTenantId ? (
-            <div className="flex flex-col items-center justify-center py-16">
-              <div className="text-center space-y-2 max-w-sm">
-                <h2 className="text-sm font-semibold text-gray-900">
-                  Select a client workspace
-                </h2>
-                <p className="text-xs text-gray-500">
-                  Choose a client above to view or add players for that tenant.
-                  Those players will appear on the Weekly Schedule for that client.
-                </p>
+      <div className="px-6 py-6">
+        <div className="bg-white rounded-[28px] border border-gray-100 shadow-[0_8px_30px_rgba(0,0,0,0.04)] flex flex-col min-h-[calc(100vh-220px)] overflow-hidden">
+          <div className="flex-1 overflow-y-auto p-6">
+            {loadError && (
+              <div className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+                {loadError}
               </div>
-            </div>
-          ) : playersLoading ? (
-            <div className="flex flex-col items-center justify-center py-16 text-sm text-gray-500">
-              Loading players…
-            </div>
-          ) : isAllClientsView ? (
-            <div className="space-y-3">
-              {workspaceClients.length === 0 ? (
-                <p className="text-sm text-gray-500 py-12 text-center">
-                  No active client workspaces found.
-                </p>
-              ) : playersByClient.every((g) => g.players.length === 0) ? (
-                <p className="text-sm text-gray-500 py-12 text-center">
-                  No players found across client workspaces.
-                </p>
-              ) : (
-                playersByClient.map(({ client, players: groupPlayers }) => {
-                  if (groupPlayers.length === 0) return null;
-                  const expanded = expandedClients[client.id] ?? true;
-                  return (
-                    <div
-                      key={client.id}
-                      className="rounded-lg border border-gray-200 overflow-hidden bg-white shadow-sm"
-                    >
-                      <button
-                        type="button"
-                        onClick={() => toggleClientAccordion(client.id)}
-                        className="w-full flex items-center justify-between gap-3 px-4 py-3 bg-gradient-to-r from-violet-50 to-white hover:from-violet-100/80 transition-colors text-left"
-                      >
-                        <div>
-                          <span className="font-semibold text-gray-900">
-                            {client.name}
-                          </span>
-                          <span className="ml-2 text-xs text-gray-500">
-                            {groupPlayers.length}{" "}
-                            {groupPlayers.length === 1 ? "player" : "players"}
-                          </span>
-                        </div>
-                        <ChevronDown
-                          size={18}
-                          className={`text-gray-500 shrink-0 transition-transform duration-200 ${
-                            expanded ? "rotate-180" : ""
-                          }`}
-                        />
-                      </button>
-                      {expanded && (
-                        <div className="border-t border-gray-100 px-2 py-3">
-                          {view === "list" ? (
-                            <div className="space-y-2">
-                              {groupPlayers.map((p) => (
-                                <PlayerRow
-                                  key={p.id}
-                                  player={p}
-                                  onPlayPause={togglePlay}
-                                  onSkip={skip}
-                                  onRename={renamePlayer}
-                                  onDelete={deletePlayer}
-                                  onRequestEdit={(id) => setEditingId(id)}
-                                  editing={editingId === p.id}
-                                />
-                              ))}
-                            </div>
-                          ) : (
-                            <div className={`grid gap-4 ${gridCols}`}>
-                              {groupPlayers.map((p) => (
-                                <PlayerCard
-                                  key={p.id}
-                                  player={p}
-                                  onRename={renamePlayer}
-                                  onDelete={deletePlayer}
-                                  onRequestEdit={(id) => setEditingId(id)}
-                                  editing={editingId === p.id}
-                                  onOpenSchedule={() =>
-                                    openScheduleForRoom(p.roomId)
-                                  }
-                                />
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })
-              )}
-            </div>
-          ) : players.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-16">
-              <div className="text-center space-y-2">
-                <h2 className="text-sm font-semibold text-gray-900">
-                  No players yet
-                </h2>
-                <p className="text-xs text-gray-500 max-w-sm">
-                  Add your first player to start managing your audio devices by
-                  location.
-                </p>
+            )}
+            {isSuperAdmin && !isAllClientsView && !workspaceTenantId ? (
+              <div className="flex flex-col items-center justify-center py-16">
+                <div className="text-center space-y-2 max-w-sm">
+                  <h2 className="text-sm font-semibold text-gray-900">Select a client workspace</h2>
+                  <p className="text-xs text-gray-500">
+                    Choose a client above to view or add players for that tenant.
+                    Those players will appear on the Weekly Schedule for that client.
+                  </p>
+                </div>
               </div>
-            </div>
-          ) : filteredPlayers.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-16">
-              <div className="text-center space-y-2">
-                <h2 className="text-sm font-semibold text-gray-900">
-                  No players match your filters
-                </h2>
-                <p className="text-xs text-gray-500 max-w-sm">
-                  Try adjusting your search or status filters to see more players.
-                </p>
+            ) : playersLoading ? (
+              <div className="flex flex-col items-center justify-center py-16 text-sm text-gray-500">Loading players…</div>
+            ) : isAllClientsView ? (
+              <div className="space-y-3">
+                {workspaceClients.length === 0 ? (
+                  <p className="text-sm text-gray-500 py-12 text-center">No active client workspaces found.</p>
+                ) : playersByClient.every((g) => g.players.length === 0) ? (
+                  <p className="text-sm text-gray-500 py-12 text-center">No players found across client workspaces.</p>
+                ) : (
+                  playersByClient.map(({ client, players: groupPlayers }) => {
+                    if (groupPlayers.length === 0) return null;
+                    const expanded = expandedClients[client.id] ?? true;
+                    return (
+                      <div key={client.id} className="rounded-lg border border-gray-200 overflow-hidden bg-white shadow-sm">
+                        <button
+                          type="button"
+                          onClick={() => toggleClientAccordion(client.id)}
+                          className="w-full flex items-center justify-between gap-3 px-4 py-3 bg-gradient-to-r from-violet-50 to-white hover:from-violet-100/80 transition-colors text-left"
+                        >
+                          <div>
+                            <span className="font-semibold text-gray-900">{client.name}</span>
+                            <span className="ml-2 text-xs text-gray-500">{groupPlayers.length} {groupPlayers.length === 1 ? "player" : "players"}</span>
+                          </div>
+                          <ChevronDown size={18} className={`text-gray-500 shrink-0 transition-transform duration-200 ${expanded ? "rotate-180" : ""}`} />
+                        </button>
+                        {expanded && (
+                          <div className="border-t border-gray-100 px-2 py-3">
+                            {view === "list" ? (
+                              <div className="space-y-2">
+                                {groupPlayers.map((p) => (
+                                  <PlayerRow
+                                    key={p.id}
+                                    player={p}
+                                    onPlayPause={togglePlay}
+                                    onSkip={skip}
+                                    onRename={renamePlayer}
+                                    onDelete={deletePlayer}
+                                    onRequestEdit={(id) => setEditingId(id)}
+                                    editing={editingId === p.id}
+                                  />
+                                ))}
+                              </div>
+                            ) : (
+                              <div className={`grid gap-4 ${gridCols}`}>
+                                {groupPlayers.map((p) => (
+                                  <PlayerCard
+                                    key={p.id}
+                                    player={p}
+                                    onRename={renamePlayer}
+                                    onDelete={deletePlayer}
+                                    onRequestEdit={(id) => setEditingId(id)}
+                                    editing={editingId === p.id}
+                                    onOpenSchedule={() => openScheduleForRoom(p.roomId)}
+                                  />
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })
+                )}
               </div>
-            </div>
-          ) : view === "list" ? (
-            <div className="space-y-2">
-              {paginatedPlayers.map((p) => (
-                <PlayerRow
-                  key={p.id}
-                  player={p}
-                  onPlayPause={togglePlay}
-                  onSkip={skip}
-                  onRename={renamePlayer}
-                  onDelete={deletePlayer}
-                  onRequestEdit={(id) => setEditingId(id)}
-                  editing={editingId === p.id}
-                />
-              ))}
-            </div>
-          ) : (
-            <div className={`grid gap-4 ${gridCols}`}>
-              {paginatedPlayers.map((p) => (
-                <PlayerCard
-                  key={p.id}
-                  player={p}
-                  onRename={renamePlayer}
-                  onDelete={deletePlayer}
-                  onRequestEdit={(id) => setEditingId(id)}
-                  editing={editingId === p.id}
-                  onOpenSchedule={() => openScheduleForRoom(p.roomId)}
-                />
-              ))}
-            </div>
-          )}
+            ) : players.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-16">
+                <div className="text-center space-y-2">
+                  <h2 className="text-sm font-semibold text-gray-900">No players yet</h2>
+                  <p className="text-xs text-gray-500 max-w-sm">Add your first player to start managing your audio devices by location.</p>
+                </div>
+              </div>
+            ) : filteredPlayers.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-16">
+                <div className="text-center space-y-2">
+                  <h2 className="text-sm font-semibold text-gray-900">No players match your filters</h2>
+                  <p className="text-xs text-gray-500 max-w-sm">Try adjusting your search or status filters to see more players.</p>
+                </div>
+              </div>
+            ) : view === "list" ? (
+              <div className="space-y-2">
+                {paginatedPlayers.map((p) => (
+                  <PlayerRow
+                    key={p.id}
+                    player={p}
+                    onPlayPause={togglePlay}
+                    onSkip={skip}
+                    onRename={renamePlayer}
+                    onDelete={deletePlayer}
+                    onRequestEdit={(id) => setEditingId(id)}
+                    editing={editingId === p.id}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className={`grid gap-4 ${gridCols}`}>
+                {paginatedPlayers.map((p) => (
+                  <PlayerCard
+                    key={p.id}
+                    player={p}
+                    onRename={renamePlayer}
+                    onDelete={deletePlayer}
+                    onRequestEdit={(id) => setEditingId(id)}
+                    editing={editingId === p.id}
+                    onOpenSchedule={() => openScheduleForRoom(p.roomId)}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="sticky bottom-0 bg-white border-t border-gray-100 p-3 z-10">
+            <AudioToolbar
+              query={query}
+              setQuery={setQuery}
+              filteredCount={totalFiltered}
+              totalCount={players.length}
+              page={page}
+              setPage={setPage}
+              perPage={perPage}
+              setPerPage={setPerPage}
+              perPageOptions={perPageOptions}
+              totalPages={totalPages}
+              placeholder="Search by room, player, track..."
+            />
+          </div>
         </div>
       </div>
-       <AudioToolbar
-         query={query}
-         setQuery={setQuery}
-         filteredCount={totalFiltered}
-         totalCount={players.length}
-         page={page}
-         setPage={setPage}
-         perPage={perPage}
-         setPerPage={setPerPage}
-         perPageOptions={perPageOptions}
-         totalPages={totalPages}
-         placeholder="Search by room, player, track..."
-       />
 
        {/* Add Player Modal */}
        <AddPlayerModal

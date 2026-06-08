@@ -437,4 +437,3 @@ export interface UserProfileUpdateInput {
   bio?: string;
   profilePhotoUrl?: string | null;
 }
-

@@ -22,7 +22,7 @@ export default function AudioToolbar(p: Props) {
   const inputRef = useRef<HTMLInputElement | null>(null);
   return (
     <div className="border-gray-100 bg-white">
-      <div className="px-4 sm:px-7 py-3">
+      <div className="px-6 py-4">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div className="flex items-center gap-3 w-full max-w-md">
             <div className="relative flex-1">

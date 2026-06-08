@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useRef, useState } from "react";
+import React, { useRef, useState, useId } from "react";
 import { UploadCloud, Edit2, Trash, Camera, Loader2 } from "lucide-react";
 import { getApiClient } from "@/lib/api-client";
 import {
@@ -77,6 +77,8 @@ export default function MyDetailsTab({
   const [isDragging, setIsDragging] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  const gradientId = useId();
 
   const initials = `${(firstName || "").trim().charAt(0)}${(lastName || "").trim().charAt(0)}`.toUpperCase();
 
@@ -238,39 +240,57 @@ export default function MyDetailsTab({
                       fileInputRef.current?.click();
                     }
                   }}
-                  className="relative group h-24 w-24 rounded-full bg-gray-50 flex items-center justify-center overflow-hidden focus:outline-none focus:ring-2 focus:ring-gray-300 focus:ring-offset-2 disabled:opacity-60"
                   aria-label={avatar ? "Change profile photo" : "Upload profile photo"}
+                  className={`relative group w-24 h-24 rounded-full focus:outline-none disabled:opacity-60 ${isDragging ? "ring-2 ring-gray-300" : ""}`}
                 >
-                  {uploadingPhoto ? (
-                    <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
-                  ) : avatar ? (
-                    isRemoteImageUrl(avatar) ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={avatar}
-                        alt="Profile"
-                        className="h-full w-full object-cover"
-                      />
+                  {/* SVG interrupted gradient ring */}
+                  <svg className="absolute inset-0 w-full h-full" viewBox="0 0 100 100" aria-hidden>
+                    <defs>
+                      <linearGradient id={`avatarGrad-${gradientId}`} x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stopColor="#A473FF" />
+                        <stop offset="100%" stopColor="#7A42FF" />
+                      </linearGradient>
+                    </defs>
+                    <circle
+                      cx="50"
+                      cy="50"
+                      r="46"
+                      fill="none"
+                      stroke={`url(#avatarGrad-${gradientId})`}
+                      strokeWidth="6"
+                      strokeDasharray="6 6"
+                      strokeLinecap="round"
+                      transform="rotate(-90 50 50)"
+                    />
+                  </svg>
+
+                  {/* Inner white surface */}
+                  <div className="relative bg-white rounded-full h-full w-full flex items-center justify-center overflow-hidden shadow-[inset_0_2px_6px_rgba(0,0,0,0.06)]">
+                    {uploadingPhoto ? (
+                      <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+                    ) : avatar ? (
+                      isRemoteImageUrl(avatar) ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={avatar} alt="Profile" className="h-full w-full object-cover" />
+                      ) : (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={avatar} alt="Profile preview" className="h-full w-full object-cover" />
+                      )
                     ) : (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={avatar}
-                        alt="Profile preview"
-                        className="h-full w-full object-cover"
-                      />
-                    )
-                  ) : (
-                    <div
-                      className="h-full w-full flex items-center justify-center bg-gray-100 text-gray-500 text-sm font-medium"
-                      aria-hidden
-                      title={initials || "Profile"}
-                    >
-                      {initials || ""}
-                    </div>
-                  )}
-                  <span className="pointer-events-none absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 group-focus:opacity-100 transition-opacity">
-                    <span className="bg-white/80 p-1 rounded-full">
-                      <Camera size={16} className="text-gray-500" />
+                      <div
+                        className="h-full w-full flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100 text-gray-700 text-lg font-semibold"
+                        aria-hidden
+                        title={initials || "Profile"}
+                      >
+                        {initials || ""}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* camera overlay */}
+                  <span className="pointer-events-none absolute inset-0 flex items-end justify-end p-2 opacity-0 group-hover:opacity-100 group-focus:opacity-100 transition-opacity">
+                    <span className="bg-white/90 p-2 rounded-full shadow">
+                      <Camera size={16} className="text-gray-600" />
                     </span>
                   </span>
                 </button>

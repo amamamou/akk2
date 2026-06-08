@@ -1,3 +1,5 @@
+/* eslint-disable prefer-const */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
@@ -115,7 +117,9 @@ function mapRecentActivity(schedules: ScheduleEntry[], players: PlayerInfo[], ac
 export default function DashboardClient() {
   const apiClient = getApiClient();
   const [players, setPlayers] = useState<PlayerInfo[]>([]);
-  const [media, setMedia] = useState<MediaInfo[]>([]);
+  // _media is reserved for future use (fetched media) — keep setter for API response
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [_media, setMedia] = useState<MediaInfo[]>([]);
   const [schedules, setSchedules] = useState<ScheduleEntry[]>([]);
   const [clients, setClients] = useState<ClientInfo[]>([]);
   const [systemHealth, setSystemHealth] = useState<SystemHealthMetrics | null>(null);
@@ -211,31 +215,79 @@ export default function DashboardClient() {
       { label: "Players", value: String(players.length), icon: "Cast", trend: "registered" },
       { label: "System Health", value: String(healthValue) + "%", icon: "Activity", trend: healthStatus },
     ];
-  }, [media.length, players, schedules.length, clients.length, systemHealth]);
+  }, [players, clients.length, systemHealth]);
 
   const livePlayers = useMemo(() => mapPlayerStatus(players), [players]);
   const upcomingBroadcasts = useMemo(() => mapUpcomingBroadcasts(schedules, players), [schedules, players]);
   const recentActivity = useMemo(() => mapRecentActivity(schedules, players, activityLogs), [schedules, players, activityLogs]);
 
-  if (isLoading) {
-    return (
-      <div className="flex-1 flex items-center justify-center bg-gray-50">
-        <div className="text-center text-sm text-gray-600">Loading dashboard…</div>
+if (isLoading) {
+  return (
+    <div className="flex-1 flex flex-col overflow-hidden bg-[#F4F4F5]">
+      <div className="sticky top-0 z-10 bg-[#F4F4F5]">
+        <div className="px-8 py-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="w-56 h-8 bg-gray-200 rounded-md" aria-hidden="true" />
+              <div className="w-96 h-4 bg-gray-200 rounded-md mt-2" aria-hidden="true" />
+            </div>
+
+            <div className="flex items-center gap-3 shrink-0">
+              <div className="hidden sm:block">
+                <div className="w-72 h-12 bg-gray-200 rounded-2xl border border-gray-200" aria-hidden="true" />
+              </div>
+              <div className="w-36 h-12 bg-gray-200 rounded-2xl border border-gray-200" aria-hidden="true" />
+            </div>
+          </div>
+        </div>
       </div>
-    );
-  }
+
+      <div className="flex-1 overflow-auto bg-[#F4F4F5]">
+        <div className="px-6 py-6">
+
+          {/* Quick stats skeleton row */}
+          <div className="mb-6">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 animate-pulse">
+              <div className="h-20 bg-gray-200 rounded-lg border border-gray-200" aria-hidden="true" />
+              <div className="h-20 bg-gray-200 rounded-lg border border-gray-200" aria-hidden="true" />
+              <div className="h-20 bg-gray-200 rounded-lg border border-gray-200" aria-hidden="true" />
+              <div className="h-20 bg-gray-200 rounded-lg border border-gray-200" aria-hidden="true" />
+            </div>
+          </div>
+
+          {/* Skeleton / wireframe grid */}
+          <div className="animate-pulse">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <div className="lg:col-span-2 space-y-6">
+                <div className="h-40 bg-gray-200 rounded-[12px] border border-gray-200" aria-hidden="true" />
+                <div className="h-60 bg-gray-200 rounded-[12px] border border-gray-200" aria-hidden="true" />
+              </div>
+
+              <div className="space-y-6">
+                <div className="h-24 bg-gray-200 rounded-[12px] border border-gray-200" aria-hidden="true" />
+                <div className="h-40 bg-gray-200 rounded-[12px] border border-gray-200" aria-hidden="true" />
+                <div className="h-20 bg-gray-200 rounded-[12px] border border-gray-200" aria-hidden="true" />
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  );
+}
 
   return (
-    <div className="flex-1 overflow-auto bg-gray-50/30">
+    <div className="flex-1 overflow-auto bg-[#F4F4F5]">
       {error && (
         <div className="mx-8 mt-6 p-3 rounded-lg bg-red-50 border border-red-200 text-sm text-red-800">
           {error}
         </div>
       )}
 
-      <DashboardHeader stats={quickStats} />
+  <DashboardHeader stats={quickStats} showStats={true} />
 
-      <div className="p-8 ">
+      <div className="p-4 ">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 space-y-6">
             <LivePlayerStatus players={livePlayers} />

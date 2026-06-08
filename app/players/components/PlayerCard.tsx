@@ -77,23 +77,21 @@ export default function PlayerCard({
           e.preventDefault();
         }
       }}
-      className={`group grid grid-cols-[64px_1fr] md:grid-cols-[64px_1fr_160px] gap-4 items-start p-4 rounded-md border border-gray-100 bg-white transition-all duration-150 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-blue-400 min-h-[72px]`}
+      className={"group bg-[#FAFAFB] rounded-[24px] border border-transparent hover:bg-white hover:border-gray-100 hover:shadow-[0_12px_32px_rgba(0,0,0,0.05)] transition-all duration-200 p-4 min-h-[72px]"}
       onClick={() => { /* keep card click available for parent if needed */ }}
     >
       {/* ICON with status overlay */}
-      <div className={"relative flex items-center justify-center rounded-md w-16 h-16 transition-transform"}>
-        <div className="relative rounded-md p-3 shadow-sm" style={{ backgroundColor: '#A473FF' }}>
-          <Cast size={20} style={{ color: '#F3F4F6' }} />
-
-          {/* status indicator */}
-          <span className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-white ${isActive ? 'bg-green-500' : 'bg-gray-300'}`} />
-          <span className="sr-only">{isActive ? 'Online' : 'Offline'}</span>
+      <div className="relative rounded-2xl bg-[#F3F0FF] p-3 w-16 h-16 flex items-center justify-center">
+        <div className="rounded-xl bg-[#A473FF] p-2.5">
+          <Cast size={18} className="text-white" />
         </div>
+
+        <span className={`absolute bottom-1 right-1 h-2.5 w-2.5 rounded-full ${isActive ? 'bg-emerald-500' : 'bg-zinc-300'}`} />
       </div>
 
       {/* MAIN */}
       <div className="min-w-0">
-        <div className="text-sm font-medium text-gray-900">
+        <div className="text-[15px] font-semibold text-zinc-900 truncate">
           {isEditing ? (
             <input
               ref={inputRef}
@@ -131,7 +129,7 @@ export default function PlayerCard({
 
       {/* ACTIONS */}
       <div className="md:col-auto col-span-2 flex items-center md:justify-end justify-start gap-3 w-full">
-        <div className={`hidden md:flex items-center gap-2 transition-all transform z-30 opacity-100`}> 
+        <div className={`hidden md:flex items-center gap-2 transition-all transform z-30 opacity-0 group-hover:opacity-100`}> 
           <PlayerActions
             isPlaying={!!player.isPlaying}
             onPlayPause={(e) => { e?.stopPropagation(); onOpenSchedule?.(); }}

@@ -1,16 +1,11 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { Loader2 } from "lucide-react";
+import { CreditCard, CalendarCheck, ShieldCheck, Users, Cloud, TrendingUp } from "lucide-react";
 import { getApiClient } from "@/lib/api-client";
 import type { TenantSettingsData } from "@/types/api";
 import { cn } from "@/utils/cn";
 
-const TIER_STYLES: Record<string, string> = {
-  STARTER: "bg-gray-100 text-gray-800",
-  PROFESSIONAL: "bg-purple-100 text-purple-800",
-  ENTERPRISE: "bg-amber-100 text-amber-800",
-};
 
 function UsageBar({ used, max, label }: { used: number; max: number; label: string }) {
   const pct = max > 0 ? Math.min(100, Math.round((used / max) * 100)) : 0;
@@ -75,9 +70,29 @@ export default function PlanTab() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center gap-2 text-sm text-gray-500">
-        <Loader2 className="h-4 w-4 animate-spin" />
-        Loading plan…
+      <div className="space-y-6">
+        {/* Hero skeleton (simple) */}
+        <div className="animate-pulse">
+          <div className="h-6 w-1/3 bg-gray-200 rounded mb-2" />
+          <div className="h-4 w-1/4 bg-gray-200 rounded" />
+        </div>
+
+        {/* Features skeleton (stacked) */}
+        <div className="space-y-4">
+          <div className="h-4 w-1/4 bg-gray-200 rounded" />
+          <div className="space-y-3 animate-pulse">
+            <div className="h-3 bg-gray-200 rounded w-full" />
+            <div className="h-3 bg-gray-200 rounded w-full" />
+            <div className="h-3 bg-gray-200 rounded w-2/3" />
+          </div>
+        </div>
+
+        {/* Billing skeleton (stacked) */}
+        <div className="space-y-3 animate-pulse">
+          <div className="h-4 w-1/4 bg-gray-200 rounded" />
+          <div className="h-3 bg-gray-200 rounded w-full" />
+          <div className="h-3 bg-gray-200 rounded w-full" />
+        </div>
       </div>
     );
   }
@@ -97,46 +112,79 @@ export default function PlanTab() {
   }
 
   const tier = (settings.subscriptionTier || settings.planName || "STARTER").toUpperCase();
-  const tierStyle = TIER_STYLES[tier] ?? TIER_STYLES.STARTER;
 
   return (
-    <div className="max-w-2xl space-y-6">
-      <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <h2 className="text-lg font-semibold text-gray-900">Current plan</h2>
-            <p className="mt-1 text-sm text-gray-500">
-              Subscription tier and resource usage for your tenant
-            </p>
+    <div className="max-w-8xl space-y-6">
+      {/* Hero (simple, no card) */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-xl font-semibold text-gray-900">Your plan</h2>
+          <p className="mt-1 text-sm text-gray-600">{settings.planName ? settings.planName : tier}</p>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <button className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-md text-sm text-gray-700 hover:bg-gray-50">
+            <CreditCard className="h-4 w-4 text-amber-500" /> Manage billing
+          </button>
+          <button className="group inline-flex items-center gap-2 px-4 py-2 bg-[#A473FF] text-white rounded-md text-sm hover:bg-[#7A42FF]">
+            <TrendingUp className="h-4 w-4 transform transition-transform duration-200 group-hover:-translate-y-1" />
+            Upgrade
+          </button>
+        </div>
+      </div>
+
+      {/* Features (stacked) */}
+      <div className="space-y-4">
+        <h3 className="text-sm font-semibold text-gray-900">What&apos;s included</h3>
+        <ul className="space-y-3">
+          <li className="flex items-start gap-3">
+            <div className="flex items-center justify-center h-8 w-8 rounded-md bg-amber-50 text-amber-600">
+              <Users className="h-4 w-4" />
+            </div>
+            <div>
+              <div className="font-medium text-gray-900">Player seats</div>
+              <div className="text-sm text-gray-500">{settings.maxPlayers ?? "—"} seats included</div>
+            </div>
+          </li>
+
+          <li className="flex items-start gap-3">
+            <div className="flex items-center justify-center h-8 w-8 rounded-md bg-purple-50 text-purple-600">
+              <Cloud className="h-4 w-4" />
+            </div>
+            <div>
+              <div className="font-medium text-gray-900">Storage</div>
+              <div className="text-sm text-gray-500">{settings.maxStorageGb ?? "—"} GB storage</div>
+            </div>
+          </li>
+
+          <li className="flex items-start gap-3">
+            <div className="flex items-center justify-center h-8 w-8 rounded-md bg-green-50 text-green-600">
+              <ShieldCheck className="h-4 w-4" />
+            </div>
+            <div>
+              <div className="font-medium text-gray-900">Security & support</div>
+              <div className="text-sm text-gray-500">Enterprise-grade security and priority support</div>
+            </div>
+          </li>
+        </ul>
+      </div>
+
+      {/* Billing & limits (stacked) */}
+      <div className="space-y-4">
+        <h3 className="text-sm font-semibold text-gray-900">Billing & limits</h3>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <CalendarCheck className="h-5 w-5 text-amber-500" />
+            <div>
+              <div className="font-medium text-gray-900">Billing cycle</div>
+              <div className="text-sm text-gray-500">Monthly</div>
+            </div>
           </div>
-          <span
-            className={cn(
-              "inline-flex rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide",
-              tierStyle
-            )}
-          >
-            {tier}
-          </span>
+          <div className="text-sm text-gray-700 font-medium">Contact sales</div>
         </div>
 
-        {settings.planName && settings.planName.toUpperCase() !== tier && (
-          <p className="mt-4 text-sm text-gray-600">
-            Plan name: <span className="font-medium">{settings.planName}</span>
-          </p>
-        )}
-
-        <div className="mt-8 space-y-6">
-          <UsageBar
-            label="Registered players"
-            used={settings.usedPlayers}
-            max={settings.maxPlayers}
-          />
-          <UsageBar
-            label="Storage (GB)"
-            used={settings.usedStorageGb}
-            max={settings.maxStorageGb}
-          />
-        </div>
+        <UsageBar label="Registered players" used={settings.usedPlayers} max={settings.maxPlayers} />
+        <UsageBar label="Storage (GB)" used={settings.usedStorageGb} max={settings.maxStorageGb} />
       </div>
 
       <p className="text-xs text-gray-500">
