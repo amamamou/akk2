@@ -1,5 +1,6 @@
 "use client";
 import React, { useEffect, useRef, useState } from "react";
+import { cn } from '@/utils/cn';
 import { useAuth } from '@/app/context/AuthContext';
 import { createPortal } from "react-dom";
 import { Cast, MoreHorizontal, Pencil, Trash } from "lucide-react";
@@ -121,26 +122,46 @@ export default function PlayerRow({ player, onPlayPause, onSkip, onRename, onDel
           e.preventDefault();
         }
       }}
-      className={`group grid grid-cols-[48px_1fr] md:grid-cols-[48px_1fr_140px] gap-4 items-center p-3 rounded-md border border-gray-100 bg-white transition-all duration-150 ${isEditing ? "shadow-sm" : "hover:shadow-sm"} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-blue-400`}
+      className={cn(
+        "group",
+        "grid grid-cols-[56px_1fr_auto]",
+        "gap-5 items-center",
+
+        "px-5 py-4",
+
+        "rounded-2xl",
+
+        "bg-[#FAFAFB]",
+
+        "border border-transparent",
+
+        "transition-all duration-200",
+
+        "hover:bg-white",
+        "hover:border-gray-100",
+        "hover:shadow-[0_8px_24px_rgba(0,0,0,0.04)]",
+
+        "focus-visible:outline-none",
+        "focus-visible:ring-2",
+        "focus-visible:ring-[#A473FF]/20",
+      )}
       onClick={() => { /* keep row click available for parent if needed */ }}
     >
       {/* ICON with status overlay */}
-      <div className={"relative flex items-center justify-center rounded-md w-12 h-12 transition-transform"}>
-        <div className="relative rounded-md p-2" style={{ backgroundColor: '#A473FF' }}>
-          <Cast size={16} style={{ color: '#F3F4F6' }} />
+      <div className="flex items-center justify-center w-14 h-14">
+        <div className="relative rounded-xl p-2.5 bg-[#A473FF]">
+          <Cast size={16} className="text-white" />
 
-          {/* status indicator: small ringed dot at bottom-right of icon */}
           <span
-            className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-white ${player.status === 'online' ? 'bg-green-500' : 'bg-gray-300'}`}
+            className={`absolute bottom-1 right-1 h-3 w-3 rounded-full border-2 border-white ${player.status === 'online' ? 'bg-emerald-500' : 'bg-zinc-300'}`}
             aria-hidden
           />
-          <span className="sr-only">{player.status === 'online' ? 'Online' : 'Offline'}</span>
         </div>
       </div>
 
       {/* MAIN */}
       <div className="min-w-0">
-        <div className="text-sm font-medium text-gray-900 truncate">
+        <div className="text-[15px] font-semibold text-zinc-900 truncate">
           {isEditing ? (
             <input
               ref={inputRef}
@@ -162,19 +183,36 @@ export default function PlayerRow({ player, onPlayPause, onSkip, onRename, onDel
           ) : (
             <span
               onClick={(e) => { e.stopPropagation(); setIsEditing(true); setTimeout(() => { inputRef.current?.focus(); inputRef.current?.select?.(); }, 50); }}
-              className="line-clamp-1 cursor-pointer px-2 py-0.5 text-sm font-medium text-gray-900 hover:text-gray-700 truncate inline-block max-w-[28ch] md:max-w-[40ch]"
+              className="cursor-pointer truncate"
               title={player.roomName}
             >
               {player.roomName}
             </span>
           )}
+
         </div>
-        {/* removed playerName and tracks count for minimal header */}
+
+        <div className="mt-1 flex items-center gap-2 text-xs text-zinc-500">
+          <span>{player.playerName}</span>
+          <span className="h-1 w-1 rounded-full bg-zinc-300" />
+          <span>{player.status === 'online' ? 'Connected' : 'Offline'}</span>
+        </div>
+
+        {player.nowPlaying && (
+          <div className="mt-2 flex items-center gap-2">
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+            <span className="text-[11px] text-zinc-400 truncate">Now playing {player.nowPlaying.title}</span>
+          </div>
+        )}
       </div>
 
       {/* STATUS + NOW PLAYING */}
       <div className="md:col-auto col-span-2 flex items-center md:justify-end justify-start gap-3 w-full">
-  <div className={`hidden md:flex items-center gap-2 transition-all transform z-30 ${menuOpen ? 'opacity-100 translate-x-0' : 'opacity-0 md:group-hover:opacity-100 md:group-hover:translate-x-0 md:translate-x-2'}`}>
+        <div className={cn(
+          "hidden md:flex items-center gap-2 transition-all duration-200 transform z-30",
+          menuOpen ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-2',
+          'group-hover:opacity-100 group-hover:translate-x-0'
+        )}>
           <PlayerActions
             isPlaying={!!player.isPlaying}
             onPlayPause={(e) => { e?.stopPropagation(); onPlayPause(player.id); }}

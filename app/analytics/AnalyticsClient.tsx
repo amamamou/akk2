@@ -419,14 +419,87 @@ export default function AnalyticsClient() {
           <div className="px-8 py-6">
             <div className="flex items-center justify-between">
               <div>
-                <div className="w-56 h-8 bg-gray-200 rounded-md" aria-hidden="true" />
-                <div className="w-96 h-4 bg-gray-200 rounded-md mt-2" aria-hidden="true" />
+                <h1 className="text-2xl font-semibold text-gray-900">Analytics</h1>
+                <p className="mt-1 text-sm text-gray-500">Playback verification and listening metrics</p>
               </div>
-              <div className="flex items-center gap-3 shrink-0">
-                <div className="hidden sm:block">
-                  <div className="w-72 h-12 bg-gray-200 rounded-2xl  border-gray-200" aria-hidden="true" />
+
+              <div className="flex gap-2 items-center flex-wrap justify-end">
+                {isSuperAdmin && workspaceClients.length > 0 && (
+                  <div className="relative">
+                    <select
+                      value={selectedWorkspaceClientId}
+                      onChange={(e) => {
+                        const match = workspaceClients.find((c) => c.id === e.target.value);
+                        if (!match) return;
+                        setSelectedWorkspaceClientId(match.id);
+                        setWorkspaceTenantId(match.tenantId);
+                        setSelectedPlayerId("all");
+                      }}
+                      className="border border-violet-100 rounded-lg text-sm px-3 py-1.5 bg-violet-50 text-gray-900 outline-none focus:border-violet-200 appearance-none pr-8"
+                      aria-label="Client workspace"
+                    >
+                      {workspaceClients.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.name}
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDown
+                      size={14}
+                      className="absolute right-2.5 top-1/2 transform -translate-y-1/2 pointer-events-none text-gray-400"
+                    />
+                  </div>
+                )}
+                <div className="relative">
+                  <select
+                    value={selectedPlayerId}
+                    onChange={(e) => setSelectedPlayerId(e.target.value)}
+                    className="border border-gray-100 rounded-lg text-sm px-3 py-1.5 bg-white text-gray-900 outline-none focus:border-gray-300 focus:ring-0 appearance-none pr-8 transition-colors hover:border-gray-200"
+                  >
+                    <option value="all">All Players</option>
+                    {playerOptions.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {resolveDeviceLabel(p.id, p.roomName || p.playerName)}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown
+                    size={14}
+                    className="absolute right-2.5 top-1/2 transform -translate-y-1/2 pointer-events-none text-gray-400"
+                  />
                 </div>
-                <div className="w-36 h-12 bg-gray-200 rounded-2xl  border-gray-200" aria-hidden="true" />
+
+                {selectedPlayerId !== "all" && (
+                  <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-gray-50 rounded-lg border border-gray-100 text-xs">
+                    <div
+                      className={cn(
+                        "w-1 h-1 rounded-full",
+                        selectedPlayerMeta.status === "online" ? "bg-green-600" : "bg-gray-400"
+                      )}
+                    />
+                    <span className="text-gray-600 font-medium">
+                      {selectedPlayerMeta.status === "online" ? "Online" : "Offline"}
+                    </span>
+                    <span className="text-gray-300 mx-0.5">•</span>
+                    <span className="text-gray-500">{selectedPlayerMeta.device}</span>
+                  </div>
+                )}
+
+                <div className="relative">
+                  <select
+                    value={timeRange}
+                    onChange={(e) => setTimeRange(e.target.value as TimeRange)}
+                    className="border border-gray-100 rounded-lg text-sm px-3 py-1.5 bg-white text-gray-900 outline-none focus:border-gray-300 focus:ring-0 appearance-none pr-8 transition-colors hover:border-gray-200"
+                  >
+                    <option value="today">Today</option>
+                    <option value="7d">Last 7 Days</option>
+                    <option value="month">This Month</option>
+                  </select>
+                  <ChevronDown
+                    size={14}
+                    className="absolute right-2.5 top-1/2 transform -translate-y-1/2 pointer-events-none text-gray-400"
+                  />
+                </div>
               </div>
             </div>
           </div>
