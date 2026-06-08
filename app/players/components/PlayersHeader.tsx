@@ -36,7 +36,7 @@ export default function PlayersHeader({
   );
 
   return (
-    <div className="sticky top-0 z-10 bg-[#F4F4F5]">
+    <div className="sticky top-0 z-10 bg-white">
       <div className="px-8 py-6">
         <div className="flex items-center justify-between">
           <div>

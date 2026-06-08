@@ -305,7 +305,7 @@ export default function LibraryAudioClient() {
   // deleteEdit removed — deletion handled directly via handleAudioAction
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden bg-[#F4F4F5]">
+    <div className="flex-1 flex flex-col overflow-hidden bg-white">
       <AudioHeader
         colsOpen={colsOpen}
         setColsOpen={setColsOpen}

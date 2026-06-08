@@ -227,7 +227,7 @@ export default function SettingsClient() {
   }, []);
 
   return (
-    <div className="flex-1 overflow-auto bg-[#F4F4F5]">
+    <div className="flex-1 overflow-auto bg-white">
       <div className="">
         <SettingsHeader
           tabs={TABS}

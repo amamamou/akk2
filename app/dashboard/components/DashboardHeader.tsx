@@ -18,7 +18,7 @@ export default function DashboardHeader({ stats, showStats = true }: { stats: Qu
 	const displayName = u?.name || u?.email || "there";
 
 	return (
-		<div className="mt-6 top-0 z-10 bg-[#F4F4F5]">
+		<div className="mt-6 top-0 z-10 ">
 			<div className="px-4 py-6">
 				{/* Top row: Title + actions */}
 				<div className="flex items-center justify-between gap-4 mb-5">

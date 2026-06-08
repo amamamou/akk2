@@ -9,12 +9,12 @@ import { useAuth } from "@/app/context/AuthContext";
 export default function Navbar() {
   const { user } = useAuth();
   return (
-    <header className="h-[76px] bg-[#F4F4F5] px-5">
+    <header className="h-[76px] bg-white px-5">
       <div className="grid h-full grid-cols-[300px_1fr_340px] items-center">
 
         {/* LOGO CAPSULE */}
         <div className="justify-self-start">
-          <div className="flex items-center gap-3 rounded-full bg-white px-4 py-2">
+          <div className="flex items-center gap-3 rounded-full bg-[#F4F4F5] px-4 py-2">
 
             <div className="relative h-8 w-8 overflow-hidden rounded-lg shrink-0 bg-linear-to-br from-gray-100 to-gray-50 flex items-center justify-center">
               <Image
@@ -36,7 +36,7 @@ export default function Navbar() {
 
         {/* CENTER NAV CAPSULE */}
         <div className="flex justify-center">
-          <nav className="flex items-center rounded-full bg-white p-1">
+          <nav className="flex items-center rounded-full bg-[#F4F4F5] p-1">
 
             <NavItem href="/dashboard">Overview</NavItem>
             <NavItem href="/schedule">Schedule</NavItem>
@@ -58,7 +58,7 @@ export default function Navbar() {
         <div className="flex items-center justify-end gap-3">
 
           {/* LANGUAGE SELECTOR */}
-          <div className="flex items-center gap-2 rounded-full bg-white px-2 py-1">
+          <div className="flex items-center gap-2 rounded-full bg-[#F4F4F5] px-2 py-1">
             <button
               type="button"
               aria-label="Switch to English"
@@ -138,7 +138,7 @@ function UserProfile() {
   const avatar = u?.avatar || "https://i.pravatar.cc/40";
 
   return (
-    <div className="flex items-center gap-3 rounded-full bg-white px-3 py-1">
+    <div className="flex items-center gap-3 rounded-full bg-[#F4F4F5] px-3 py-1">
     {typeof avatar === "string" && (avatar.startsWith("http://") || avatar.startsWith("https://")) ? (
   // eslint-disable-next-line @next/next/no-img-element
   <img src={avatar} alt="" className="h-8 w-8 rounded-full object-cover" />

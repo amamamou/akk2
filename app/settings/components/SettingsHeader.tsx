@@ -64,8 +64,8 @@ export default function SettingsHeader({
   const activeLabel = tabs.find((t) => t.key === activeTab)?.label ?? "";
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden bg-[#F4F4F5]">
-      <div className="sticky top-0 z-10 bg-[#F4F4F5]">
+    <div className="flex-1 flex flex-col overflow-hidden bg-white">
+      <div className="sticky top-0 z-10 bg-white">
         <div className="px-8 py-6">
           <div className="flex items-center justify-between">
             <div>

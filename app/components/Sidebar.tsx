@@ -24,10 +24,10 @@ export default function Sidebar() {
   const roleCandidate = (user as { role?: unknown } | undefined)?.role;
   const isAdmin = typeof roleCandidate === "string" && /admin/i.test(roleCandidate);
   return (
-    <aside className="w-[76px] h-full bg-[#F4F4F5] flex flex-col items-center py-4">
+    <aside className="w-[76px] h-full bg-white flex flex-col items-center py-4">
 
       {/* TOP CAPSULE */}
-      <div className="bg-white rounded-full px-2 py-2 flex flex-col items-center gap-2">
+      <div className="bg-[#F4F4F5] rounded-full px-2 py-2 flex flex-col items-center gap-2">
         <SidebarButton
           icon={<SunDim size={16} strokeWidth={1.9} />}
         />
@@ -38,7 +38,7 @@ export default function Sidebar() {
       </div>
 
       {/* CENTER CAPSULE */}
-      <div className="mt-6 bg-white rounded-full px-2.5 py-3 flex flex-col items-center gap-2">
+      <div className="mt-6 bg-[#F4F4F5] rounded-full px-2.5 py-3 flex flex-col items-center gap-2">
         <SidebarButton
           href="/dashboard"
           icon={<LayoutDashboard size={15} strokeWidth={1.9} />}
@@ -83,7 +83,7 @@ export default function Sidebar() {
       </div>
 
       {/* BOTTOM CAPSULE */}
-      <div className="mt-auto bg-white rounded-full px-2 py-2 flex flex-col items-center gap-2">
+      <div className="mt-auto bg-[#F4F4F5] rounded-full px-2 py-2 flex flex-col items-center gap-2">
         <SidebarButton
           icon={
             <LogOut

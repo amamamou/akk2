@@ -414,8 +414,8 @@ export default function AnalyticsClient() {
 
   if (isLoading) {
     return (
-      <div className="flex-1 flex flex-col overflow-hidden bg-[#F4F4F5]">
-        <div className="sticky top-0 z-10 bg-[#F4F4F5]">
+      <div className="flex-1 flex flex-col overflow-hidden bg-white">
+        <div className="sticky top-0 z-10 bg-white">
           <div className="px-8 py-6">
             <div className="flex items-center justify-between">
               <div>
@@ -505,7 +505,7 @@ export default function AnalyticsClient() {
           </div>
         </div>
 
-        <div className="flex-1 overflow-auto bg-[#F4F4F5]">
+        <div className="flex-1 overflow-auto bg-white">
           <div className="px-6 py-6">
             {/* Quick stats skeleton row */}
             <div className="mb-6">
@@ -540,7 +540,7 @@ export default function AnalyticsClient() {
   }
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden bg-[#F4F4F5]">
+    <div className="flex-1 flex flex-col overflow-hidden bg-white">
       <div className="sticky top-0 z-10 ] ">
         <div className="px-8 py-6">
           <div className="flex items-center justify-between">

@@ -488,7 +488,7 @@ export default function PlayersClient() {
   );
 
    return (
-     <div className="flex-1 flex flex-col overflow-hidden bg-[#F4F4F5]">
+     <div className="flex-1 flex flex-col overflow-hidden bg-white">
        <PlayersHeader
          view={view}
          onToggleView={(v) => setView(v)}

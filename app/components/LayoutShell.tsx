@@ -25,7 +25,7 @@ export default function LayoutShell({
   <div className="flex flex-1 overflow-hidden">
         <SidebarWrapper />
 
-        <main className="flex-1 overflow-auto bg-[#F4F4F5]">
+        <main className="flex-1 overflow-auto bg-white">
           {children}
         </main>
       </div>
