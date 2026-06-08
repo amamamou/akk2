@@ -227,105 +227,103 @@ export default function SettingsClient() {
   }, []);
 
   return (
-    <div className="flex-1 overflow-auto bg-[#F4F4F5]">
-      <div className="">
-        <SettingsHeader
-          tabs={TABS}
-          activeTab={activeTab}
-          onTabChange={(key) => setActiveTab(key)}
-          dirty={dirty}
-          onCancel={() => {
-            setFirstName(initialProfile.firstName);
-            setLastName(initialProfile.lastName);
-            setEmail(initialProfile.email);
-            setRole(initialProfile.role);
-            setCountry(initialProfile.country);
-            setTimezone(initialProfile.timezone);
-            setBio(initialProfile.bio);
-            setAvatar(initialProfile.avatar ?? null);
+    <div className="flex-1 overflow-auto bg-white">
+      <SettingsHeader
+        tabs={TABS}
+        activeTab={activeTab}
+        onTabChange={(key) => setActiveTab(key)}
+        dirty={dirty}
+        onCancel={() => {
+          setFirstName(initialProfile.firstName);
+          setLastName(initialProfile.lastName);
+          setEmail(initialProfile.email);
+          setRole(initialProfile.role);
+          setCountry(initialProfile.country);
+          setTimezone(initialProfile.timezone);
+          setBio(initialProfile.bio);
+          setAvatar(initialProfile.avatar ?? null);
+          setDirty(false);
+        }}
+        onSave={() => {
+          void (async () => {
+            const profile: UserProfile = {
+              firstName,
+              lastName,
+              email,
+              role,
+              country,
+              timezone,
+              bio,
+              avatar,
+            };
+
+            const isAvatarUrl =
+              typeof profile.avatar === "string" &&
+              (profile.avatar.startsWith("http") || profile.avatar.startsWith("/"));
+
+            try {
+              await getApiClient().updateUserProfile({
+                firstName: profile.firstName,
+                lastName: profile.lastName,
+                country: profile.country,
+                timezone: profile.timezone,
+                bio: profile.bio,
+                profilePhotoUrl: isAvatarUrl ? profile.avatar : profile.avatar ?? null,
+              });
+            } catch (err) {
+              console.error("Failed to save profile to server", err);
+            }
+
+            persistUserProfileToStorage({
+              firstName: profile.firstName,
+              lastName: profile.lastName,
+              email: profile.email,
+              avatar: isAvatarUrl ? profile.avatar : null,
+            });
+
+            dispatchUserProfileUpdated({
+              firstName: profile.firstName,
+              lastName: profile.lastName,
+              role: profile.role,
+              avatar: isAvatarUrl ? profile.avatar : null,
+            });
+
+            setInitialProfile(profile);
             setDirty(false);
-          }}
-          onSave={() => {
-            void (async () => {
-              const profile: UserProfile = {
-                firstName,
-                lastName,
-                email,
-                role,
-                country,
-                timezone,
-                bio,
-                avatar,
-              };
+          })();
+        }}
+      />
 
-              const isAvatarUrl =
-                typeof profile.avatar === "string" &&
-                (profile.avatar.startsWith("http") || profile.avatar.startsWith("/"));
-
-              try {
-                await getApiClient().updateUserProfile({
-                  firstName: profile.firstName,
-                  lastName: profile.lastName,
-                  country: profile.country,
-                  timezone: profile.timezone,
-                  bio: profile.bio,
-                  profilePhotoUrl: isAvatarUrl ? profile.avatar : profile.avatar ?? null,
-                });
-              } catch (err) {
-                console.error("Failed to save profile to server", err);
-              }
-
-              persistUserProfileToStorage({
-                firstName: profile.firstName,
-                lastName: profile.lastName,
-                email: profile.email,
-                avatar: isAvatarUrl ? profile.avatar : null,
-              });
-
-              dispatchUserProfileUpdated({
-                firstName: profile.firstName,
-                lastName: profile.lastName,
-                role: profile.role,
-                avatar: isAvatarUrl ? profile.avatar : null,
-              });
-
-              setInitialProfile(profile);
-              setDirty(false);
-            })();
-          }}
-        />
-
-        <div className="px-6 py-6">
-          <div className="bg-white rounded-[28px] border border-gray-100 shadow-[0_8px_30px_rgba(0,0,0,0.04)] flex flex-col min-h-[calc(100vh-220px)] overflow-hidden">
-            <div className="p-8 flex-1 overflow-auto">
-              {activeTab === "my-details" ? (
-                <MyDetailsTab
-                  initial={initialProfile}
-                  firstName={firstName}
-                  lastName={lastName}
-                  email={email}
-                  role={role}
-                  country={country}
-                  timezone={timezone}
-                  bio={bio}
-                  countries={countries}
-                  avatar={avatar}
-                  setFirstName={setFirstName}
-                  setLastName={setLastName}
-                  setEmail={setEmail}
-                  setRole={setRole}
-                  setCountry={setCountry}
-                  setTimezone={setTimezone}
-                  setBio={setBio}
-                  setAvatar={setAvatar}
-                  setDirty={setDirty}
-                />
-              ) : activeTab === "plan" ? (
-                <PlanTab />
-              ) : (
-                <BillingTab />
-              )}
-            </div>
+      <div className="px-8 py-8">
+        <div className="bg-white rounded-lg border border-[#e5e5e5] shadow-md flex flex-col min-h-[calc(100vh-300px)] overflow-hidden">
+          <div className="p-8 flex-1 overflow-auto">
+            {activeTab === "my-details" ? (
+              <MyDetailsTab
+                initial={initialProfile}
+                firstName={firstName}
+                lastName={lastName}
+                email={email}
+                role={role}
+                country={country}
+                timezone={timezone}
+                bio={bio}
+                countries={countries}
+                avatar={avatar}
+                setFirstName={setFirstName}
+                setLastName={setLastName}
+                setEmail={setEmail}
+                setRole={setRole}
+                setCountry={setCountry}
+                setTimezone={setTimezone}
+                setBio={setBio}
+                setAvatar={setAvatar}
+                setDirty={setDirty}
+              />
+            ) : activeTab === "plan" ? (
+              <PlanTab />
+            ) : (
+              <BillingTab />
+            )}
           </div>
         </div>
       </div>

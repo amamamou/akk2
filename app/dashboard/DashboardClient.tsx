@@ -35,9 +35,6 @@ function mapPlayerStatus(players: PlayerInfo[]): PlayerStatus[] {
   return players.map((player, index) => {
     const currentTrack = player.nowPlaying?.title || player.playlist?.[player.playlistIndex]?.title || "Idle";
     const duration = player.nowPlaying?.duration || player.playlist?.[player.playlistIndex]?.duration || 180;
-    // Derive online/offline from lastSeen if available. Treat anything within
-    // the last 2 minutes as online; otherwise offline. This prevents the UI
-    // from showing random/hardcoded statuses.
     const lastSeen = player.lastSeen ? new Date(player.lastSeen).getTime() : 0;
     const isOnline = lastSeen && Date.now() - lastSeen <= 2 * 60 * 1000;
     return {
@@ -70,7 +67,6 @@ function mapUpcomingBroadcasts(schedules: ScheduleEntry[], players: PlayerInfo[]
 }
 
 function mapRecentActivity(schedules: ScheduleEntry[], players: PlayerInfo[], activityLogs?: ActivityLogEntry[]): ActivityItem[] {
-  // If we have activity logs from the API, use those first
   if (activityLogs && activityLogs.length > 0) {
     return activityLogs.slice(0, 5).map((log) => {
       const relTime = relativeTime(log.createdAt);
@@ -81,7 +77,6 @@ function mapRecentActivity(schedules: ScheduleEntry[], players: PlayerInfo[], ac
       else if (log.action.includes("started")) type = "connect";
       else if (log.action.includes("completed")) type = "complete";
 
-      // Ensure detail is a string
       const detailsObj = log.details || {};
       const detailString = typeof detailsObj === 'string'
         ? detailsObj
@@ -98,7 +93,6 @@ function mapRecentActivity(schedules: ScheduleEntry[], players: PlayerInfo[], ac
     });
   }
 
-  // Fall back to schedules if no activity logs
   const playersById = new Map(players.map((player) => [player.id, player]));
   return [...schedules]
     .sort((a, b) => new Date(b.startsAt).getTime() - new Date(a.startsAt).getTime())
@@ -117,8 +111,6 @@ function mapRecentActivity(schedules: ScheduleEntry[], players: PlayerInfo[], ac
 export default function DashboardClient() {
   const apiClient = getApiClient();
   const [players, setPlayers] = useState<PlayerInfo[]>([]);
-  // _media is reserved for future use (fetched media) — keep setter for API response
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [_media, setMedia] = useState<MediaInfo[]>([]);
   const [schedules, setSchedules] = useState<ScheduleEntry[]>([]);
   const [clients, setClients] = useState<ClientInfo[]>([]);
@@ -134,14 +126,12 @@ export default function DashboardClient() {
          setIsLoading(true);
          setError(null);
          
-         // Fetch players, media, schedules, and clients in parallel
          const [playersRes, mediaRes, schedulesRes, clientsRes, healthRes, activityRes] = await Promise.all([
            apiClient.listPlayers().catch(() => ({ ok: false, players: [] })),
            apiClient.listMedia().catch(() => ({ ok: false, media: [] })),
            apiClient.listSchedules().catch(() => ({ ok: false, schedules: [] })),
            apiClient.listClients().catch(() => ({ ok: false, clients: [] })),
            apiClient.getSystemHealth().catch(() => null),
-           // Try the new dashboard activity endpoint first, fall back to list activity logs
            apiClient.getDashboardActivity(1, 10)
              .catch(() => apiClient.listActivityLogs(10))
              .catch(() => ({ ok: false, activities: [], activityLogs: [] })),
@@ -155,7 +145,6 @@ export default function DashboardClient() {
          setClients(clientsRes?.clients || []);
          setSystemHealth(healthRes);
          
-         // Handle both activity response formats
          const activities = activityRes?.activities || activityRes?.activityLogs || [];
          setActivityLogs(activities);
        } catch (err: any) {
@@ -170,9 +159,6 @@ export default function DashboardClient() {
 
      load();
 
-     // Re-fetch players every 30 seconds so the live status updates without a
-     // full page refresh. We only refresh the players list on interval to
-     // avoid reloading media/schedules unnecessarily.
      const intervalId = typeof window !== "undefined" ? window.setInterval(async () => {
        try {
          const playersRes = await apiClient.listPlayers();
@@ -203,7 +189,7 @@ export default function DashboardClient() {
     const activePlayers = players.filter((player) => {
       if (!player.lastSeen) return false;
       const last = new Date(player.lastSeen).getTime();
-      return Date.now() - last <= 2 * 60 * 1000; // active within last 2 minutes
+      return Date.now() - last <= 2 * 60 * 1000;
     }).length;
 
     const healthStatus = systemHealth?.ok ? "Healthy" : "Check status";
@@ -223,54 +209,41 @@ export default function DashboardClient() {
 
 if (isLoading) {
   return (
-    <div className="flex-1 flex flex-col overflow-hidden bg-[#F4F4F5]">
-      <div className="sticky top-0 z-10 bg-[#F4F4F5]">
-        <div className="px-8 py-6">
-          <div className="flex items-center justify-between">
+    <div className="flex-1 flex flex-col overflow-hidden bg-white">
+      <div className="sticky top-20 z-10 bg-white border-b border-[#e5e5e5]">
+        <div className="px-8 py-8">
+          <div className="flex items-center justify-between mb-6">
             <div>
-              <div className="w-56 h-8 bg-gray-200 rounded-md" aria-hidden="true" />
-              <div className="w-96 h-4 bg-gray-200 rounded-md mt-2" aria-hidden="true" />
+              <div className="w-56 h-10 bg-[#f5f5f5] rounded-lg" aria-hidden="true" />
+              <div className="w-96 h-5 bg-[#f5f5f5] rounded-lg mt-3" aria-hidden="true" />
             </div>
-
             <div className="flex items-center gap-3 shrink-0">
-              <div className="hidden sm:block">
-                <div className="w-72 h-12 bg-gray-200 rounded-2xl border border-gray-200" aria-hidden="true" />
-              </div>
-              <div className="w-36 h-12 bg-gray-200 rounded-2xl border border-gray-200" aria-hidden="true" />
+              <div className="hidden sm:block w-72 h-11 bg-[#f5f5f5] rounded-lg" aria-hidden="true" />
+              <div className="w-36 h-11 bg-[#A473FF]/20 rounded-lg" aria-hidden="true" />
             </div>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 animate-pulse">
+            {[...Array(4)].map((_, i) => (
+              <div key={i} className="h-32 bg-[#f5f5f5] rounded-lg border border-[#e5e5e5]" aria-hidden="true" />
+            ))}
           </div>
         </div>
       </div>
 
-      <div className="flex-1 overflow-auto bg-[#F4F4F5]">
-        <div className="px-6 py-6">
-
-          {/* Quick stats skeleton row */}
-          <div className="mb-6">
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 animate-pulse">
-              <div className="h-20 bg-gray-200 rounded-lg border border-gray-200" aria-hidden="true" />
-              <div className="h-20 bg-gray-200 rounded-lg border border-gray-200" aria-hidden="true" />
-              <div className="h-20 bg-gray-200 rounded-lg border border-gray-200" aria-hidden="true" />
-              <div className="h-20 bg-gray-200 rounded-lg border border-gray-200" aria-hidden="true" />
-            </div>
-          </div>
-
-          {/* Skeleton / wireframe grid */}
+      <div className="flex-1 overflow-auto">
+        <div className="px-8 py-8">
           <div className="animate-pulse">
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               <div className="lg:col-span-2 space-y-6">
-                <div className="h-40 bg-gray-200 rounded-[12px] border border-gray-200" aria-hidden="true" />
-                <div className="h-60 bg-gray-200 rounded-[12px] border border-gray-200" aria-hidden="true" />
+                <div className="h-56 bg-[#f5f5f5] rounded-lg border border-[#e5e5e5]" aria-hidden="true" />
+                <div className="h-64 bg-[#f5f5f5] rounded-lg border border-[#e5e5e5]" aria-hidden="true" />
               </div>
-
               <div className="space-y-6">
-                <div className="h-24 bg-gray-200 rounded-[12px] border border-gray-200" aria-hidden="true" />
-                <div className="h-40 bg-gray-200 rounded-[12px] border border-gray-200" aria-hidden="true" />
-                <div className="h-20 bg-gray-200 rounded-[12px] border border-gray-200" aria-hidden="true" />
+                <div className="h-28 bg-[#f5f5f5] rounded-lg border border-[#e5e5e5]" aria-hidden="true" />
+                <div className="h-44 bg-[#f5f5f5] rounded-lg border border-[#e5e5e5]" aria-hidden="true" />
               </div>
             </div>
           </div>
-
         </div>
       </div>
     </div>
@@ -278,16 +251,16 @@ if (isLoading) {
 }
 
   return (
-    <div className="flex-1 overflow-auto bg-[#F4F4F5]">
+    <div className="flex-1 overflow-auto bg-white">
       {error && (
-        <div className="mx-8 mt-6 p-3 rounded-lg bg-red-50 border border-red-200 text-sm text-red-800">
+        <div className="mx-8 mt-8 p-4 rounded-lg bg-red-50 border border-red-200 text-sm text-red-700 font-medium">
           {error}
         </div>
       )}
 
-  <DashboardHeader stats={quickStats} showStats={true} />
+      <DashboardHeader stats={quickStats} showStats={true} />
 
-      <div className="p-4 ">
+      <div className="px-8 py-8">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 space-y-6">
             <LivePlayerStatus players={livePlayers} />
