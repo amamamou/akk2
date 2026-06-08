@@ -52,11 +52,9 @@ export default function ScheduleToolbar({
             <p className="mt-1 text-sm text-gray-500">
               {viewMode === "month" ? "Calendar month view" : viewMode === "hour" ? "Hour-by-hour schedule view" : "Overview of the current week"}
             </p>
-          </div>
 
-          <div className="flex items-center gap-4">
             {showWorkspaceSelector && (
-              <div className="flex items-center gap-2">
+              <div className="mt-3 flex items-center gap-2">
                 <label
                   htmlFor="schedule-workspace-client"
                   className="text-xs font-semibold uppercase tracking-wide text-gray-500 shrink-0"
@@ -77,6 +75,10 @@ export default function ScheduleToolbar({
                 </select>
               </div>
             )}
+          </div>
+
+          <div className="flex items-center gap-4">
+            
 
             <div
               className="inline-flex rounded-lg border border-gray-200 bg-gray-50 p-0.5"

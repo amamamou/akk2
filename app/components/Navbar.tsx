@@ -40,17 +40,16 @@ export default function Navbar() {
 
             <NavItem href="/dashboard">Overview</NavItem>
             <NavItem href="/schedule">Schedule</NavItem>
+            {/* Admin-only: Clients (show for super admins) - placed after Schedule */}
+            {(() => {
+              const role = (user as { role?: string } | undefined)?.role || "";
+              return (user && String(role).toUpperCase() === "SUPER_ADMIN") ? <NavItem href="/clients">Clients</NavItem> : null;
+            })()}
             <NavItem href="/players">Players</NavItem>
             <NavItem href="/library/playlists">Playlists</NavItem>
             <NavItem href="/library/audio">Audios</NavItem>
             <NavItem href="/analytics">Analytics</NavItem>
             <NavItem href="/settings">Settings</NavItem>
-
-            {/* Admin-only: Clients (show for super admins) */}
-            {(() => {
-              const role = (user as { role?: string } | undefined)?.role || "";
-              return (user && String(role).toUpperCase() === "SUPER_ADMIN") ? <NavItem href="/clients">Clients</NavItem> : null;
-            })()}
 
           </nav>
         </div>

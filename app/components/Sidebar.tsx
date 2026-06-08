@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter, usePathname } from "next/navigation";
+import { useAuth } from "@/app/context/AuthContext";
 import {
   SunDim,
   MoonStar,
@@ -9,11 +10,19 @@ import {
   CalendarDays,
   Speaker,
   ListMusic,
+  Music,
   BarChart3,
   Settings,
+  Users,
 } from "lucide-react";
 
 export default function Sidebar() {
+  const { logout, user } = useAuth();
+  const router = useRouter();
+
+  // Determine admin role from the auth user without using `any` or try/catch.
+  const roleCandidate = (user as { role?: unknown } | undefined)?.role;
+  const isAdmin = typeof roleCandidate === "string" && /admin/i.test(roleCandidate);
   return (
     <aside className="w-[76px] h-full bg-[#F4F4F5] flex flex-col items-center py-4">
 
@@ -40,6 +49,13 @@ export default function Sidebar() {
           icon={<CalendarDays size={15} strokeWidth={1.9} />}
         />
 
+        {isAdmin && (
+          <SidebarButton
+            href="/clients"
+            icon={<Users size={15} strokeWidth={1.9} />}
+          />
+        )}
+
         <SidebarButton
           href="/players"
           icon={<Speaker size={15} strokeWidth={1.9} />}
@@ -48,6 +64,11 @@ export default function Sidebar() {
         <SidebarButton
           href="/library/playlists"
           icon={<ListMusic size={15} strokeWidth={1.9} />}
+        />
+
+        <SidebarButton
+          href="/library/audio"
+          icon={<Music size={15} strokeWidth={1.9} />}
         />
 
         <SidebarButton
@@ -71,7 +92,29 @@ export default function Sidebar() {
               className="scale-x-[-1]"
             />
           }
-          // optional: take user to login on logout click - left blank intentionally
+          onClick={() => {
+            const ok = confirm("Sign out?");
+            if (!ok) return;
+            try {
+              logout();
+            } catch {
+              // fallback: remove a set of known keys then redirect to login
+              try {
+                const keys = [
+                  'akou_access_token','akou_tenant_id','akou_tenant_slug','akou_user','akou_user_email',
+                  'fastapi_token','fastapi_tenant_id','fastapi_tenant_slug','fastapi_user','fastapi_user_email'
+                ];
+                keys.forEach((k) => localStorage.removeItem(k));
+              } catch {
+                // noop
+              }
+              try {
+                router.push('/login');
+              } catch {
+                window.location.href = '/login';
+              }
+            }
+          }}
         />
       </div>
 
@@ -83,10 +126,12 @@ function SidebarButton({
   icon,
   active = false,
   href,
+  onClick,
 }: {
   icon: React.ReactNode;
   active?: boolean;
   href?: string;
+  onClick?: (e?: React.MouseEvent) => void;
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -95,6 +140,15 @@ function SidebarButton({
     active || (href ? pathname === href || pathname?.startsWith(href + "/") : false);
 
   const handleClick = (e: React.MouseEvent) => {
+    if (onClick) {
+      try {
+        onClick(e);
+      } catch {
+        // ignore
+      }
+      return;
+    }
+
     if (!href) return;
     e.preventDefault();
     try {

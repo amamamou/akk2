@@ -107,12 +107,7 @@ export default function SettingsHeader({
               }}
             />
 
-            {/* Active underline */}
-            <div
-              className="absolute bottom-0 h-[2px] bg-gray-900 transition-all duration-300 ease-out"
-              style={activeStyle}
-            />
-
+         
             <div className="relative flex space-x-[6px] items-center">
               {tabs.map((t, index) => {
                 const isActive = activeTab === t.key;
@@ -128,10 +123,10 @@ export default function SettingsHeader({
                       onTabChange(t.key);
                     }}
                     className={`px-4 py-2 text-sm font-medium whitespace-nowrap transition-colors duration-300 h-10 flex items-center justify-center ${
-                      isActive
-                        ? "text-gray-900"
-                        : "text-gray-600 hover:text-gray-900"
-                    }`}
+  isActive
+    ? "text-gray-900"
+    : "text-gray-400 hover:text-gray-600"
+}`}
                   >
                     {t.label}
                   </button>

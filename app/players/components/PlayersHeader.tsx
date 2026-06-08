@@ -65,14 +65,21 @@ export default function PlayersHeader({
             <div className="flex items-center gap-3">
               <ViewToggle view={view} onChange={onToggleView} />
               {canAddPlayer && (
-                <button
-                  type="button"
-                  onClick={onAdd}
-                  className="inline-flex items-center gap-2 rounded-md bg-[#F3F4F6] text-gray-900 px-4 py-2 text-sm font-medium hover:bg-[#E7E7E7]"
-                >
-                  <Plus size={16} />
-                  <span>Add player</span>
-                </button>
+        <button
+  type="button"
+  onClick={onAdd}
+  className="group inline-flex items-center gap-3 h-12 px-5 bg-white text-gray-900 font-medium text-sm rounded-2xl border border-gray-100 shadow-[0_8px_30px_rgba(0,0,0,0.04)] transition-all hover:shadow-lg hover:translate-y-0.5 cursor-pointer"
+>
+  <span className="inline-flex items-center justify-center transition-colors">
+    <Plus
+      size={16}
+      strokeWidth={1.9}
+      className="text-zinc-500 group-hover:text-[#A473FF] transition-colors"
+    />
+  </span>
+
+  <span>Add player</span>
+</button>
               )}
             </div>
           </div>

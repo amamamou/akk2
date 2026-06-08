@@ -19,7 +19,7 @@ export default function AudioHeader({
   setUploadOpen: React.Dispatch<React.SetStateAction<boolean>>;
 }) {
   return (
-    <div className="flex-1 flex flex-col overflow-hidden bg-[#F4F4F5]">
+    <div className="flex-1 flex flex-col bg-[#F4F4F5]">
       <div className="sticky top-0 z-10 bg-[#F4F4F5]">
         <div className="px-8 py-6">
           <div className="flex items-center justify-between">

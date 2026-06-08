@@ -639,14 +639,8 @@ export default function AnalyticsClient() {
             </div>
           )}
 
-          {!error && logs.length === 0 && (
-            <div className="p-3 rounded-2xl bg-amber-50 border border-amber-200 text-sm text-amber-900">
-              No playback logs returned for this workspace. API calls are active (
-              <code className="text-xs">/analytics/playback-logs</code>,{" "}
-              <code className="text-xs">/analytics/system-health</code>
-              ).{isSuperAdmin ? " Select a French demo client above or re-run seed SQL." : " Confirm PlaybackLog rows exist for your tenant."}
-            </div>
-          )}
+          {/* Removed the global 'No playback logs returned' banner so the page shows KPIs/charts immediately.
+              The PlaybackTable already renders a contextual 'No playback logs for this filter.' row when appropriate. */}
 
           <KpiGrid stats={kpiCards} />
 
