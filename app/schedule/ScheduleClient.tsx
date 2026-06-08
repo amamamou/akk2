@@ -3,7 +3,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { DndProvider } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
-import { AlertCircle, Loader } from "lucide-react";
+import { AlertCircle } from "lucide-react";
 import { cn } from "@/utils/cn";
 import ScheduleToolbar from "./components/ScheduleToolbar";
 import CalendarCell from "./components/CalendarCell";
@@ -753,7 +753,7 @@ export default function ScheduleClientPage() {
     segmentRooms: { id: string; name: string }[],
     segmentTenantId?: string
   ) => (
-    <div className="p-2">
+    <div className="min-w-0">
       <div className="grid grid-cols-7 border-b border-gray-200 bg-gray-50 text-xs font-semibold text-gray-600 uppercase">
         {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => (
           <div key={d} className="px-2 py-2 text-center">
@@ -895,18 +895,63 @@ export default function ScheduleClientPage() {
 
   if (authLoading || isLoading) {
     return (
-      <div className="flex-1 flex items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <Loader className="h-8 w-8 animate-spin text-gray-400 mx-auto mb-3" />
-          <p className="text-sm text-gray-600">Loading schedule...</p>
+      <DndProvider backend={HTML5Backend}>
+        <div className="flex-1 flex flex-col overflow-hidden">
+          <ScheduleToolbar
+            query={query}
+            onQueryChange={setQuery}
+            selectedRoom={selectedRoom}
+            onChangeRoom={setSelectedRoom}
+            selectedDay={selectedDay}
+            onChangeDay={setSelectedDay}
+            viewMode={viewMode}
+            onChangeViewMode={setViewMode}
+            rooms={activeRooms}
+            days={weekDays}
+            showWorkspaceSelector={isSuperAdmin}
+            workspaceClients={workspaceClients}
+            selectedWorkspaceClientId={selectedWorkspaceClientId}
+            onChangeWorkspaceClient={handleWorkspaceClientChange}
+          />
+
+          <div className="px-6 py-6">
+            <div className="bg-white rounded-[28px] border border-gray-100 shadow-[0_8px_30px_rgba(0,0,0,0.04)] flex flex-col min-h-[calc(100vh-220px)] overflow-hidden">
+              <div className="flex-1 overflow-auto p-6">
+                <div className="animate-pulse">
+                  {viewMode === "month" ? (
+                    <>
+                      <div className="grid grid-cols-7 gap-3 mb-4">
+                        {Array.from({ length: 7 }).map((_, i) => (
+                          <div key={i} className="h-8 bg-gray-200 rounded" />
+                        ))}
+                      </div>
+                      <div className="grid grid-cols-7 gap-3">
+                        {Array.from({ length: 4 * 7 }).map((_, i) => (
+                          <div key={i} className="h-24 bg-gray-200 rounded" />
+                        ))}
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="space-y-4">
+                        {Array.from({ length: 8 }).map((_, i) => (
+                          <div key={i} className="h-14 bg-gray-200 rounded" />
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
-      </div>
+      </DndProvider>
     );
   }
 
   return (
     <DndProvider backend={HTML5Backend}>
-      <div className="flex-1 flex flex-col overflow-hidden bg-white">
+      <div className="flex-1 flex flex-col overflow-hidden">
         <ScheduleToolbar
           query={query}
           onQueryChange={setQuery}
@@ -924,36 +969,40 @@ export default function ScheduleClientPage() {
           onChangeWorkspaceClient={handleWorkspaceClientChange}
         />
 
-        <div className="flex-1 overflow-auto">
-          {error && (
-            <div className="mx-4 my-2 p-2 bg-red-50 border border-red-200 rounded text-sm text-red-800 flex gap-2">
-              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-              <span>{error}</span>
-              <button
-                type="button"
-                className="ml-auto text-xs underline"
-                onClick={() => setError(null)}
-              >
-                Dismiss
-              </button>
-            </div>
-          )}
-
-          {isSuperAdmin && !workspaceTenantId && !isAllClientsWorkspace ? (
-            <div className="flex items-center justify-center h-full min-h-[240px]">
-              <div className="text-center max-w-md px-4">
-                <h2 className="font-semibold text-gray-900">
-                  Select a client workspace
-                </h2>
-                <p className="text-sm text-gray-500 mt-1">
-                  Choose an active client or All Clients from the dropdown above.
-                </p>
+      <div className="px-6 py-6">
+        <div className="bg-white rounded-[28px] border border-gray-100 shadow-[0_8px_30px_rgba(0,0,0,0.04)] flex flex-col min-h-[calc(100vh-220px)] overflow-hidden">
+          <div className="flex-1 overflow-auto">
+            {error && (
+              <div className="mx-4 my-2 p-2 bg-red-50 border border-red-200 rounded text-sm text-red-800 flex gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                <span>{error}</span>
+                <button
+                  type="button"
+                  className="ml-auto text-xs underline"
+                  onClick={() => setError(null)}
+                >
+                  Dismiss
+                </button>
               </div>
-            </div>
-          ) : (
-            renderScheduleBody()
-          )}
+            )}
+
+            {isSuperAdmin && !workspaceTenantId && !isAllClientsWorkspace ? (
+              <div className="flex items-center justify-center h-full min-h-[240px]">
+                <div className="text-center max-w-md px-4">
+                  <h2 className="font-semibold text-gray-900">
+                    Select a client workspace
+                  </h2>
+                  <p className="text-sm text-gray-500 mt-1">
+                    Choose an active client or All Clients from the dropdown above.
+                  </p>
+                </div>
+              </div>
+            ) : (
+              renderScheduleBody()
+            )}
+          </div>
         </div>
+      </div>
 
         <ConfirmDialog
           open={!!pendingDeleteEvent}
