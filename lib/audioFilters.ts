@@ -1,4 +1,4 @@
-import type { AudioItem } from "./../app/library/components/AudioTile";
+import type { AudioItem } from "../app/library/components/AudioTile";
 import { categoryMatchesTag, parseMediaTags } from "@/lib/media-tags";
 
 type Playlist = { id: string; title?: string; trackIds?: string[]; tracks?: string[]; items?: string[] };

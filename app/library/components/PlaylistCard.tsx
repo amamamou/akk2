@@ -33,6 +33,7 @@ export default function PlaylistCard({
   const [menuOpen, setMenuOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [name, setName] = useState(playlist.title);
+  const [coverError, setCoverError] = useState(false);
   const inputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
@@ -80,9 +81,15 @@ export default function PlaylistCard({
         }}
         className={cn("w-full aspect-square rounded-lg overflow-hidden relative bg-gradient-to-br", gradientClass)}
       >
-        {playlist.cover ? (
+        {playlist.cover && !coverError ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={playlist.cover} alt={playlist.title} className="w-full h-full object-cover" />
+          <img
+            src={playlist.cover}
+            alt={playlist.title}
+            // R2 cover link broken/missing → fall back to the gradient + Music glyph below.
+            onError={() => setCoverError(true)}
+            className="w-full h-full object-cover"
+          />
         ) : (
           <div className="w-full h-full flex items-center justify-center bg-black/10 backdrop-blur-sm">
             <Music size={36} className="text-white/70" />
@@ -170,12 +177,16 @@ export default function PlaylistCard({
             {playlist.title}
           </h3>
         )}
-        <div className="mt-1 text-xs text-gray-400">
-          {playlist.trackCount > 0 ? (
-            <span>{playlist.trackCount} {playlist.trackCount === 1 ? "track" : "tracks"}</span>
-          ) : (
-            <span>{playlist.totalDuration}</span>
-          )}
+        <div className="mt-1 text-xs text-gray-400 flex items-center gap-1">
+          <span>
+            {playlist.trackCount} {playlist.trackCount === 1 ? "track" : "tracks"}
+          </span>
+          {playlist.totalDuration ? (
+            <>
+              <span>&middot;</span>
+              <span>{playlist.totalDuration}</span>
+            </>
+          ) : null}
         </div>
       </div>
     </div>

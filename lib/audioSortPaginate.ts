@@ -1,4 +1,4 @@
-import type { AudioItem } from "./../app/library/components/AudioTile";
+import type { AudioItem } from "../app/library/components/AudioTile";
 
 export function sortAndFilterByDate(items: AudioItem[], sortBy: 'added' | 'title' | 'duration', sortDir: 'asc' | 'desc', dateFilterType: 'all' | 'last7' | 'last30' | 'custom', cutoff: number | null, customDate: string | null, singerFilter?: string | null) {
   const arr = items.slice().filter((t) => {

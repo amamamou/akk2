@@ -16,15 +16,17 @@ import {
   Settings,
   Users,
 } from "lucide-react";
-import { ConfirmDialog } from "../components/ConfirmDialog";
+import { ConfirmDialog } from "./ConfirmDialog";
+import { isSuperAdminRole } from "@/lib/rbac";
 
 export default function Sidebar() {
   const { logout, user } = useAuth();
   const router = useRouter();
   const [showLogoutDialog, setShowLogoutDialog] = useState(false);
 
-  const roleCandidate = (user as { role?: unknown } | undefined)?.role;
-  const isAdmin = typeof roleCandidate === "string" && /admin/i.test(roleCandidate);
+  // RBAC: the /clients route is Super Admin only. Use the centralized type-safe helper
+  // instead of a loose /admin/i regex (which would also match CLIENT_ADMIN, etc.).
+  const isAdmin = isSuperAdminRole(user?.role);
 
   const handleLogoutConfirm = () => {
     try {

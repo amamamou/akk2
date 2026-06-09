@@ -6,7 +6,7 @@ import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { ChevronDown, LogOut, Settings } from "lucide-react";
 import { useAuth } from "@/app/context/AuthContext";
-import { ConfirmDialog } from "../components/ConfirmDialog";  
+import { ConfirmDialog } from "./ConfirmDialog";  
 
 export default function Navbar() {
   const { user, logout } = useAuth();

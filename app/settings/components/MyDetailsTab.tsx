@@ -1,8 +1,9 @@
 "use client";
 
-import React, { useRef, useState, useId } from "react";
+import React, { useEffect, useRef, useState, useId } from "react";
 import { UploadCloud, Edit2, Trash, Camera, Loader2 } from "lucide-react";
 import { getApiClient } from "@/lib/api-client";
+import { isSuperAdminRole } from "@/lib/rbac";
 import {
   dispatchUserProfileUpdated,
   persistUserProfileToStorage,
@@ -76,11 +77,23 @@ export default function MyDetailsTab({
   const [photoError, setPhotoError] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  // Set when the avatar URL (often a Cloudflare R2 link) fails to load, so we render the
+  // styled initials fallback instead of a broken-image icon.
+  const [avatarError, setAvatarError] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  // A new/changed avatar source should get a fresh chance to load.
+  useEffect(() => {
+    setAvatarError(false);
+  }, [avatar]);
 
   const gradientId = useId();
 
   const initials = `${(firstName || "").trim().charAt(0)}${(lastName || "").trim().charAt(0)}`.toUpperCase();
+
+  // RBAC: only a Super Admin may change their own role. For everyone else the field is
+  // read-only (the backend also redacts `role` on profile updates as defense-in-depth).
+  const canEditRole = isSuperAdminRole(role);
 
   function notifyAvatarChange(url: string | null) {
     dispatchUserProfileUpdated({
@@ -268,13 +281,23 @@ export default function MyDetailsTab({
                   <div className="relative bg-white rounded-full h-full w-full flex items-center justify-center overflow-hidden shadow-[inset_0_2px_6px_rgba(0,0,0,0.06)]">
                     {uploadingPhoto ? (
                       <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
-                    ) : avatar ? (
+                    ) : avatar && !avatarError ? (
                       isRemoteImageUrl(avatar) ? (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img src={avatar} alt="Profile" className="h-full w-full object-cover" />
+                        <img
+                          src={avatar}
+                          alt="Profile"
+                          onError={() => setAvatarError(true)}
+                          className="h-full w-full object-cover"
+                        />
                       ) : (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img src={avatar} alt="Profile preview" className="h-full w-full object-cover" />
+                        <img
+                          src={avatar}
+                          alt="Profile preview"
+                          onError={() => setAvatarError(true)}
+                          className="h-full w-full object-cover"
+                        />
                       )
                     ) : (
                       <div
@@ -395,11 +418,18 @@ export default function MyDetailsTab({
               </label>
               <input
                 value={role}
+                readOnly={!canEditRole}
+                disabled={!canEditRole}
+                aria-readonly={!canEditRole}
+                title={canEditRole ? undefined : "Role can only be changed by a Super Admin"}
                 onChange={(e) => {
+                  if (!canEditRole) return;
                   setRole(e.target.value);
                   setDirty(true);
                 }}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900/5 focus:border-gray-900"
+                className={`w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900/5 focus:border-gray-900 ${
+                  canEditRole ? "" : "bg-gray-50 text-gray-500 cursor-not-allowed"
+                }`}
               />
             </div>
           </div>

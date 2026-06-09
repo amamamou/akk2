@@ -125,7 +125,7 @@ export default function LibraryAudioClient() {
   const perPageOptions = [5, 10, 20, 50];
 
   // Minimal triage — highly usable essentials only
-  const [sortBy, setSortBy] = useState<'added' | 'title' | 'duration'>('added');
+  const [sortBy, setSortBy] = useState<'added' | 'title' | 'duration'>('title');
   const [sortDir, setSortDir] = useState<'desc' | 'asc'>('desc');
   const [dateFilterType, setDateFilterType] = useState<'all' | 'last7' | 'last30' | 'custom'>('all');
   // custom date selection
