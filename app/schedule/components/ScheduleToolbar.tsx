@@ -1,13 +1,34 @@
 "use client";
-import React from "react";
-import { Search } from "lucide-react";
-import { cn } from "@/utils/cn";
+
+import React, { useState } from "react";
+import {
+  Search,
+  SlidersHorizontal,
+  CalendarDays,
+  CalendarRange,
+  Clock3,
+  Building2,
+  RotateCcw,
+} from "lucide-react";
+import { cn } from "@/lib/utils";
 import type { ScheduleViewMode } from "@/lib/schedule-calendar";
 
-const VIEW_OPTIONS: { mode: ScheduleViewMode; label: string }[] = [
-  { mode: "week", label: "Week View" },
-  { mode: "month", label: "Month View" },
-  { mode: "hour", label: "Hour View" },
+const VIEW_OPTIONS = [
+  {
+    mode: "week" as ScheduleViewMode,
+    label: "Week",
+    icon: CalendarDays,
+  },
+  {
+    mode: "month" as ScheduleViewMode,
+    label: "Month",
+    icon: CalendarRange,
+  },
+  {
+    mode: "hour" as ScheduleViewMode,
+    label: "Hour",
+    icon: Clock3,
+  },
 ];
 
 export default function ScheduleToolbar({
@@ -41,106 +62,207 @@ export default function ScheduleToolbar({
   selectedWorkspaceClientId?: string;
   onChangeWorkspaceClient?: (clientId: string) => void;
 }) {
-  return (
-    <div className="sticky top-0 z-10 bg-white">
-      <div className="px-8 py-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-semibold text-gray-900">
-              {viewMode === "month" ? "Monthly Schedule" : viewMode === "hour" ? "Hourly Schedule" : "Weekly Schedule"}
-            </h1>
-            <p className="mt-1 text-sm text-gray-500">
-              {viewMode === "month" ? "Calendar month view" : viewMode === "hour" ? "Hour-by-hour schedule view" : "Overview of the current week"}
-            </p>
+  const [showFilters, setShowFilters] = useState(false);
 
-            {showWorkspaceSelector && (
-              <div className="mt-3 flex items-center gap-2">
-                <label
-                  htmlFor="schedule-workspace-client"
-                  className="text-xs font-semibold uppercase tracking-wide text-gray-500 shrink-0"
-                >
-                  Select Client Workspace
-                </label>
-                <select
-                  id="schedule-workspace-client"
-                  value={selectedWorkspaceClientId || ""}
-                  onChange={(e) => onChangeWorkspaceClient?.(e.target.value)}
-                  className="text-sm px-3 py-1.5 rounded-md bg-violet-50 border border-violet-100 text-gray-900"
-                >
-                  {(workspaceClients ?? []).map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
-          </div>
+return (
+  <div className="sticky top-0 z-10 bg-white">
+    {/* Header */}
+    <div className="px-8 py-6">
+      <div className="flex items-start justify-between gap-8">
+        <div>
+          <h1 className="text-2xl font-semibold text-gray-900 tracking-tight">
+            {viewMode === "month"
+              ? "Monthly Schedule"
+              : viewMode === "hour"
+              ? "Hourly Schedule"
+              : "Weekly Schedule"}
+          </h1>
+  <div>            </div>
+          <p className="mt-1 text-sm text-gray-500">
+            {viewMode === "month"
+              ? "Calendar month view"
+              : viewMode === "hour"
+              ? "Hour-by-hour schedule view"
+              : "Overview of the current week"}
+          </p>
+        </div>
 
-          <div className="flex items-center gap-4">
-            
+        {/* View Modes */}
+        <div className="hidden lg:flex items-center gap-1 rounded-2xl bg-zinc-100 p-1">
+          {VIEW_OPTIONS.map((opt) => {
+            const Icon = opt.icon;
 
-            <div
-              className="inline-flex rounded-lg border border-gray-200 bg-gray-50 p-0.5"
-              role="group"
-              aria-label="Schedule view mode"
-            >
-              {VIEW_OPTIONS.map((opt) => (
-                <button
-                  key={opt.mode}
-                  type="button"
-                  onClick={() => onChangeViewMode(opt.mode)}
-                  className={cn(
-                    "px-4 py-1.5 text-sm font-medium rounded-md transition-colors",
-                    viewMode === opt.mode
-                      ? "bg-white text-gray-900 shadow-sm border border-gray-200"
-                      : "text-gray-600 hover:text-gray-900"
-                  )}
-                >
-                  {opt.label}
-                </button>
-              ))}
-            </div>
-
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
-              <input
-                aria-label="Search schedule"
-                value={query}
-                onChange={(e) => onQueryChange(e.target.value)}
-                placeholder="Search audio title..."
-                className="pl-9 pr-3 py-1 text-sm rounded-md w-56 bg-gray-50 focus:outline-none"
-              />
-            </div>
-
-            <select
-              value={selectedRoom}
-              onChange={(e) => onChangeRoom(e.target.value)}
-              className="text-sm px-3 py-1.5 rounded-md bg-gray-50 border border-transparent"
-            >
-              <option value="all">All Rooms</option>
-              {rooms.map((r) => (
-                <option key={r.id} value={r.id}>
-                  {r.name}
-                </option>
-              ))}
-            </select>
-
-            <select
-              value={selectedDay}
-              onChange={(e) => onChangeDay(e.target.value)}
-              className="text-sm px-3 py-1.5 rounded-md bg-gray-50 border border-transparent"
-            >
-              <option value="all">All Days</option>
-              {days.map((d) => (
-                <option key={d.short} value={d.short}>
-                  {d.full} ({d.date})
-                </option>
-              ))}
-            </select>
-          </div>
+            return (
+              <button
+                key={opt.mode}
+                type="button"
+                onClick={() => onChangeViewMode(opt.mode)}
+                className={cn(
+                  "flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium transition-all",
+                  viewMode === opt.mode
+                    ? "bg-white text-zinc-950 shadow-sm"
+                    : "text-zinc-500 hover:text-zinc-900"
+                )}
+              >
+                <Icon size={15} />
+                {opt.label}
+              </button>
+            );
+          })}
         </div>
       </div>
     </div>
-  );
+
+
+    {/* Premium Toolbar */}
+    <div className="px-8 py-6">
+      <div
+        className="
+          flex
+          flex-wrap
+          items-center
+          gap-6
+          rounded-2xl
+          
+          border-zinc-200
+          
+        "
+      >
+        {/* Workspace */}
+        {showWorkspaceSelector && (
+          <div className="flex items-center gap-3">
+            <span className="text-sm font-medium text-zinc-500">
+              Workspace
+            </span>
+
+            <select
+              id="schedule-workspace-client"
+              value={selectedWorkspaceClientId || ""}
+              onChange={(e) =>
+                onChangeWorkspaceClient?.(e.target.value)
+              }
+              className="
+                bg-transparent
+                border-0
+                text-sm
+                font-medium
+                text-zinc-900
+                focus:outline-none
+                cursor-pointer
+              "
+            >
+              {(workspaceClients ?? []).map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        <div className="h-5 w-px bg-zinc-200" />
+
+        {/* Filters */}
+        <button
+          onClick={() => setShowFilters(!showFilters)}
+          className={cn(
+            "flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium transition-all",
+            showFilters
+              ? "bg-white text-zinc-950 shadow-sm"
+              : "text-zinc-600 hover:text-zinc-900"
+          )}
+        >
+          <SlidersHorizontal size={15} />
+          Filters
+        </button>
+
+        {showFilters && (
+          <>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-zinc-400">
+                Room
+              </span>
+
+              <select
+                id="schedule-room"
+                value={selectedRoom}
+                onChange={(e) => onChangeRoom(e.target.value)}
+                className="
+                  bg-transparent
+                  border-0
+                  text-sm
+                  font-medium
+                  text-zinc-900
+                  focus:outline-none
+                "
+              >
+                <option value="all">All Rooms</option>
+
+                {rooms.map((r) => (
+                  <option key={r.id} value={r.id}>
+                    {r.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-zinc-400">
+                Day
+              </span>
+
+              <select
+                id="schedule-day"
+                value={selectedDay}
+                onChange={(e) => onChangeDay(e.target.value)}
+                className="
+                  bg-transparent
+                  border-0
+                  text-sm
+                  font-medium
+                  text-zinc-900
+                  focus:outline-none
+                "
+              >
+                <option value="all">All Days</option>
+
+                {days.map((d) => (
+                  <option key={d.short} value={d.short}>
+                    {d.full}
+                    {d.date && ` (${d.date})`}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <button
+              onClick={() => {
+                onQueryChange("");
+                onChangeRoom("all");
+                onChangeDay("all");
+              }}
+              className="
+                flex
+                items-center
+                gap-2
+                rounded-xl
+                px-3
+                py-2
+                text-sm
+                font-medium
+                text-zinc-500
+                hover:bg-white
+                hover:text-zinc-900
+                transition-all
+              "
+            >
+              <RotateCcw size={14} />
+              Reset
+            </button>
+          </>
+        )}
+      </div>
+    </div>
+  </div>
+);
 }

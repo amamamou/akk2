@@ -203,7 +203,7 @@ export default function MyDetailsTab({
         </p>
 
         <div className="space-y-6">
-          <div className="py-6 border-t border-gray-200">
+          <div className="py-6">
             <label className="block text-sm font-medium text-gray-900 mb-3">
               Profile photo
             </label>

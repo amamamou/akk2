@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
-import { Check, X } from "lucide-react";
+import { Check, CreditCard, Sparkles, User, X } from "lucide-react";
 
 export type SettingsTab = {
   key: string;
@@ -35,7 +35,11 @@ export default function SettingsHeader({
 
   // Derive the active index directly from the active tab
   const activeIndex = tabs.findIndex((t) => t.key === activeTab) ?? 0;
-
+const TAB_ICONS = {
+  "my-details": User,
+  plan: Sparkles,
+  billing: CreditCard,
+};
   // Hover highlight
   useEffect(() => {
     if (hoveredIndex === null) return;
@@ -67,11 +71,48 @@ export default function SettingsHeader({
     <div className="flex-1 flex flex-col overflow-hidden bg-white">
       <div className="sticky top-0 z-10 bg-white">
         <div className="px-8 py-6">
-          <div className="flex items-center justify-between">
-            <div>
+          <div className="flex items-start justify-between gap-8">
+           <div className="flex items-start justify-between w-full">
+  <div>
+  <div>
               <h1 className="text-2xl font-semibold text-gray-900">Settings</h1>
               <p className="mt-1 text-sm text-gray-500">{activeLabel}</p>
             </div>
+  </div>
+<div className="hidden lg:flex items-center gap-1 rounded-2xl bg-zinc-100 p-1">
+  {tabs.map((t) => {
+    const isActive = activeTab === t.key;
+    const Icon =
+      TAB_ICONS[t.key as keyof typeof TAB_ICONS];
+
+    return (
+      <button
+        key={t.key}
+        onClick={() => onTabChange(t.key)}
+        className={`
+          flex
+          items-center
+          gap-2
+          rounded-xl
+          px-4
+          py-2
+          text-sm
+          font-medium
+          transition-all
+          ${
+            isActive
+              ? "bg-white text-zinc-950 shadow-sm"
+              : "text-zinc-500 hover:text-zinc-900"
+          }
+        `}
+      >
+        {Icon && <Icon size={15} />}
+        {t.label}
+      </button>
+    );
+  })}
+</div>
+</div>
 
             <div className="flex items-center gap-2">
               {dirty && (
@@ -95,47 +136,7 @@ export default function SettingsHeader({
         </div>
       </div>
 
-      <nav className="px-8 py-3 overflow-x-auto scrollbar-hide">
-        <div className="inline-block bg-white rounded-xl border border-gray-100 shadow-[0_8px_30px_rgba(0,0,0,0.04)] p-2">
-          <div className="relative w-max">
-            {/* Hover highlight */}
-            <div
-              className="absolute top-1 h-8 rounded-[6px] bg-gray-100 transition-all duration-300 ease-out flex items-center"
-              style={{
-                ...hoverStyle,
-                opacity: hoveredIndex !== null ? 1 : 0,
-              }}
-            />
-
-         
-            <div className="relative flex space-x-[6px] items-center">
-              {tabs.map((t, index) => {
-                const isActive = activeTab === t.key;
-                return (
-                  <button
-                    key={t.key}
-                    ref={(el) => {
-                      tabRefs.current[index] = el;
-                    }}
-                    onMouseEnter={() => setHoveredIndex(index)}
-                    onMouseLeave={() => setHoveredIndex(null)}
-                    onClick={() => {
-                      onTabChange(t.key);
-                    }}
-                    className={`px-4 py-2 text-sm font-medium whitespace-nowrap transition-colors duration-300 h-10 flex items-center justify-center ${
-  isActive
-    ? "text-gray-900"
-    : "text-gray-400 hover:text-gray-600"
-}`}
-                  >
-                    {t.label}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      </nav>
+  
     </div>
   );
 }
