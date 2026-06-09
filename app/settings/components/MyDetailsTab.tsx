@@ -4,6 +4,7 @@ import React, { useEffect, useRef, useState, useId } from "react";
 import { UploadCloud, Edit2, Trash, Camera, Loader2 } from "lucide-react";
 import { getApiClient } from "@/lib/api-client";
 import { isSuperAdminRole } from "@/lib/rbac";
+import { useAuth } from "@/app/context/AuthContext";
 import {
   dispatchUserProfileUpdated,
   persistUserProfileToStorage,
@@ -91,9 +92,11 @@ export default function MyDetailsTab({
 
   const initials = `${(firstName || "").trim().charAt(0)}${(lastName || "").trim().charAt(0)}`.toUpperCase();
 
-  // RBAC: only a Super Admin may change their own role. For everyone else the field is
-  // read-only (the backend also redacts `role` on profile updates as defense-in-depth).
-  const canEditRole = isSuperAdminRole(role);
+  // RBAC: gate on the authenticated SESSION role (not the editable `role` field value), so a
+  // draft edit to the field can never unlock itself. Only a Super Admin may mutate the role;
+  // the backend also redacts `role` on profile updates as defense-in-depth.
+  const { user } = useAuth();
+  const canEditRole = isSuperAdminRole(user?.role);
 
   function notifyAvatarChange(url: string | null) {
     dispatchUserProfileUpdated({
