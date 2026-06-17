@@ -101,7 +101,9 @@ export default function AnalyticsClient() {
   const sessionTenantId =
     user?.tenantId || apiClient.getTenantId() || apiClient.getEffectiveTenantId();
   const [workspaceClients, setWorkspaceClients] = useState<WorkspaceClientOption[]>([]);
-  const [selectedWorkspaceClientId, setSelectedWorkspaceClientId] = useState("");
+  const [selectedWorkspaceClientId, setSelectedWorkspaceClientId] = useState(
+    ANALYTICS_ALL_CLIENTS_ID
+  );
   const [workspaceTenantId, setWorkspaceTenantId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -117,7 +119,7 @@ export default function AnalyticsClient() {
   const workspaceSelectOptions = useMemo((): WorkspaceClientOption[] => {
     if (!isSuperAdmin) return workspaceClients;
     return [
-      { id: ANALYTICS_ALL_CLIENTS_ID, name: "Select All Clients", tenantId: "" },
+      { id: ANALYTICS_ALL_CLIENTS_ID, name: "All Clients", tenantId: "" },
       ...workspaceClients,
     ];
   }, [workspaceClients, isSuperAdmin]);
@@ -158,13 +160,11 @@ export default function AnalyticsClient() {
           toActiveWorkspaceClients(res?.clients ?? [])
         );
         setWorkspaceClients(merged);
-        if (!selectedWorkspaceClientId && merged.length > 0) {
-          const preferred =
-            merged.find((c) => c.tenantId === FRENCH_DEMO_ENTERPRISES[0]?.tenantId) ??
-            merged[0];
-          setSelectedWorkspaceClientId(preferred.id);
-          setWorkspaceTenantId(preferred.tenantId);
-        }
+        setSelectedWorkspaceClientId((prev) => {
+          if (prev === ANALYTICS_ALL_CLIENTS_ID) return prev;
+          if (prev && merged.some((c) => c.id === prev)) return prev;
+          return ANALYTICS_ALL_CLIENTS_ID;
+        });
       } catch {
         if (cancelled) return;
         const fallback = FRENCH_DEMO_ENTERPRISES.map((e) => ({
@@ -173,16 +173,18 @@ export default function AnalyticsClient() {
           tenantId: e.tenantId,
         }));
         setWorkspaceClients(fallback);
-        if (fallback[0]) {
-          setSelectedWorkspaceClientId(fallback[0].id);
-          setWorkspaceTenantId(fallback[0].tenantId);
-        }
+        setSelectedWorkspaceClientId((prev) =>
+          prev === ANALYTICS_ALL_CLIENTS_ID ||
+          (prev && fallback.some((c) => c.id === prev))
+            ? prev
+            : ANALYTICS_ALL_CLIENTS_ID
+        );
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [apiClient, isSuperAdmin, selectedWorkspaceClientId]);
+  }, [apiClient, isSuperAdmin]);
 
   useEffect(() => {
     let cancelled = false;
@@ -306,23 +308,35 @@ export default function AnalyticsClient() {
   );
 
   const tenantScopedPlayerIds = useMemo(() => {
+    if (analyticsScopeAll) return null;
     if (!activeAnalyticsTenantId) return null;
     return frenchDemoPlayerIdsForTenant(activeAnalyticsTenantId);
-  }, [activeAnalyticsTenantId]);
+  }, [activeAnalyticsTenantId, analyticsScopeAll]);
 
   const playerOptions = useMemo(() => {
     const byId = new Map<string, PlayerInfo>();
-    const scopeTenant = activeAnalyticsTenantId;
 
-    if (scopeTenant) {
+    if (analyticsScopeAll) {
       for (const [playerId, meta] of Object.entries(FRENCH_DEMO_PLAYER_REGISTRY)) {
-        if (meta.tenantId !== scopeTenant) continue;
         byId.set(playerId, {
           id: playerId,
           playerName: meta.name,
           roomName: meta.name,
           status: "online",
         } as PlayerInfo);
+      }
+    } else {
+      const scopeTenant = activeAnalyticsTenantId;
+      if (scopeTenant) {
+        for (const [playerId, meta] of Object.entries(FRENCH_DEMO_PLAYER_REGISTRY)) {
+          if (meta.tenantId !== scopeTenant) continue;
+          byId.set(playerId, {
+            id: playerId,
+            playerName: meta.name,
+            roomName: meta.name,
+            status: "online",
+          } as PlayerInfo);
+        }
       }
     }
 
@@ -363,7 +377,7 @@ export default function AnalyticsClient() {
     return Array.from(byId.values()).sort((a, b) =>
       (a.roomName || a.playerName || "").localeCompare(b.roomName || b.playerName || "")
     );
-  }, [players, logs, activeAnalyticsTenantId, tenantScopedPlayerIds]);
+  }, [players, logs, activeAnalyticsTenantId, tenantScopedPlayerIds, analyticsScopeAll]);
 
   const filteredLogs = useMemo(() => {
     let rows = filterLogsByPlayerId(logs, selectedPlayerId);
