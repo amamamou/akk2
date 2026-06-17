@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { DndProvider } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
@@ -40,6 +40,7 @@ import {
   type TenantScheduleSegment,
 } from "@/lib/schedule-all-clients";
 import {
+  FRENCH_DEMO_PLAYER_REGISTRY,
   frenchDemoPlayerName,
   frenchDemoTenantForPlayer,
   frenchDemoTenantSlug,
@@ -59,16 +60,10 @@ function playlistDurationMinutes(trackCount: number) {
   return Math.max(15, trackCount * 4);
 }
 
-/** Resolve room filter once the room catalog is known (avoids reading rooms during SSR/init). */
+/** Keep room filter in sync with catalog + optional ?roomId= deep link. */
 function pickSelectedRoom(
   catalog: { id: string; name: string }[],
-  opts: {
-    roomIdParam: string | null;
-    isSuperAdmin: boolean;
-    isAllClientsWorkspace: boolean;
-    current: string;
-    allowSuperAdminFirstRoomDefault: boolean;
-  }
+  opts: { roomIdParam: string | null; current: string }
 ): string {
   if (catalog.length === 0) return "all";
 
@@ -76,32 +71,7 @@ function pickSelectedRoom(
     return opts.roomIdParam;
   }
 
-  if (opts.roomIdParam) {
-    return opts.current !== "all" && catalog.some((r) => r.id === opts.current)
-      ? opts.current
-      : "all";
-  }
-
-  // Managers default to all locations; never auto-pin a single room.
-  if (!opts.isSuperAdmin) {
-    return opts.current !== "all" && catalog.some((r) => r.id === opts.current)
-      ? opts.current
-      : "all";
-  }
-
-  // SUPER_ADMIN single-tenant view: one-time first-room focus when no deep link.
-  if (
-    !opts.isAllClientsWorkspace &&
-    opts.allowSuperAdminFirstRoomDefault &&
-    opts.current === "all"
-  ) {
-    return catalog[0]?.id ?? "all";
-  }
-
-  if (
-    opts.current !== "all" &&
-    catalog.some((r) => r.id === opts.current)
-  ) {
+  if (opts.current !== "all" && catalog.some((r) => r.id === opts.current)) {
     return opts.current;
   }
 
@@ -128,7 +98,7 @@ export default function ScheduleClientPage() {
     { id: string; name: string; tenantId: string }[]
   >([]);
   const [selectedWorkspaceClientId, setSelectedWorkspaceClientId] =
-    useState<string>("");
+    useState<string>(ALL_CLIENTS_WORKSPACE_ID);
   const [workspaceTenantId, setWorkspaceTenantId] = useState<string | null>(
     null
   );
@@ -147,7 +117,6 @@ export default function ScheduleClientPage() {
   const [calendarAnchor, setCalendarAnchor] = useState(() => new Date());
   const [inspectorEvent, setInspectorEvent] = useState<ScheduleEventCard | null>(null);
   const [inspectorSaving, setInspectorSaving] = useState(false);
-  const superAdminRoomDefaultApplied = useRef(false);
 
   const weekDays = useMemo(() => buildWeekDays(calendarAnchor), [calendarAnchor]);
   const monthWeeks = useMemo(() => buildMonthGrid(calendarAnchor), [calendarAnchor]);
@@ -196,7 +165,8 @@ export default function ScheduleClientPage() {
     setCalendarAnchor(new Date());
   }, []);
 
-  const isAllClientsWorkspace = isAllClientsSelection(selectedWorkspaceClientId);
+  const isAllClientsWorkspace =
+    isSuperAdmin && isAllClientsSelection(selectedWorkspaceClientId);
   const allClientRooms = useMemo(() => {
     if (!isAllClientsWorkspace) return rooms;
     const merged: { id: string; name: string }[] = [];
@@ -211,36 +181,13 @@ export default function ScheduleClientPage() {
     return merged;
   }, [isAllClientsWorkspace, rooms, tenantSegments]);
 
-  // Apply room focus after catalog loads (deep link, SUPER_ADMIN fallback, or safe reset).
+  // Sync room filter when catalog or deep link changes (always default to "all").
   useEffect(() => {
     const catalog = isAllClientsWorkspace ? allClientRooms : rooms;
-
-    if (catalog.length === 0) {
-      superAdminRoomDefaultApplied.current = false;
-      setSelectedRoom((current) => (current === "all" ? current : "all"));
-      return;
-    }
-
-    setSelectedRoom((current) => {
-      const next = pickSelectedRoom(catalog, {
-        roomIdParam,
-        isSuperAdmin,
-        isAllClientsWorkspace,
-        current,
-        allowSuperAdminFirstRoomDefault: !superAdminRoomDefaultApplied.current,
-      });
-      if (
-        !roomIdParam &&
-        isSuperAdmin &&
-        !isAllClientsWorkspace &&
-        current === "all" &&
-        next !== "all"
-      ) {
-        superAdminRoomDefaultApplied.current = true;
-      }
-      return next;
-    });
-  }, [roomIdParam, rooms, allClientRooms, isAllClientsWorkspace, isSuperAdmin]);
+    setSelectedRoom((current) =>
+      pickSelectedRoom(catalog, { roomIdParam, current })
+    );
+  }, [roomIdParam, rooms, allClientRooms, isAllClientsWorkspace]);
 
   const activeWorkspaceClient = useMemo(
     () => workspaceClients.find((c) => c.id === selectedWorkspaceClientId),
@@ -265,19 +212,12 @@ export default function ScheduleClientPage() {
         const merged = mergeEnterpriseWorkspaceClients(eligible);
         const options = workspaceSelectorOptions(merged);
         setWorkspaceClients(options);
-        if (options.length > 0 && !selectedWorkspaceClientId) {
-          const preferred =
-            options.find((c) => !isAllClientsSelection(c.id) && c.tenantId === user?.tenantId) ??
-            options.find((c) => !isAllClientsSelection(c.id)) ??
-            options[0];
-          if (preferred) {
-            if (!isAllClientsSelection(preferred.id)) {
-              setSelectedWorkspaceClientId(preferred.id);
-              setWorkspaceTenantId(preferred.tenantId);
-            } else {
-              setSelectedWorkspaceClientId(preferred.id);
-            }
-          }
+        if (options.length > 0) {
+          setSelectedWorkspaceClientId((prev) => {
+            if (prev && options.some((o) => o.id === prev)) return prev;
+            const allClients = options.find((c) => isAllClientsSelection(c.id));
+            return allClients?.id ?? ALL_CLIENTS_WORKSPACE_ID;
+          });
         }
       } catch (err: unknown) {
         if (cancelled) return;
@@ -291,7 +231,7 @@ export default function ScheduleClientPage() {
       cancelled = true;
       apiClient.clearWorkspaceTenant();
     };
-  }, [apiClient, isSuperAdmin, authLoading, user?.tenantId]);
+  }, [apiClient, isSuperAdmin, authLoading]);
 
   useEffect(() => {
     if (authLoading) return;
@@ -410,7 +350,6 @@ export default function ScheduleClientPage() {
     if (!match) return;
     setSelectedWorkspaceClientId(clientId);
     setSelectedRoom("all");
-    superAdminRoomDefaultApplied.current = false;
     setSelectedDay("all");
     setError(null);
     if (clientId === ALL_CLIENTS_WORKSPACE_ID || isAllClientsSelection(clientId)) {
@@ -445,23 +384,56 @@ export default function ScheduleClientPage() {
     [activeRooms, selectedRoom]
   );
 
-  const renderAllClientsPlaceholder = () => (
-    <div className="flex items-center justify-center h-full min-h-[320px] px-6 py-12">
-      <div className="max-w-md w-full rounded-2xl border border-gray-100 bg-[#FAFAFB] px-8 py-10 text-center shadow-[0_8px_30px_rgba(0,0,0,0.04)]">
-        <h2 className="text-base font-semibold text-gray-900">
-          Select a client workspace
-        </h2>
-        <p className="mt-2 text-sm text-gray-500 leading-relaxed">
-          Please select a specific client workspace from the dropdown above to
-          manage schedule timelines.
-        </p>
-      </div>
-    </div>
-  );
-
   const renderScheduleBody = () => {
     if (isAllClientsWorkspace) {
-      return renderAllClientsPlaceholder();
+      const fallbackSegments: TenantScheduleSegment[] =
+        resolveAllClientsEnterpriseRows(workspaceClients).map((client) => ({
+          clientId: client.id,
+          clientName: client.name,
+          tenantId: client.tenantId,
+          rooms: Object.entries(FRENCH_DEMO_PLAYER_REGISTRY)
+            .filter(([, m]) => m.tenantId === client.tenantId)
+            .map(([id, m]) => ({ id, name: m.name })),
+          events: [],
+        }));
+      const segmentsToRender =
+        tenantSegments.length > 0 ? tenantSegments : fallbackSegments;
+
+      if (segmentsToRender.length === 0) {
+        return (
+          <div className="flex items-center justify-center h-full min-h-[240px] text-sm text-gray-500">
+            No client workspaces available.
+          </div>
+        );
+      }
+
+      return (
+        <div className="min-w-0 divide-y divide-gray-200">
+          {segmentsToRender.map((seg) => {
+            const segRooms =
+              selectedRoom === "all"
+                ? seg.rooms
+                : seg.rooms.filter((r) => r.id === selectedRoom);
+            if (segRooms.length === 0) return null;
+            return (
+              <section key={seg.tenantId} className="py-2">
+                <h3 className="px-4 py-2 text-sm font-semibold text-violet-900 bg-violet-50/60 border-b border-violet-100">
+                  {seg.clientName}
+                </h3>
+                <div className="min-w-0">
+                  {viewMode === "month"
+                    ? renderMonthGrid(seg.events, segRooms, seg.tenantId)
+                    : viewMode === "hour"
+                      ? renderHourGrid(seg.events, segRooms, seg.tenantId)
+                      : viewMode === "day"
+                        ? renderDayGrid(seg.events, segRooms, seg.tenantId)
+                        : renderWeekGrid(seg.events, segRooms, seg.tenantId)}
+                </div>
+              </section>
+            );
+          })}
+        </div>
+      );
     }
 
     if (rooms.length === 0) {
