@@ -16,6 +16,26 @@ import { filterLibrary } from "@/lib/audioFilters";
 import { sortAndFilterByDate, paginate } from "@/lib/audioSortPaginate";
 import { getApiClient } from "@/lib/api-client";
 import { parseMediaTags } from "@/lib/media-tags";
+import type { MediaInfo } from "@/types/api";
+
+function mapMediaToAudioItem(item: MediaInfo): AudioItem {
+  const { baseCategory, tags } = parseMediaTags(item.category);
+  return {
+    id: item.id,
+    title: item.title,
+    duration: item.duration,
+    durationMinutes: item.durationMinutes,
+    category: baseCategory,
+    tags: item.tags ?? tags,
+    usageCount: 0,
+    spacesCount: 0,
+    lastPlayed: undefined,
+    isScheduled: false,
+    singer: undefined,
+    url: item.url,
+    size: item.fileSize,
+  };
+}
 
 export default function LibraryAudioClient() {
   const apiClient = getApiClient();
@@ -80,24 +100,7 @@ export default function LibraryAudioClient() {
       setLoading(true);
       try {
         const response = await apiClient.listMedia();
-        const mapped = response.media.map((item) => {
-          const { baseCategory, tags } = parseMediaTags(item.category);
-          return {
-          id: item.id,
-          title: item.title,
-          duration: item.duration,
-          durationMinutes: item.durationMinutes,
-          category: baseCategory,
-          tags: item.tags ?? tags,
-          usageCount: 0,
-          spacesCount: 0,
-          lastPlayed: undefined,
-          isScheduled: false,
-          singer: undefined,
-          url: item.url,
-          size: item.fileSize,
-        };
-        });
+        const mapped = response.media.map(mapMediaToAudioItem);
         startTransition(() => setAudios(mapped));
       } catch (err) {
         console.error("Failed to load media library", err);
@@ -399,22 +402,7 @@ export default function LibraryAudioClient() {
         onUpload={async () => {
           const refreshed = await apiClient.listMedia();
           startTransition(() => {
-            setAudios(
-              refreshed.media.map((item) => ({
-                id: item.id,
-                title: item.title,
-                duration: item.duration,
-                durationMinutes: item.durationMinutes,
-                category: item.category,
-                usageCount: 0,
-                spacesCount: 0,
-                lastPlayed: undefined,
-                isScheduled: false,
-                singer: undefined,
-                url: item.url,
-                size: item.fileSize,
-              })),
-            );
+            setAudios(refreshed.media.map(mapMediaToAudioItem));
           });
         }}
       />
@@ -438,22 +426,7 @@ export default function LibraryAudioClient() {
               await apiClient.deleteMedia(selectedAudioForDelete.id);
               const refreshed = await apiClient.listMedia();
               startTransition(() => {
-                setAudios(
-                  refreshed.media.map((item) => ({
-                    id: item.id,
-                    title: item.title,
-                    duration: item.duration,
-                    durationMinutes: item.durationMinutes,
-                    category: item.category,
-                    usageCount: 0,
-                    spacesCount: 0,
-                    lastPlayed: undefined,
-                    isScheduled: false,
-                    singer: undefined,
-                    url: item.url,
-                    size: item.fileSize,
-                  })),
-                );
+                setAudios(refreshed.media.map(mapMediaToAudioItem));
               });
             }
           } catch (err) {

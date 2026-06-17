@@ -9,6 +9,7 @@ import ScheduleToolbar from "./components/ScheduleToolbar";
 import CalendarCell from "./components/CalendarCell";
 import ScheduleAssignModal, { type PlaylistPick } from "./components/ScheduleAssignModal";
 import EventCard, { type ScheduleEventCard } from "./components/EventCard";
+import InspectorPanel from "./components/InspectorPanel";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import { useAuth } from "@/app/context/AuthContext";
 import { getApiClient } from "@/lib/api-client";
@@ -90,10 +91,45 @@ export default function ScheduleClientPage() {
     tenantId?: string;
   } | null>(null);
   const [viewMode, setViewMode] = useState<ScheduleViewMode>("week");
-  const [calendarAnchor] = useState(() => new Date());
+  const [calendarAnchor, setCalendarAnchor] = useState(() => new Date());
+  const [inspectorEvent, setInspectorEvent] = useState<ScheduleEventCard | null>(null);
+  const [inspectorSaving, setInspectorSaving] = useState(false);
 
   const weekDays = useMemo(() => buildWeekDays(calendarAnchor), [calendarAnchor]);
   const monthWeeks = useMemo(() => buildMonthGrid(calendarAnchor), [calendarAnchor]);
+
+  const calendarPeriodLabel = useMemo(() => {
+    if (viewMode === "month") {
+      return calendarAnchor.toLocaleDateString(undefined, {
+        month: "long",
+        year: "numeric",
+      });
+    }
+    const days = buildWeekDays(calendarAnchor);
+    if (days.length > 0) {
+      return `${days[0].date} – ${days[days.length - 1].date}`;
+    }
+    return calendarAnchor.toLocaleDateString();
+  }, [calendarAnchor, viewMode]);
+
+  const shiftCalendarPeriod = useCallback(
+    (direction: -1 | 1) => {
+      setCalendarAnchor((prev) => {
+        const next = new Date(prev);
+        if (viewMode === "month") {
+          next.setMonth(next.getMonth() + direction);
+        } else {
+          next.setDate(next.getDate() + direction * 7);
+        }
+        return next;
+      });
+    },
+    [viewMode]
+  );
+
+  const resetCalendarToToday = useCallback(() => {
+    setCalendarAnchor(new Date());
+  }, []);
 
   const isAllClientsWorkspace = isAllClientsSelection(selectedWorkspaceClientId);
   const allClientRooms = useMemo(() => {
@@ -287,6 +323,15 @@ export default function ScheduleClientPage() {
   };
 
   const activeRooms = isAllClientsWorkspace ? allClientRooms : rooms;
+
+  const inspectorRooms = useMemo(() => {
+    if (!inspectorEvent) return activeRooms;
+    if (inspectorEvent.tenantId && isAllClientsWorkspace) {
+      const seg = tenantSegments.find((s) => s.tenantId === inspectorEvent.tenantId);
+      if (seg?.rooms.length) return seg.rooms;
+    }
+    return activeRooms;
+  }, [inspectorEvent, isAllClientsWorkspace, tenantSegments, activeRooms]);
 
   const roomsToShow = useMemo(
     () =>
@@ -623,13 +668,134 @@ export default function ScheduleClientPage() {
 
   const confirmDeleteEvent = async () => {
     if (!pendingDeleteEvent) return;
+    const deleted = pendingDeleteEvent;
     try {
-      await apiClient.deleteSchedule(pendingDeleteEvent.id);
-      setEvents((prev) => prev.filter((e) => e.id !== pendingDeleteEvent.id));
+      await withScheduleTenant(deleted.tenantId);
+      await apiClient.deleteSchedule(deleted.id);
+
+      if (isAllClientsWorkspace && deleted.tenantId) {
+        setTenantSegments((prev) =>
+          prev.map((seg) =>
+            seg.tenantId === deleted.tenantId
+              ? {
+                  ...seg,
+                  events: seg.events.filter((e) => e.id !== deleted.id),
+                }
+              : seg
+          )
+        );
+      } else {
+        setEvents((prev) => prev.filter((e) => e.id !== deleted.id));
+      }
+
+      if (inspectorEvent?.id === deleted.id) {
+        setInspectorEvent(null);
+      }
       setPendingDeleteEvent(null);
     } catch (err: unknown) {
       const ax = err as { response?: { data?: { error?: string } } };
       setError(ax?.response?.data?.error || "Failed to delete");
+    }
+  };
+
+  const replaceEventInState = useCallback(
+    (updated: ScheduleEventCard) => {
+      if (isAllClientsWorkspace) {
+        const routedTenantId = updated.tenantId ?? workspaceTenantId ?? null;
+        if (routedTenantId) {
+          const normalized: ScheduleEventCard = {
+            ...updated,
+            tenantId: routedTenantId,
+          };
+          setTenantSegments((prev) =>
+            prev.map((seg) =>
+              seg.tenantId === routedTenantId
+                ? {
+                    ...seg,
+                    events: seg.events.map((e) =>
+                      e.id === normalized.id ? normalized : e
+                    ),
+                  }
+                : seg
+            )
+          );
+          return;
+        }
+        // All-Clients mode without a resolvable tenant — avoid null segment keys.
+        setEvents((prev) => {
+          const exists = prev.some((e) => e.id === updated.id);
+          return exists
+            ? prev.map((e) => (e.id === updated.id ? updated : e))
+            : [...prev, updated];
+        });
+        return;
+      }
+
+      setEvents((prev) =>
+        prev.map((e) => (e.id === updated.id ? updated : e))
+      );
+    },
+    [isAllClientsWorkspace, workspaceTenantId]
+  );
+
+  const openEventInspector = useCallback((evt: ScheduleEventCard) => {
+    setInspectorEvent({ ...evt });
+  }, []);
+
+  const handleInspectorChange = useCallback(
+    (patch: Partial<ScheduleEventCard>) => {
+      setInspectorEvent((prev) => (prev ? { ...prev, ...patch } : null));
+    },
+    []
+  );
+
+  const saveInspectorChanges = async () => {
+    if (!inspectorEvent) return;
+    try {
+      setInspectorSaving(true);
+      setError(null);
+      await withScheduleTenant(inspectorEvent.tenantId);
+
+      const start = inspectorEvent.calendarDate
+        ? buildDateForIsoAndTime(inspectorEvent.calendarDate, inspectorEvent.time)
+        : buildDateForDayAndTime(
+            inspectorEvent.day,
+            inspectorEvent.time,
+            calendarAnchor
+          );
+      const end = new Date(start);
+      end.setMinutes(end.getMinutes() + Math.max(1, inspectorEvent.duration));
+
+      if (start >= end) {
+        setError("Invalid time range - end time must be after start time");
+        return;
+      }
+
+      const res = await apiClient.updateSchedule(inspectorEvent.id, {
+        playerId: inspectorEvent.roomId,
+        startTime: start.toISOString(),
+        endTime: end.toISOString(),
+        recurrence: inspectorEvent.loopPlayback ? "DAILY" : "ONCE",
+      });
+
+      const mapped = scheduleEntryToEventCard(res.schedule);
+      const next: ScheduleEventCard = {
+        ...mapped,
+        roomId: inspectorEvent.roomId,
+        day: shortDayFromDate(start),
+        time: inspectorEvent.time,
+        calendarDate: start.toISOString().slice(0, 10),
+        loopPlayback: inspectorEvent.loopPlayback,
+        tenantId: inspectorEvent.tenantId,
+        tenantLabel: inspectorEvent.tenantLabel,
+      };
+
+      replaceEventInState(next);
+      setInspectorEvent(next);
+    } catch (err: unknown) {
+      handleScheduleError(err);
+    } finally {
+      setInspectorSaving(false);
     }
   };
 
@@ -735,6 +901,7 @@ export default function ScheduleClientPage() {
                 onDropEvent={handleDropEvent}
                 onDropPlaylist={handleDropPlaylist}
                 onEventDelete={setPendingDeleteEvent}
+                onEventEdit={openEventInspector}
                 compact={daysToShow.length > 3}
                 onQuickCreate={(roomId, day, time, cal) =>
                   openAssignPicker(roomId, day, time, cal, segmentTenantId)
@@ -793,6 +960,7 @@ export default function ScheduleClientPage() {
                           evt={evt}
                           compact
                           onDelete={setPendingDeleteEvent}
+                          onEdit={openEventInspector}
                         />
                       ))}
                     </div>
@@ -881,6 +1049,7 @@ export default function ScheduleClientPage() {
                 onDropEvent={handleDropEvent}
                 onDropPlaylist={handleDropPlaylist}
                 onEventDelete={setPendingDeleteEvent}
+                onEventEdit={openEventInspector}
                 compact
                 onQuickCreate={(r, d, t, cal) =>
                   openAssignPicker(r, d, t, cal, segmentTenantId)
@@ -912,6 +1081,10 @@ export default function ScheduleClientPage() {
             workspaceClients={workspaceClients}
             selectedWorkspaceClientId={selectedWorkspaceClientId}
             onChangeWorkspaceClient={handleWorkspaceClientChange}
+            calendarPeriodLabel={calendarPeriodLabel}
+            onPrevPeriod={() => shiftCalendarPeriod(-1)}
+            onNextPeriod={() => shiftCalendarPeriod(1)}
+            onToday={resetCalendarToToday}
           />
 
           <div className="px-6 py-6">
@@ -967,6 +1140,10 @@ export default function ScheduleClientPage() {
           workspaceClients={workspaceClients}
           selectedWorkspaceClientId={selectedWorkspaceClientId}
           onChangeWorkspaceClient={handleWorkspaceClientChange}
+          calendarPeriodLabel={calendarPeriodLabel}
+          onPrevPeriod={() => shiftCalendarPeriod(-1)}
+          onNextPeriod={() => shiftCalendarPeriod(1)}
+          onToday={resetCalendarToToday}
         />
 
       <div className="px-6 py-6">
@@ -1027,6 +1204,16 @@ export default function ScheduleClientPage() {
           }}
           onSelectAudio={handleSelectAudio}
           onSelectPlaylist={handleSelectPlaylist}
+        />
+
+        <InspectorPanel
+          open={!!inspectorEvent}
+          event={inspectorEvent}
+          rooms={inspectorRooms}
+          saving={inspectorSaving}
+          onClose={() => setInspectorEvent(null)}
+          onChange={handleInspectorChange}
+          onSave={saveInspectorChanges}
         />
       </div>
     </DndProvider>

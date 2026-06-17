@@ -193,6 +193,12 @@ export default function UploadModal({
           file.tags ?? [],
         );
 
+        if (file.playlistId) {
+          await apiClient.addPlaylistItem(file.playlistId, {
+            mediaId: response.media.id,
+          });
+        }
+
         const completed: UploadFile = {
           id: file.id,
           name: file.name,

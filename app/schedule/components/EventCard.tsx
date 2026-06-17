@@ -24,10 +24,12 @@ export default function EventCard({
   evt,
   compact = false,
   onDelete,
+  onEdit,
 }: {
   evt: ScheduleEventCard;
   compact?: boolean;
   onDelete?: (e: ScheduleEventCard) => void;
+  onEdit?: (e: ScheduleEventCard) => void;
 }) {
   const isPlaylist = Boolean(evt.playlistId);
   const statusLeft =
@@ -39,7 +41,16 @@ export default function EventCard({
 
   return (
     <div
-      className={`relative flex items-center justify-between rounded-md px-3 py-2 transition duration-150 cursor-default group ${
+      role="button"
+      tabIndex={0}
+      onClick={() => onEdit?.(evt)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onEdit?.(evt);
+        }
+      }}
+      className={`relative flex items-center justify-between rounded-md px-3 py-2 transition duration-150 cursor-pointer group ${
         isPlaylist
           ? "bg-gradient-to-r from-purple-50 to-indigo-50 border border-purple-200 hover:from-purple-100 hover:to-indigo-100"
           : "bg-gray-50 border border-transparent hover:bg-gray-100"

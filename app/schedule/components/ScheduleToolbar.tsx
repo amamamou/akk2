@@ -2,13 +2,13 @@
 
 import React, { useState } from "react";
 import {
-  Search,
   SlidersHorizontal,
   CalendarDays,
   CalendarRange,
   Clock3,
-  Building2,
   RotateCcw,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { ScheduleViewMode } from "@/lib/schedule-calendar";
@@ -46,6 +46,10 @@ export default function ScheduleToolbar({
   workspaceClients,
   selectedWorkspaceClientId,
   onChangeWorkspaceClient,
+  calendarPeriodLabel,
+  onPrevPeriod,
+  onNextPeriod,
+  onToday,
 }: {
   query: string;
   onQueryChange: (q: string) => void;
@@ -61,6 +65,10 @@ export default function ScheduleToolbar({
   workspaceClients?: { id: string; name: string; tenantId: string }[];
   selectedWorkspaceClientId?: string;
   onChangeWorkspaceClient?: (clientId: string) => void;
+  calendarPeriodLabel?: string;
+  onPrevPeriod?: () => void;
+  onNextPeriod?: () => void;
+  onToday?: () => void;
 }) {
   const [showFilters, setShowFilters] = useState(false);
 
@@ -85,9 +93,41 @@ return (
               ? "Hour-by-hour schedule view"
               : "Overview of the current week"}
           </p>
+          {calendarPeriodLabel ? (
+            <div className="mt-3 flex items-center gap-2">
+              <button
+                type="button"
+                aria-label="Previous period"
+                onClick={onPrevPeriod}
+                className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-zinc-200 text-zinc-600 hover:bg-zinc-50"
+              >
+                <ChevronLeft size={16} />
+              </button>
+              <span className="min-w-[10rem] text-center text-sm font-medium text-zinc-800">
+                {calendarPeriodLabel}
+              </span>
+              <button
+                type="button"
+                aria-label="Next period"
+                onClick={onNextPeriod}
+                className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-zinc-200 text-zinc-600 hover:bg-zinc-50"
+              >
+                <ChevronRight size={16} />
+              </button>
+              {onToday ? (
+                <button
+                  type="button"
+                  onClick={onToday}
+                  className="rounded-lg border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-50"
+                >
+                  Today
+                </button>
+              ) : null}
+            </div>
+          ) : null}
         </div>
 
-        {/* View Modes */}
+        {/* View Modes — desktop */}
         <div className="hidden lg:flex items-center gap-1 rounded-2xl bg-zinc-100 p-1">
           {VIEW_OPTIONS.map((opt) => {
             const Icon = opt.icon;
@@ -109,6 +149,31 @@ return (
               </button>
             );
           })}
+        </div>
+
+        {/* View Modes — mobile */}
+        <div className="flex lg:hidden shrink-0">
+          <label className="sr-only" htmlFor="schedule-view-mode-mobile">
+            Schedule view
+          </label>
+          <select
+            id="schedule-view-mode-mobile"
+            value={viewMode}
+            onChange={(e) => onChangeViewMode(e.target.value as ScheduleViewMode)}
+            className="min-w-[9.5rem] appearance-none rounded-xl border border-zinc-200 bg-white px-3 py-2 pr-8 text-sm font-medium text-zinc-900 shadow-sm focus:border-[#A473FF] focus:outline-none focus:ring-2 focus:ring-[#A473FF]/20"
+            style={{
+              backgroundImage:
+                "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2371717a' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E\")",
+              backgroundRepeat: "no-repeat",
+              backgroundPosition: "right 0.65rem center",
+            }}
+          >
+            {VIEW_OPTIONS.map((opt) => (
+              <option key={opt.mode} value={opt.mode}>
+                {opt.label} view
+              </option>
+            ))}
+          </select>
         </div>
       </div>
     </div>

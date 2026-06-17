@@ -24,6 +24,7 @@ export default function CalendarCell({
   onDropEvent,
   onDropPlaylist,
   onEventDelete,
+  onEventEdit,
   compact,
   onQuickCreate,
 }: {
@@ -47,6 +48,7 @@ export default function CalendarCell({
     calendarDate?: string
   ) => void;
   onEventDelete?: (evt: ScheduleEventCard) => void;
+  onEventEdit?: (evt: ScheduleEventCard) => void;
   compact?: boolean;
   onQuickCreate?: (
     roomId: string,
@@ -101,7 +103,12 @@ export default function CalendarCell({
         <div className="space-y-1">
           {events.map((evt) => (
             <div key={evt.id} role="listitem">
-              <EventCard evt={evt} compact={compact} onDelete={onEventDelete} />
+              <EventCard
+                evt={evt}
+                compact={compact}
+                onDelete={onEventDelete}
+                onEdit={onEventEdit}
+              />
             </div>
           ))}
         </div>
