@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { DndProvider } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
@@ -60,6 +60,55 @@ function playlistDurationMinutes(trackCount: number) {
   return Math.max(15, trackCount * 4);
 }
 
+/** Resolve room filter once the room catalog is known (avoids reading rooms during SSR/init). */
+function pickSelectedRoom(
+  catalog: { id: string; name: string }[],
+  opts: {
+    roomIdParam: string | null;
+    isSuperAdmin: boolean;
+    isAllClientsWorkspace: boolean;
+    current: string;
+    allowSuperAdminFirstRoomDefault: boolean;
+  }
+): string {
+  if (catalog.length === 0) return "all";
+
+  if (opts.roomIdParam && catalog.some((r) => r.id === opts.roomIdParam)) {
+    return opts.roomIdParam;
+  }
+
+  if (opts.roomIdParam) {
+    return opts.current !== "all" && catalog.some((r) => r.id === opts.current)
+      ? opts.current
+      : "all";
+  }
+
+  // Managers default to all locations; never auto-pin a single room.
+  if (!opts.isSuperAdmin) {
+    return opts.current !== "all" && catalog.some((r) => r.id === opts.current)
+      ? opts.current
+      : "all";
+  }
+
+  // SUPER_ADMIN single-tenant view: one-time first-room focus when no deep link.
+  if (
+    !opts.isAllClientsWorkspace &&
+    opts.allowSuperAdminFirstRoomDefault &&
+    opts.current === "all"
+  ) {
+    return catalog[0]?.id ?? "all";
+  }
+
+  if (
+    opts.current !== "all" &&
+    catalog.some((r) => r.id === opts.current)
+  ) {
+    return opts.current;
+  }
+
+  return "all";
+}
+
 export default function ScheduleClientPage() {
   const apiClient = getApiClient();
   const searchParams = useSearchParams();
@@ -73,7 +122,7 @@ export default function ScheduleClientPage() {
   const [rooms, setRooms] = useState<{ id: string; name: string }[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [selectedRoom, setSelectedRoom] = useState<string>(() => roomIdParam || "all");
+  const [selectedRoom, setSelectedRoom] = useState<string>("all");
   const [selectedDay, setSelectedDay] = useState<string>("all");
   const [query, setQuery] = useState("");
   const [workspaceClients, setWorkspaceClients] = useState<
@@ -99,6 +148,7 @@ export default function ScheduleClientPage() {
   const [calendarAnchor, setCalendarAnchor] = useState(() => new Date());
   const [inspectorEvent, setInspectorEvent] = useState<ScheduleEventCard | null>(null);
   const [inspectorSaving, setInspectorSaving] = useState(false);
+  const superAdminRoomDefaultApplied = useRef(false);
 
   const weekDays = useMemo(() => buildWeekDays(calendarAnchor), [calendarAnchor]);
   const monthWeeks = useMemo(() => buildMonthGrid(calendarAnchor), [calendarAnchor]);
@@ -162,14 +212,41 @@ export default function ScheduleClientPage() {
     return merged;
   }, [isAllClientsWorkspace, rooms, tenantSegments]);
 
-  // Deep-link from Players: ?roomId=… focuses the schedule on that location.
+  // Apply room focus after catalog loads (deep link, SUPER_ADMIN fallback, or safe reset).
   useEffect(() => {
-    if (!roomIdParam) return;
     const catalog = isAllClientsWorkspace ? allClientRooms : rooms;
-    if (catalog.some((r) => r.id === roomIdParam)) {
-      setSelectedRoom(roomIdParam);
+
+    if (catalog.length === 0) {
+      superAdminRoomDefaultApplied.current = false;
+      setSelectedRoom((current) => (current === "all" ? current : "all"));
+      return;
     }
-  }, [roomIdParam, rooms, allClientRooms, isAllClientsWorkspace]);
+
+    setSelectedRoom((current) => {
+      const next = pickSelectedRoom(catalog, {
+        roomIdParam,
+        isSuperAdmin,
+        isAllClientsWorkspace,
+        current,
+        allowSuperAdminFirstRoomDefault: !superAdminRoomDefaultApplied.current,
+      });
+      if (
+        !roomIdParam &&
+        isSuperAdmin &&
+        !isAllClientsWorkspace &&
+        current === "all" &&
+        next !== "all"
+      ) {
+        superAdminRoomDefaultApplied.current = true;
+      }
+      return next;
+    });
+  }, [roomIdParam, rooms, allClientRooms, isAllClientsWorkspace, isSuperAdmin]);
+
+  const activeWorkspaceClient = useMemo(
+    () => workspaceClients.find((c) => c.id === selectedWorkspaceClientId),
+    [workspaceClients, selectedWorkspaceClientId]
+  );
 
   const assignModalTenantId = useMemo(() => {
     if (pickerCell?.tenantId) return pickerCell.tenantId;
@@ -194,11 +271,13 @@ export default function ScheduleClientPage() {
             options.find((c) => !isAllClientsSelection(c.id) && c.tenantId === user?.tenantId) ??
             options.find((c) => !isAllClientsSelection(c.id)) ??
             options[0];
-          if (!isAllClientsSelection(preferred.id)) {
-            setSelectedWorkspaceClientId(preferred.id);
-            setWorkspaceTenantId(preferred.tenantId);
-          } else {
-            setSelectedWorkspaceClientId(preferred.id);
+          if (preferred) {
+            if (!isAllClientsSelection(preferred.id)) {
+              setSelectedWorkspaceClientId(preferred.id);
+              setWorkspaceTenantId(preferred.tenantId);
+            } else {
+              setSelectedWorkspaceClientId(preferred.id);
+            }
           }
         }
       } catch (err: unknown) {
@@ -332,6 +411,7 @@ export default function ScheduleClientPage() {
     if (!match) return;
     setSelectedWorkspaceClientId(clientId);
     setSelectedRoom("all");
+    superAdminRoomDefaultApplied.current = false;
     setSelectedDay("all");
     setError(null);
     if (clientId === ALL_CLIENTS_WORKSPACE_ID || isAllClientsSelection(clientId)) {
@@ -859,10 +939,15 @@ export default function ScheduleClientPage() {
   );
 
   const defaultRoomId = useCallback(
-    (segmentRooms: { id: string; name: string }[]) =>
-      selectedRoom !== "all"
-        ? selectedRoom
-        : segmentRooms[0]?.id ?? "",
+    (segmentRooms: { id: string; name: string }[]) => {
+      if (segmentRooms.length === 0) return "";
+      if (selectedRoom !== "all") {
+        return segmentRooms.some((r) => r.id === selectedRoom)
+          ? selectedRoom
+          : segmentRooms[0]?.id ?? "";
+      }
+      return segmentRooms[0]?.id ?? "";
+    },
     [selectedRoom]
   );
 
@@ -1139,6 +1224,7 @@ export default function ScheduleClientPage() {
             showWorkspaceSelector={isSuperAdmin}
             workspaceClients={workspaceClients}
             selectedWorkspaceClientId={selectedWorkspaceClientId}
+            activeWorkspaceClientName={activeWorkspaceClient?.name}
             onChangeWorkspaceClient={handleWorkspaceClientChange}
             calendarPeriodLabel={calendarPeriodLabel}
             onPrevPeriod={() => shiftCalendarPeriod(-1)}
@@ -1203,6 +1289,7 @@ export default function ScheduleClientPage() {
           showWorkspaceSelector={isSuperAdmin}
           workspaceClients={workspaceClients}
           selectedWorkspaceClientId={selectedWorkspaceClientId}
+          activeWorkspaceClientName={activeWorkspaceClient?.name}
           onChangeWorkspaceClient={handleWorkspaceClientChange}
           calendarPeriodLabel={calendarPeriodLabel}
           onPrevPeriod={() => shiftCalendarPeriod(-1)}

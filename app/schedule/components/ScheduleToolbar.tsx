@@ -51,6 +51,7 @@ export default function ScheduleToolbar({
   showWorkspaceSelector,
   workspaceClients,
   selectedWorkspaceClientId,
+  activeWorkspaceClientName,
   onChangeWorkspaceClient,
   calendarPeriodLabel,
   onPrevPeriod,
@@ -70,6 +71,7 @@ export default function ScheduleToolbar({
   showWorkspaceSelector?: boolean;
   workspaceClients?: { id: string; name: string; tenantId: string }[];
   selectedWorkspaceClientId?: string;
+  activeWorkspaceClientName?: string;
   onChangeWorkspaceClient?: (clientId: string) => void;
   calendarPeriodLabel?: string;
   onPrevPeriod?: () => void;
@@ -205,33 +207,55 @@ return (
       >
         {/* Workspace */}
         {showWorkspaceSelector && (
-          <div className="flex items-center gap-3">
-            <span className="text-sm font-medium text-zinc-500">
-              Workspace
-            </span>
+          <div className="flex flex-col gap-0.5">
+            <div className="flex items-center gap-3">
+              <span className="text-sm font-medium text-zinc-500">
+                Client workspace
+              </span>
 
-            <select
-              id="schedule-workspace-client"
-              value={selectedWorkspaceClientId || ""}
-              onChange={(e) =>
-                onChangeWorkspaceClient?.(e.target.value)
-              }
-              className="
-                bg-transparent
-                border-0
-                text-sm
-                font-medium
-                text-zinc-900
-                focus:outline-none
-                cursor-pointer
-              "
-            >
-              {(workspaceClients ?? []).map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
+              <select
+                id="schedule-workspace-client"
+                aria-label="Select client workspace"
+                value={selectedWorkspaceClientId || ""}
+                onChange={(e) =>
+                  onChangeWorkspaceClient?.(e.target.value)
+                }
+                className="
+                  bg-transparent
+                  border-0
+                  text-sm
+                  font-medium
+                  text-zinc-900
+                  focus:outline-none
+                  cursor-pointer
+                  min-w-[12rem]
+                "
+              >
+                {(workspaceClients ?? []).length === 0 ? (
+                  <option value="" disabled>
+                    Loading workspaces…
+                  </option>
+                ) : (
+                  <>
+                    {!selectedWorkspaceClientId && (
+                      <option value="" disabled>
+                        Select client workspace…
+                      </option>
+                    )}
+                    {(workspaceClients ?? []).map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </>
+                )}
+              </select>
+            </div>
+            {activeWorkspaceClientName && selectedWorkspaceClientId ? (
+              <span className="text-[11px] text-zinc-400 pl-[calc(7.5rem+0.75rem)]">
+                Viewing schedule for {activeWorkspaceClientName}
+              </span>
+            ) : null}
           </div>
         )}
 
@@ -260,7 +284,11 @@ return (
 
               <select
                 id="schedule-room"
-                value={selectedRoom}
+                value={
+                  selectedRoom === "all" || rooms.some((r) => r.id === selectedRoom)
+                    ? selectedRoom
+                    : "all"
+                }
                 onChange={(e) => onChangeRoom(e.target.value)}
                 className="
                   bg-transparent
