@@ -29,6 +29,8 @@ export default function PlayerCard({
   onRename,
   editing,
   onOpenSchedule,
+  onPlayPause,
+  onSkip,
   onDelete,
   onRequestEdit,
 }: {
@@ -36,6 +38,8 @@ export default function PlayerCard({
   onRename: (id: string, name: string) => void;
   editing?: boolean;
   onOpenSchedule?: () => void;
+  onPlayPause?: (id: string) => void;
+  onSkip?: (id: string) => void;
   onDelete?: (id: string) => void;
   onRequestEdit?: (id: string) => void;
 }) {
@@ -132,8 +136,8 @@ export default function PlayerCard({
         <div className={`hidden md:flex items-center gap-2 transition-all transform z-30 opacity-0 group-hover:opacity-100`}> 
           <PlayerActions
             isPlaying={!!player.isPlaying}
-            onPlayPause={(e) => { e?.stopPropagation(); onOpenSchedule?.(); }}
-            onSkip={(e) => { e?.stopPropagation(); /* keep noop or wire if needed */ }}
+            onPlayPause={(e) => { e?.stopPropagation(); onPlayPause?.(player.id); }}
+            onSkip={(e) => { e?.stopPropagation(); onSkip?.(player.id); }}
             onOpenSchedule={(e) => { e?.stopPropagation(); onOpenSchedule?.(); }}
           />
 

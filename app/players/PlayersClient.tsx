@@ -424,10 +424,21 @@ export default function PlayersClient() {
   const router = useRouter();
 
   function openScheduleForRoom(playerId: string) {
-    // We use the player id as the schedule row id so each player
-    // appears as its own row in the schedule view.
-    router.push(`/schedule?roomId=${playerId}`);
+    router.push(`/schedule?roomId=${encodeURIComponent(playerId)}`);
   }
+
+  const playerCardBindings = useCallback(
+    (p: PlayerType) => ({
+      onRename: renamePlayer,
+      onDelete: deletePlayer,
+      onRequestEdit: (id: string) => setEditingId(id),
+      editing: editingId === p.id,
+      onOpenSchedule: () => openScheduleForRoom(p.id),
+      onPlayPause: togglePlay,
+      onSkip: skip,
+    }),
+    [editingId]
+  );
 
   const filteredPlayers = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -610,11 +621,7 @@ export default function PlayersClient() {
                                   <PlayerCard
                                     key={p.id}
                                     player={p}
-                                    onRename={renamePlayer}
-                                    onDelete={deletePlayer}
-                                    onRequestEdit={(id) => setEditingId(id)}
-                                    editing={editingId === p.id}
-                                    onOpenSchedule={() => openScheduleForRoom(p.roomId)}
+                                    {...playerCardBindings(p)}
                                   />
                                 ))}
                               </div>
@@ -661,11 +668,7 @@ export default function PlayersClient() {
                   <PlayerCard
                     key={p.id}
                     player={p}
-                    onRename={renamePlayer}
-                    onDelete={deletePlayer}
-                    onRequestEdit={(id) => setEditingId(id)}
-                    editing={editingId === p.id}
-                    onOpenSchedule={() => openScheduleForRoom(p.roomId)}
+                    {...playerCardBindings(p)}
                   />
                 ))}
               </div>

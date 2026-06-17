@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { DndProvider } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
 import { AlertCircle } from "lucide-react";
@@ -61,6 +62,8 @@ function playlistDurationMinutes(trackCount: number) {
 
 export default function ScheduleClientPage() {
   const apiClient = getApiClient();
+  const searchParams = useSearchParams();
+  const roomIdParam = searchParams.get("roomId");
   const { user, isLoading: authLoading } = useAuth();
   const role = String(user?.role || "").toUpperCase();
   const isSuperAdmin = role === "SUPER_ADMIN";
@@ -70,7 +73,7 @@ export default function ScheduleClientPage() {
   const [rooms, setRooms] = useState<{ id: string; name: string }[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [selectedRoom, setSelectedRoom] = useState<string>("all");
+  const [selectedRoom, setSelectedRoom] = useState<string>(() => roomIdParam || "all");
   const [selectedDay, setSelectedDay] = useState<string>("all");
   const [query, setQuery] = useState("");
   const [workspaceClients, setWorkspaceClients] = useState<
@@ -158,6 +161,15 @@ export default function ScheduleClientPage() {
     }
     return merged;
   }, [isAllClientsWorkspace, rooms, tenantSegments]);
+
+  // Deep-link from Players: ?roomId=… focuses the schedule on that location.
+  useEffect(() => {
+    if (!roomIdParam) return;
+    const catalog = isAllClientsWorkspace ? allClientRooms : rooms;
+    if (catalog.some((r) => r.id === roomIdParam)) {
+      setSelectedRoom(roomIdParam);
+    }
+  }, [roomIdParam, rooms, allClientRooms, isAllClientsWorkspace]);
 
   const assignModalTenantId = useMemo(() => {
     if (pickerCell?.tenantId) return pickerCell.tenantId;

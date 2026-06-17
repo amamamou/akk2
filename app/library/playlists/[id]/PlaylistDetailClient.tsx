@@ -40,7 +40,17 @@ export default function PlaylistDetailClient({
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [saving, setSaving] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
   const titleRef = useRef<HTMLInputElement | null>(null);
+
+  const DUPLICATE_TRACK_MESSAGE =
+    "This audio track is already present inside this playlist.";
+
+  useEffect(() => {
+    if (!toast) return;
+    const timer = window.setTimeout(() => setToast(null), 4000);
+    return () => window.clearTimeout(timer);
+  }, [toast]);
 
   const loadPlaylist = useCallback(async () => {
     if (!isValidPlaylistId(playlistId)) {
@@ -128,14 +138,26 @@ export default function PlaylistDetailClient({
   }
 
   async function addTrack(mediaId: string) {
+    if (tracks.some((t) => t.mediaId === mediaId)) {
+      setToast(DUPLICATE_TRACK_MESSAGE);
+      return;
+    }
     try {
       const res = await apiClient.addPlaylistItem(playlistId, { mediaId });
       const ui = apiPlaylistToUi(res.playlist);
       setPlaylist(ui);
       setTracks(res.playlist.tracks ?? []);
       setMediaPickerOpen(false);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to add track");
+    } catch (err: unknown) {
+      const ax = err as { response?: { status?: number; data?: { error?: string } } };
+      if (ax.response?.status === 409) {
+        setToast(DUPLICATE_TRACK_MESSAGE);
+        return;
+      }
+      setError(
+        ax.response?.data?.error ??
+          (err instanceof Error ? err.message : "Failed to add track")
+      );
     }
   }
 
@@ -178,6 +200,11 @@ export default function PlaylistDetailClient({
 
   return (
     <div className="min-h-screen overflow-auto">
+      {toast && (
+        <div className="fixed right-6 bottom-6 z-50 max-w-sm rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-900 shadow-md">
+          {toast}
+        </div>
+      )}
       {error && (
         <div className="mx-8 mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
           {error}

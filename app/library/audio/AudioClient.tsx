@@ -435,16 +435,47 @@ export default function LibraryAudioClient() {
   const [viewing, setViewing] = useState<AudioItem | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [selectedAudioForDelete, setSelectedAudioForDelete] = useState<AudioItem | null>(null);
+  const [saveNotice, setSaveNotice] = useState<string | null>(null);
 
-  const saveEdit = (v: { id: string; title: string; singer?: string }) => {
-    setAudios((s) => s.map((a) => (a.id === v.id ? { ...a, title: v.title, singer: v.singer ?? a.singer } : a)));
-    setEditing(null);
+  useEffect(() => {
+    if (!saveNotice) return;
+    const timer = window.setTimeout(() => setSaveNotice(null), 3500);
+    return () => window.clearTimeout(timer);
+  }, [saveNotice]);
+
+  const saveEdit = async (v: { id: string; title: string; singer?: string }) => {
+    try {
+      const res = await apiClient.updateMedia(v.id, { title: v.title.trim() });
+      setAudios((s) =>
+        s.map((a) =>
+          a.id === v.id
+            ? {
+                ...a,
+                title: res.media.title,
+                singer: v.singer ?? a.singer,
+              }
+            : a
+        )
+      );
+      setSaveNotice("Audio updated successfully.");
+      setEditing(null);
+      const refreshed = await apiClient.listMedia();
+      setAudios(refreshed.media.map(mapMediaToAudioItem));
+    } catch (err) {
+      console.error("Failed to update audio", err);
+      setSaveNotice("Could not save changes. Please try again.");
+    }
   };
 
   // deleteEdit removed — deletion handled directly via handleAudioAction
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-white">
+      {saveNotice && (
+        <div className="fixed right-6 bottom-6 z-50 max-w-sm rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-900 shadow-md">
+          {saveNotice}
+        </div>
+      )}
       <AudioHeader
         colsOpen={colsOpen}
         setColsOpen={setColsOpen}

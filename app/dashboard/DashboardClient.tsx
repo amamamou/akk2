@@ -210,8 +210,15 @@ export default function DashboardClient() {
       return Date.now() - last <= 2 * 60 * 1000; // active within last 2 minutes
     }).length;
 
-    const healthStatus = systemHealth?.ok ? "Healthy" : "Check status";
-    const healthValue = systemHealth ? Math.round((healthStatus === "Healthy" ? 99 : 50)) : "0";
+    const healthRate = systemHealth?.heartbeatSuccessRate ?? 0;
+    const healthValue = systemHealth ? Math.round(healthRate) : 0;
+    const healthStatus = !systemHealth
+      ? "Unavailable"
+      : healthRate >= 80
+        ? "Healthy"
+        : healthRate >= 50
+          ? "Degraded"
+          : "Check status";
 
     const secondStat: QuickStat = isSuperAdmin
       ? {

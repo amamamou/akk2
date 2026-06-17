@@ -93,6 +93,11 @@ export interface MediaCreate {
   url?: string;
 }
 
+export interface MediaUpdateInput {
+  title?: string;
+  category?: string;
+}
+
 // ============ Schedule Types ============
 export interface ScheduleEntry {
   id: string;

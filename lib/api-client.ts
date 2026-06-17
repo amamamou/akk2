@@ -14,6 +14,7 @@ import type {
   PlayerUpdate,
   MediaListResponse,
   MediaResponse,
+  MediaUpdateInput,
   ScheduleListResponse,
   ScheduleResponse,
   ScheduleCreate,
@@ -503,6 +504,17 @@ export class ApiClient {
         : undefined,
     });
 
+    return response.data;
+  }
+
+  /**
+   * PUT /media/{id} - Update media metadata
+   */
+  async updateMedia(mediaId: string, data: MediaUpdateInput): Promise<MediaResponse> {
+    const response = await this.instance.put<MediaResponse>(`/media/${mediaId}`, {
+      title: data.title,
+      category: data.category,
+    });
     return response.data;
   }
 

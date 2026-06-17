@@ -217,7 +217,7 @@ export default function PlayerRow({ player, onPlayPause, onSkip, onRename, onDel
             isPlaying={!!player.isPlaying}
             onPlayPause={(e) => { e?.stopPropagation(); onPlayPause(player.id); }}
             onSkip={(e) => { e?.stopPropagation(); onSkip(player.id); }}
-            onOpenSchedule={(e) => { e?.stopPropagation(); router.push(`/schedule?roomId=${player.id}`); }}
+            onOpenSchedule={(e) => { e?.stopPropagation(); router.push(`/schedule?roomId=${encodeURIComponent(player.id)}`); }}
           />
 
 

@@ -14,7 +14,16 @@ const coverGradients = {
   slate: "from-slate-500 via-slate-600 to-slate-800",
   gray: "from-zinc-500 via-zinc-600 to-zinc-800",
   emerald: "from-emerald-500 via-emerald-600 to-emerald-800",
-};
+} as const;
+
+type CoverGradientKey = keyof typeof coverGradients;
+
+function resolveCoverGradient(color?: string | null): string {
+  if (color && color in coverGradients) {
+    return coverGradients[color as CoverGradientKey];
+  }
+  return coverGradients.indigo;
+}
 
 export default function PlaylistCard({
   playlist,
@@ -44,6 +53,11 @@ export default function PlaylistCard({
     }, 50);
     return () => clearTimeout(t);
   }, [isEditing]);
+
+  useEffect(() => {
+    setCoverError(false);
+  }, [playlist.id, playlist.cover, playlist.coverColor]);
+
   function saveName() {
     const trimmed = name.trim();
     if (trimmed === "") return;
@@ -52,7 +66,10 @@ export default function PlaylistCard({
       onEdit?.(playlist.id, trimmed);
     }
   }
-  const gradientClass = coverGradients[playlist.coverColor || "indigo"];
+  const gradientClass = resolveCoverGradient(playlist.coverColor);
+  const remoteCover =
+    typeof playlist.cover === "string" &&
+    (playlist.cover.startsWith("http://") || playlist.cover.startsWith("https://"));
 
   const openPlaylist = () => {
     if (!isValidPlaylistId(playlist.id)) return;
@@ -81,7 +98,7 @@ export default function PlaylistCard({
         }}
         className={cn("w-full aspect-square rounded-lg overflow-hidden relative bg-gradient-to-br", gradientClass)}
       >
-        {playlist.cover && !coverError ? (
+        {remoteCover && !coverError ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={playlist.cover}
