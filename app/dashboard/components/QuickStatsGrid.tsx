@@ -12,6 +12,10 @@ export interface QuickStat {
 	context?: string;
 	// footer / status line (e.g. "18 live now")
 	footer?: string;
+	/** Optional Tailwind class for the primary value (e.g. status chips). */
+	valueClassName?: string;
+	/** Single-line subtext under the value; bypasses trend token splitting when set. */
+	subtext?: string;
 }
 
 export default function QuickStatsGrid({ stats }: { stats: QuickStat[] }) {
@@ -34,6 +38,7 @@ export default function QuickStatsGrid({ stats }: { stats: QuickStat[] }) {
 				// Attempt to parse trend into delta + label (e.g. "+12% this month")
 				const [delta, ...labelParts] = stat.trend ? stat.trend.split(" ") : ["", ""];
 				const labelText = labelParts.join(" ");
+				const valueTone = stat.valueClassName ?? (isFirst ? "text-white" : "text-zinc-900");
 
 				return (
 					<div
@@ -53,13 +58,17 @@ export default function QuickStatsGrid({ stats }: { stats: QuickStat[] }) {
 						</div>
 
 						{/* value */}
-						<div className={isFirst ? "mt-4 text-4xl font-semibold text-white tracking-tight" : "mt-4 text-4xl font-semibold text-zinc-900 tracking-tight"}>{stat.value}</div>
+						<div className={`mt-4 text-4xl font-semibold tracking-tight ${valueTone}`}>{stat.value}</div>
 
-						{/* trend (contextual) */}
+						{/* trend (contextual) or dedicated subtext */}
+						{stat.subtext ? (
+							<div className="mt-3 text-sm text-emerald-600">{stat.subtext}</div>
+						) : (
 						<div className="mt-3">
 							<div className={isFirst ? "text-sm text-emerald-200" : "text-sm text-emerald-600"}>{delta}</div>
 							<div className={isFirst ? "text-xs text-white/60" : "text-xs text-zinc-400"}>{labelText}</div>
 						</div>
+						)}
 
 						{/* divider + footer (visible) - structured footer + status */}
 						<div className={isFirst ? "mt-auto pt-4 border-t border-white/15" : "mt-auto pt-4 border-t border-gray-100"}>

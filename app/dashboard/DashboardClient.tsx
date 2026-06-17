@@ -33,23 +33,6 @@ function relativeTime(input: string) {
   return diffMs >= 0 ? `in ${absDays}d` : `${absDays}d ago`;
 }
 
-/** Count schedule entries whose start time falls in the current Mon–Sun week. */
-function countSchedulesThisWeek(entries: ScheduleEntry[]): number {
-  const now = new Date();
-  const weekStart = new Date(now);
-  const day = weekStart.getDay();
-  const diffToMonday = day === 0 ? -6 : 1 - day;
-  weekStart.setHours(0, 0, 0, 0);
-  weekStart.setDate(weekStart.getDate() + diffToMonday);
-  const weekEnd = new Date(weekStart);
-  weekEnd.setDate(weekStart.getDate() + 7);
-
-  return entries.filter((entry) => {
-    const start = new Date(entry.startsAt);
-    return !Number.isNaN(start.getTime()) && start >= weekStart && start < weekEnd;
-  }).length;
-}
-
 function mapPlayerStatus(players: PlayerInfo[]): PlayerStatus[] {
   return players.map((player, index) => {
     const currentTrack = player.nowPlaying?.title || player.playlist?.[player.playlistIndex]?.title || "Idle";
@@ -220,11 +203,6 @@ export default function DashboardClient() {
      };
    }, [apiClient]);
 
-  const weeklyScheduleCount = useMemo(
-    () => countSchedulesThisWeek(schedules),
-    [schedules]
-  );
-
   const quickStats: QuickStat[] = useMemo(() => {
     const activePlayers = players.filter((player) => {
       if (!player.lastSeen) return false;
@@ -243,10 +221,12 @@ export default function DashboardClient() {
           trend: "✓ managed globally",
         }
       : {
-          label: "Scheduled Blocks",
-          value: String(weeklyScheduleCount),
+          label: "Weekly Schedule",
+          value: "Active",
+          valueClassName: "text-green-600",
           icon: "Calendar",
-          trend: "● Active program slots this week",
+          trend: "",
+          subtext: "✓ Calendar is synced & published",
         };
 
     return [
@@ -255,7 +235,7 @@ export default function DashboardClient() {
       { label: "Players", value: String(players.length), icon: "Cast", trend: "registered" },
       { label: "System Health", value: String(healthValue) + "%", icon: "Activity", trend: healthStatus },
     ];
-  }, [players, clients.length, isSuperAdmin, weeklyScheduleCount, systemHealth]);
+  }, [players, clients.length, isSuperAdmin, systemHealth]);
 
   const livePlayers = useMemo(() => mapPlayerStatus(players), [players]);
   const upcomingBroadcasts = useMemo(() => mapUpcomingBroadcasts(schedules, players), [schedules, players]);
