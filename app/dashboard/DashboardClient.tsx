@@ -9,6 +9,8 @@ import RecentActivityFeed, { type ActivityItem } from "./components/RecentActivi
 import UpcomingBroadcasts, { type Broadcast } from "./components/UpcomingBroadcasts";
 import QuickActions from "./components/QuickActions";
 import SystemAlerts from "./components/SystemAlerts";
+import { useAuth } from "@/app/context/AuthContext";
+import { isSuperAdminRole } from "@/lib/rbac";
 import { getApiClient } from "@/lib/api-client";
 import type { MediaInfo, PlayerInfo, ScheduleEntry, SystemHealthMetrics, ActivityLogEntry, ClientInfo } from "@/types/api";
 import type { QuickStat } from "./components/QuickStatsGrid";
@@ -29,6 +31,23 @@ function relativeTime(input: string) {
   if (absHours < 24) return diffMs >= 0 ? `in ${absHours}h` : `${absHours}h ago`;
   const absDays = Math.round(absHours / 24);
   return diffMs >= 0 ? `in ${absDays}d` : `${absDays}d ago`;
+}
+
+/** Count schedule entries whose start time falls in the current Mon–Sun week. */
+function countSchedulesThisWeek(entries: ScheduleEntry[]): number {
+  const now = new Date();
+  const weekStart = new Date(now);
+  const day = weekStart.getDay();
+  const diffToMonday = day === 0 ? -6 : 1 - day;
+  weekStart.setHours(0, 0, 0, 0);
+  weekStart.setDate(weekStart.getDate() + diffToMonday);
+  const weekEnd = new Date(weekStart);
+  weekEnd.setDate(weekStart.getDate() + 7);
+
+  return entries.filter((entry) => {
+    const start = new Date(entry.startsAt);
+    return !Number.isNaN(start.getTime()) && start >= weekStart && start < weekEnd;
+  }).length;
 }
 
 function mapPlayerStatus(players: PlayerInfo[]): PlayerStatus[] {
@@ -116,6 +135,8 @@ function mapRecentActivity(schedules: ScheduleEntry[], players: PlayerInfo[], ac
 
 export default function DashboardClient() {
   const apiClient = getApiClient();
+  const { user } = useAuth();
+  const isSuperAdmin = isSuperAdminRole(user?.role);
   const [players, setPlayers] = useState<PlayerInfo[]>([]);
   // _media is reserved for future use (fetched media) — keep setter for API response
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -199,6 +220,11 @@ export default function DashboardClient() {
      };
    }, [apiClient]);
 
+  const weeklyScheduleCount = useMemo(
+    () => countSchedulesThisWeek(schedules),
+    [schedules]
+  );
+
   const quickStats: QuickStat[] = useMemo(() => {
     const activePlayers = players.filter((player) => {
       if (!player.lastSeen) return false;
@@ -209,13 +235,27 @@ export default function DashboardClient() {
     const healthStatus = systemHealth?.ok ? "Healthy" : "Check status";
     const healthValue = systemHealth ? Math.round((healthStatus === "Healthy" ? 99 : 50)) : "0";
 
+    const secondStat: QuickStat = isSuperAdmin
+      ? {
+          label: "Clients",
+          value: String(clients.length),
+          icon: "Building",
+          trend: "✓ managed globally",
+        }
+      : {
+          label: "Scheduled Blocks",
+          value: String(weeklyScheduleCount),
+          icon: "Calendar",
+          trend: "● Active program slots this week",
+        };
+
     return [
       { label: "Listeners", value: String(activePlayers), icon: "Speaker", trend: "currently online" },
-      { label: "Clients", value: String(clients.length), icon: "Building", trend: "managed" },
+      secondStat,
       { label: "Players", value: String(players.length), icon: "Cast", trend: "registered" },
       { label: "System Health", value: String(healthValue) + "%", icon: "Activity", trend: healthStatus },
     ];
-  }, [players, clients.length, systemHealth]);
+  }, [players, clients.length, isSuperAdmin, weeklyScheduleCount, systemHealth]);
 
   const livePlayers = useMemo(() => mapPlayerStatus(players), [players]);
   const upcomingBroadcasts = useMemo(() => mapUpcomingBroadcasts(schedules, players), [schedules, players]);
