@@ -44,6 +44,7 @@ import {
   toActiveWorkspaceClients,
   type WorkspaceClientOption,
 } from "@/lib/workspace-clients";
+import { ANALYTICS_ALL_CLIENTS_ID } from "@/lib/global-admin-tenant";
 
 import KpiGrid from "./components/KpiGrid";
 import ChartsPanel from "./components/ChartsPanel";
@@ -110,11 +111,41 @@ export default function AnalyticsClient() {
   const [selectedPlayerId, setSelectedPlayerId] = useState<string>("all");
   const [timeRange, setTimeRange] = useState<TimeRange>("7d");
 
+  const analyticsScopeAll =
+    isSuperAdmin && selectedWorkspaceClientId === ANALYTICS_ALL_CLIENTS_ID;
+
+  const workspaceSelectOptions = useMemo((): WorkspaceClientOption[] => {
+    if (!isSuperAdmin) return workspaceClients;
+    return [
+      { id: ANALYTICS_ALL_CLIENTS_ID, name: "Select All Clients", tenantId: "" },
+      ...workspaceClients,
+    ];
+  }, [workspaceClients, isSuperAdmin]);
+
+  const handleWorkspaceClientChange = useCallback(
+    (clientId: string) => {
+      if (clientId === ANALYTICS_ALL_CLIENTS_ID) {
+        setSelectedWorkspaceClientId(ANALYTICS_ALL_CLIENTS_ID);
+        setWorkspaceTenantId(null);
+        setSelectedPlayerId("all");
+        apiClient.clearWorkspaceTenant();
+        return;
+      }
+      const match = workspaceClients.find((c) => c.id === clientId);
+      if (!match) return;
+      setSelectedWorkspaceClientId(match.id);
+      setWorkspaceTenantId(match.tenantId);
+      setSelectedPlayerId("all");
+    },
+    [apiClient, workspaceClients]
+  );
+
   const activeAnalyticsTenantId = useMemo(() => {
+    if (analyticsScopeAll) return sessionTenantId;
     if (isManager) return sessionTenantId;
     if (isSuperAdmin && workspaceTenantId) return workspaceTenantId;
     return sessionTenantId;
-  }, [isManager, isSuperAdmin, workspaceTenantId, sessionTenantId]);
+  }, [analyticsScopeAll, isManager, isSuperAdmin, workspaceTenantId, sessionTenantId]);
 
   useEffect(() => {
     if (!isSuperAdmin) return;
@@ -157,29 +188,48 @@ export default function AnalyticsClient() {
     let cancelled = false;
 
     const tenantForFetch = activeAnalyticsTenantId;
-    if (!tenantForFetch || (isSuperAdmin && !workspaceTenantId)) {
+    if (!tenantForFetch) {
+      setIsLoading(false);
+      return;
+    }
+    if (isSuperAdmin && !workspaceTenantId && !analyticsScopeAll) {
       setIsLoading(false);
       return;
     }
 
-    apiClient.setWorkspaceTenant(
-      tenantForFetch,
-      frenchDemoTenantSlug(tenantForFetch) ?? user?.tenantSlug
-    );
+    if (analyticsScopeAll && sessionTenantId) {
+      apiClient.setWorkspaceTenant(
+        sessionTenantId,
+        frenchDemoTenantSlug(sessionTenantId) ?? user?.tenantSlug
+      );
+    } else if (tenantForFetch) {
+      apiClient.setWorkspaceTenant(
+        tenantForFetch,
+        frenchDemoTenantSlug(tenantForFetch) ?? user?.tenantSlug
+      );
+    }
+
+    const telemetryScope = analyticsScopeAll ? ("all" as const) : undefined;
 
     const load = async () => {
       try {
         setIsLoading(true);
         setError(null);
         const [healthRes, logsRes, playersRes] = await Promise.all([
-          apiClient.getSystemHealth(),
-          apiClient.getPlaybackLogs(200),
+          apiClient.getSystemHealth(telemetryScope),
+          apiClient.getPlaybackLogs(200, telemetryScope),
           apiClient.listPlayers().catch(() => ({ ok: false, players: [] as PlayerInfo[] })),
         ]);
         if (cancelled) return;
 
-        const tenantPlayerIds = frenchDemoPlayerIdsForTenant(tenantForFetch);
-        const shouldScope = isManager || Boolean(activeAnalyticsTenantId);
+        const tenantPlayerIds = analyticsScopeAll
+          ? new Set(
+              FRENCH_DEMO_ENTERPRISES.flatMap((e) =>
+                Array.from(frenchDemoPlayerIdsForTenant(e.tenantId))
+              )
+            )
+          : frenchDemoPlayerIdsForTenant(tenantForFetch);
+        const shouldScope = !analyticsScopeAll && (isManager || Boolean(workspaceTenantId));
 
         const scopedLogs = (logsRes.logs ?? []).filter((log) => {
           if (!shouldScope || tenantPlayerIds.size === 0) return true;
@@ -227,6 +277,8 @@ export default function AnalyticsClient() {
     activeAnalyticsTenantId,
     user?.tenantSlug,
     workspaceTenantId,
+    analyticsScopeAll,
+    sessionTenantId,
   ]);
 
   const resolveDeviceLabel = useCallback(
@@ -424,21 +476,15 @@ export default function AnalyticsClient() {
               </div>
 
               <div className="flex gap-2 items-center flex-wrap justify-end">
-                {isSuperAdmin && workspaceClients.length > 0 && (
+                {isSuperAdmin && workspaceSelectOptions.length > 0 && (
                   <div className="relative">
                     <select
                       value={selectedWorkspaceClientId}
-                      onChange={(e) => {
-                        const match = workspaceClients.find((c) => c.id === e.target.value);
-                        if (!match) return;
-                        setSelectedWorkspaceClientId(match.id);
-                        setWorkspaceTenantId(match.tenantId);
-                        setSelectedPlayerId("all");
-                      }}
+                      onChange={(e) => handleWorkspaceClientChange(e.target.value)}
                       className="border border-violet-100 rounded-lg text-sm px-3 py-1.5 bg-violet-50 text-gray-900 outline-none focus:border-violet-200 appearance-none pr-8"
                       aria-label="Client workspace"
                     >
-                      {workspaceClients.map((c) => (
+                      {workspaceSelectOptions.map((c) => (
                         <option key={c.id} value={c.id}>
                           {c.name}
                         </option>
@@ -550,21 +596,15 @@ export default function AnalyticsClient() {
             </div>
 
             <div className="flex gap-2 items-center flex-wrap justify-end">
-              {isSuperAdmin && workspaceClients.length > 0 && (
+              {isSuperAdmin && workspaceSelectOptions.length > 0 && (
                 <div className="relative">
                   <select
                     value={selectedWorkspaceClientId}
-                    onChange={(e) => {
-                      const match = workspaceClients.find((c) => c.id === e.target.value);
-                      if (!match) return;
-                      setSelectedWorkspaceClientId(match.id);
-                      setWorkspaceTenantId(match.tenantId);
-                      setSelectedPlayerId("all");
-                    }}
+                    onChange={(e) => handleWorkspaceClientChange(e.target.value)}
                     className="border border-violet-100 rounded-lg text-sm px-3 py-1.5 bg-violet-50 text-gray-900 outline-none focus:border-violet-200 appearance-none pr-8"
                     aria-label="Client workspace"
                   >
-                    {workspaceClients.map((c) => (
+                    {workspaceSelectOptions.map((c) => (
                       <option key={c.id} value={c.id}>
                         {c.name}
                       </option>

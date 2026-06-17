@@ -669,8 +669,11 @@ export class ApiClient {
    /**
     * GET /analytics/system-health - Get system health metrics
     */
-   async getSystemHealth(): Promise<SystemHealthMetrics> {
-     const response = await this.instance.get<SystemHealthMetrics>('/analytics/system-health');
+   async getSystemHealth(scope?: 'all'): Promise<SystemHealthMetrics> {
+     const suffix = scope ? `?scope=${encodeURIComponent(scope)}` : '';
+     const response = await this.instance.get<SystemHealthMetrics>(
+       `/analytics/system-health${suffix}`
+     );
      return response.data;
    }
 
@@ -685,9 +688,11 @@ export class ApiClient {
    /**
     * GET /analytics/playback-logs - Recent playback verification rows
     */
-   async getPlaybackLogs(limit: number = 50): Promise<PlaybackLogsResponse> {
+   async getPlaybackLogs(limit: number = 50, scope?: 'all'): Promise<PlaybackLogsResponse> {
+     const params = new URLSearchParams({ limit: String(limit) });
+     if (scope) params.set('scope', scope);
      const response = await this.instance.get<PlaybackLogsResponse>(
-       `/analytics/playback-logs?limit=${limit}`
+       `/analytics/playback-logs?${params.toString()}`
      );
      return response.data;
    }

@@ -3,9 +3,17 @@
 import React, { useEffect, useState } from "react";
 import { ListMusic, Music, X } from "lucide-react";
 import { getApiClient } from "@/lib/api-client";
-import type { PlaylistApiInfo } from "@/types/api";
+import type { MediaInfo, PlaylistApiInfo } from "@/types/api";
 import { apiPlaylistToUi } from "@/lib/playlist-mapper";
 import { frenchDemoTenantSlug } from "@/lib/french-demo-seed";
+import { useAuth } from "@/app/context/AuthContext";
+import { isSuperAdminRole } from "@/lib/rbac";
+import {
+  GLOBAL_ADMIN_TENANT_ID,
+  dedupeById,
+  dedupeByKey,
+  filterSuperAdminCatalog,
+} from "@/lib/global-admin-tenant";
 
 type AudioItem = { id: string; title: string; duration: number; type: string; url?: string };
 
@@ -14,9 +22,21 @@ export type PlaylistPick = {
   title: string;
   trackCount: number;
   totalDuration: string;
+  tenantId?: string;
 };
 
 type Tab = "audio" | "playlist";
+
+function mapMediaRow(m: MediaInfo): AudioItem {
+  return {
+    id: m.id,
+    title: m.title,
+    duration:
+      m.durationMinutes && m.durationMinutes > 0 ? m.durationMinutes : 60,
+    type: m.category || "Audio",
+    url: m.url,
+  };
+}
 
 export default function ScheduleAssignModal({
   open,
@@ -32,6 +52,9 @@ export default function ScheduleAssignModal({
   onSelectAudio: (item: AudioItem, loopPlayback: boolean) => void;
   onSelectPlaylist: (item: PlaylistPick, loopPlayback: boolean) => void;
 }) {
+  const { user } = useAuth();
+  const isSuperAdminUser = isSuperAdminRole(user?.role);
+
   const [tab, setTab] = useState<Tab>("audio");
   const [loopPlayback, setLoopPlayback] = useState(false);
   const [audio, setAudio] = useState<AudioItem[]>([]);
@@ -41,60 +64,95 @@ export default function ScheduleAssignModal({
   const [audioError, setAudioError] = useState<string | null>(null);
   const [playlistError, setPlaylistError] = useState<string | null>(null);
 
-  const fetchWorkspaceCatalog = React.useCallback(async (tenantId: string) => {
-    const api = getApiClient();
-    const slug = frenchDemoTenantSlug(tenantId);
-    api.setWorkspaceTenant(tenantId, slug);
+  const fetchWorkspaceCatalog = React.useCallback(
+    async (tenantId: string) => {
+      const api = getApiClient();
+      const workspaceSlug = frenchDemoTenantSlug(tenantId);
+      api.setWorkspaceTenant(tenantId, workspaceSlug);
 
-    setLoadingAudio(true);
-    setLoadingPlaylists(true);
-    setAudioError(null);
-    setPlaylistError(null);
+      setLoadingAudio(true);
+      setLoadingPlaylists(true);
+      setAudioError(null);
+      setPlaylistError(null);
 
-    try {
-      const mediaRes = await api.listMedia();
-      setAudio(
-        (mediaRes.media ?? []).map((m) => ({
-          id: m.id,
-          title: m.title,
-          duration:
-            m.durationMinutes && m.durationMinutes > 0 ? m.durationMinutes : 60,
-          type: m.category || "Audio",
-          url: m.url,
-        }))
-      );
-    } catch (err) {
-      setAudio([]);
-      setAudioError(
-        err instanceof Error ? err.message : "Failed to load audio for workspace"
-      );
-    } finally {
-      setLoadingAudio(false);
-    }
+      const loadMediaForTenant = async (tid: string): Promise<MediaInfo[]> => {
+        api.setWorkspaceTenant(tid, frenchDemoTenantSlug(tid));
+        const res = await api.listMedia();
+        return res.media ?? [];
+      };
 
-    try {
-      const res = await api.listPlaylists();
-      const picks: PlaylistPick[] = [];
-      for (const row of res.playlists ?? []) {
-        const ui = apiPlaylistToUi(row as PlaylistApiInfo);
-        if (!ui) continue;
-        picks.push({
-          playlistId: ui.id,
-          title: ui.title,
-          trackCount: ui.trackCount,
-          totalDuration: ui.totalDuration,
-        });
+      const loadPlaylistsForTenant = async (
+        tid: string
+      ): Promise<PlaylistPick[]> => {
+        api.setWorkspaceTenant(tid, frenchDemoTenantSlug(tid));
+        const res = await api.listPlaylists();
+        const picks: PlaylistPick[] = [];
+        for (const row of res.playlists ?? []) {
+          const ui = apiPlaylistToUi(row as PlaylistApiInfo);
+          if (!ui) continue;
+          picks.push({
+            playlistId: ui.id,
+            title: ui.title,
+            trackCount: ui.trackCount,
+            totalDuration: ui.totalDuration,
+            tenantId: row.tenantId ?? row.tenant_id,
+          });
+        }
+        return picks;
+      };
+
+      try {
+        let mediaRows = await loadMediaForTenant(tenantId);
+        if (isSuperAdminUser && tenantId !== GLOBAL_ADMIN_TENANT_ID) {
+          const adminRows = await loadMediaForTenant(GLOBAL_ADMIN_TENANT_ID);
+          mediaRows = dedupeById([...mediaRows, ...adminRows]);
+        }
+        const visibleMedia = filterSuperAdminCatalog(
+          mediaRows.map((m) => ({
+            ...m,
+            tenantId: m.tenantId ?? m.tenant_id,
+          })),
+          tenantId,
+          isSuperAdminUser
+        );
+        setAudio(visibleMedia.map(mapMediaRow));
+      } catch (err) {
+        setAudio([]);
+        setAudioError(
+          err instanceof Error ? err.message : "Failed to load audio for workspace"
+        );
+      } finally {
+        setLoadingAudio(false);
+        api.setWorkspaceTenant(tenantId, workspaceSlug);
       }
-      setPlaylists(picks);
-    } catch (err) {
-      setPlaylists([]);
-      setPlaylistError(
-        err instanceof Error ? err.message : "Failed to load playlists for workspace"
-      );
-    } finally {
-      setLoadingPlaylists(false);
-    }
-  }, []);
+
+      try {
+        let playlistRows = await loadPlaylistsForTenant(tenantId);
+        if (isSuperAdminUser && tenantId !== GLOBAL_ADMIN_TENANT_ID) {
+          const adminPlaylists = await loadPlaylistsForTenant(GLOBAL_ADMIN_TENANT_ID);
+          playlistRows = dedupeByKey(
+            [...playlistRows, ...adminPlaylists],
+            (p) => p.playlistId
+          );
+        }
+        const visiblePlaylists = filterSuperAdminCatalog(
+          playlistRows,
+          tenantId,
+          isSuperAdminUser
+        );
+        setPlaylists(visiblePlaylists);
+      } catch (err) {
+        setPlaylists([]);
+        setPlaylistError(
+          err instanceof Error ? err.message : "Failed to load playlists for workspace"
+        );
+      } finally {
+        setLoadingPlaylists(false);
+        api.setWorkspaceTenant(tenantId, workspaceSlug);
+      }
+    },
+    [isSuperAdminUser]
+  );
 
   useEffect(() => {
     if (!open || !workspaceTenantId) {
@@ -138,6 +196,12 @@ export default function ScheduleAssignModal({
           </p>
         ) : (
           <>
+            {isSuperAdminUser && (
+              <p className="mb-3 text-xs text-violet-700 bg-violet-50 border border-violet-100 rounded-lg px-3 py-2">
+                Super Admin view: global template tracks and playlists from the master
+                catalog are included for assignment.
+              </p>
+            )}
             <label className="flex items-center justify-between gap-3 mb-4 p-3 rounded-lg border border-gray-100 bg-gray-50">
               <div>
                 <p className="text-sm font-medium text-gray-900">Loop playback</p>

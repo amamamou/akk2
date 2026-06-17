@@ -69,6 +69,8 @@ export interface MediaInfo {
   tags?: string[];
   fileSize?: number;
   url: string;
+  tenantId?: string;
+  tenant_id?: string;
 }
 
 export interface MediaListResponse {
@@ -374,6 +376,8 @@ export interface PlaylistApiInfo {
   coverColor?: string | null;
   lastModified?: string | null;
   tracks?: PlaylistTrackInfo[];
+  tenantId?: string;
+  tenant_id?: string;
 }
 
 export interface PlaylistsListResponse {
