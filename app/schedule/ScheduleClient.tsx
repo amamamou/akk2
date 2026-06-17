@@ -40,7 +40,6 @@ import {
   type TenantScheduleSegment,
 } from "@/lib/schedule-all-clients";
 import {
-  FRENCH_DEMO_PLAYER_REGISTRY,
   frenchDemoPlayerName,
   frenchDemoTenantForPlayer,
   frenchDemoTenantSlug,
@@ -446,47 +445,23 @@ export default function ScheduleClientPage() {
     [activeRooms, selectedRoom]
   );
 
+  const renderAllClientsPlaceholder = () => (
+    <div className="flex items-center justify-center h-full min-h-[320px] px-6 py-12">
+      <div className="max-w-md w-full rounded-2xl border border-gray-100 bg-[#FAFAFB] px-8 py-10 text-center shadow-[0_8px_30px_rgba(0,0,0,0.04)]">
+        <h2 className="text-base font-semibold text-gray-900">
+          Select a client workspace
+        </h2>
+        <p className="mt-2 text-sm text-gray-500 leading-relaxed">
+          Please select a specific client workspace from the dropdown above to
+          manage schedule timelines.
+        </p>
+      </div>
+    </div>
+  );
+
   const renderScheduleBody = () => {
     if (isAllClientsWorkspace) {
-      const fallbackSegments: TenantScheduleSegment[] =
-        resolveAllClientsEnterpriseRows(workspaceClients).map((client) => ({
-          clientId: client.id,
-          clientName: client.name,
-          tenantId: client.tenantId,
-          rooms: Object.entries(FRENCH_DEMO_PLAYER_REGISTRY)
-            .filter(([, m]) => m.tenantId === client.tenantId)
-            .map(([id, m]) => ({ id, name: m.name })),
-          events: [],
-        }));
-      const segmentsToRender =
-        tenantSegments.length > 0 ? tenantSegments : fallbackSegments;
-      return (
-        <div className="min-w-0 divide-y divide-gray-200">
-          {segmentsToRender.map((seg) => {
-            const segRooms =
-              selectedRoom === "all"
-                ? seg.rooms
-                : seg.rooms.filter((r) => r.id === selectedRoom);
-            if (segRooms.length === 0) return null;
-            return (
-              <section key={seg.tenantId} className="py-2">
-                <h3 className="px-4 py-2 text-sm font-semibold text-violet-900 bg-violet-50/60 border-b border-violet-100">
-                  {seg.clientName}
-                </h3>
-                <div className="min-w-0">
-                  {viewMode === "month"
-                    ? renderMonthGrid(seg.events, segRooms, seg.tenantId)
-                    : viewMode === "hour"
-                      ? renderHourGrid(seg.events, segRooms, seg.tenantId)
-                      : viewMode === "day"
-                        ? renderDayGrid(seg.events, segRooms, seg.tenantId)
-                        : renderWeekGrid(seg.events, segRooms, seg.tenantId)}
-                </div>
-              </section>
-            );
-          })}
-        </div>
-      );
+      return renderAllClientsPlaceholder();
     }
 
     if (rooms.length === 0) {
