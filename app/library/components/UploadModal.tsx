@@ -5,6 +5,7 @@ import { Upload, X, Trash, Edit3, User, Play, Pause, Check } from "lucide-react"
 // AudioVisual removed — use a neutral inline waveform glyph instead
 import { cn } from "@/utils/cn";
 import { getApiClient } from "@/lib/api-client";
+import { LIBRARY_TAG_FILTERS } from "@/lib/audio-library-tags";
 
 type UploadFile = {
   id: string;
@@ -43,7 +44,6 @@ export default function UploadModal({
   const titleRef = useRef<HTMLInputElement | null>(null);
   const [headerDuration, setHeaderDuration] = useState<number | null>(null);
   const [tagInput, setTagInput] = useState("");
-  const SUGGESTED_TAGS = ["Event", "Seasonal", "Lobby", "Retail", "Yoga", "Meditation"];
 
   const loadPlaylistsFromApi = React.useCallback(async () => {
     try {
@@ -473,7 +473,7 @@ export default function UploadModal({
                                   ))}
                                 </div>
                                 <div className="flex flex-wrap gap-1">
-                                  {SUGGESTED_TAGS.filter((t) => !(f.tags ?? []).includes(t)).map((tag) => (
+                                  {LIBRARY_TAG_FILTERS.filter((t) => !(f.tags ?? []).includes(t)).map((tag) => (
                                     <button
                                       key={tag}
                                       type="button"

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { startTransition, useEffect, useMemo, useState } from "react";
+import React, { startTransition, useCallback, useEffect, useMemo, useRef, useState } from "react";
 // icons are used in child components
 import EditAudioModal from "../components/EditAudioModal";
 import ViewAudioModal from "../components/ViewAudioModal";
@@ -12,6 +12,7 @@ import AudioTriageBar from "../components/AudioTriageBar";
 import AudioToolbar from "../components/AudioToolbar";
 import AudioHeader from "./components/AudioHeader";
 import AudioList from "./components/AudioList";
+import type { RowPlaybackState } from "./components/AudioListItem";
 import { filterLibrary } from "@/lib/audioFilters";
 import { sortAndFilterByDate, paginate } from "@/lib/audioSortPaginate";
 import { getApiClient } from "@/lib/api-client";
@@ -115,6 +116,141 @@ export default function LibraryAudioClient() {
 
   // Selected item for list view (used to apply sidebar-like active styling)
   const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  // Global HTML5 player — one active stream at a time with native timeupdate tracking
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const tickRafRef = useRef<number | null>(null);
+  const activeTrackIdRef = useRef<string | null>(null);
+  const [activeTrackId, setActiveTrackId] = useState<string | null>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const [streamError, setStreamError] = useState<string | null>(null);
+  const [errorTrackId, setErrorTrackId] = useState<string | null>(null);
+
+  useEffect(() => {
+    activeTrackIdRef.current = activeTrackId;
+  }, [activeTrackId]);
+
+  useEffect(() => {
+    if (!streamError) return;
+    const timer = window.setTimeout(() => {
+      setStreamError(null);
+      setErrorTrackId(null);
+    }, 5000);
+    return () => window.clearTimeout(timer);
+  }, [streamError]);
+
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    const scheduleTimeUpdate = () => {
+      if (tickRafRef.current != null) return;
+      tickRafRef.current = window.requestAnimationFrame(() => {
+        tickRafRef.current = null;
+        setCurrentTime(audio.currentTime);
+      });
+    };
+
+    const syncDuration = () => {
+      setDuration(Number.isFinite(audio.duration) ? audio.duration : 0);
+    };
+
+    const onPlay = () => setIsPlaying(true);
+    const onPause = () => setIsPlaying(false);
+    const onEnded = () => {
+      setIsPlaying(false);
+      setActiveTrackId(null);
+      setCurrentTime(0);
+      audio.currentTime = 0;
+    };
+    const onError = () => {
+      setStreamError("Unable to load or play this audio stream");
+      setErrorTrackId(activeTrackIdRef.current);
+      setIsPlaying(false);
+      setActiveTrackId(null);
+      setCurrentTime(0);
+    };
+
+    audio.addEventListener("timeupdate", scheduleTimeUpdate);
+    audio.addEventListener("loadedmetadata", syncDuration);
+    audio.addEventListener("durationchange", syncDuration);
+    audio.addEventListener("play", onPlay);
+    audio.addEventListener("pause", onPause);
+    audio.addEventListener("ended", onEnded);
+    audio.addEventListener("error", onError);
+
+    return () => {
+      if (tickRafRef.current != null) {
+        window.cancelAnimationFrame(tickRafRef.current);
+      }
+      audio.removeEventListener("timeupdate", scheduleTimeUpdate);
+      audio.removeEventListener("loadedmetadata", syncDuration);
+      audio.removeEventListener("durationchange", syncDuration);
+      audio.removeEventListener("play", onPlay);
+      audio.removeEventListener("pause", onPause);
+      audio.removeEventListener("ended", onEnded);
+      audio.removeEventListener("error", onError);
+    };
+  }, []);
+
+  const handlePlayToggle = useCallback(async (item: AudioItem) => {
+    const url = item.url?.trim();
+    if (!url) {
+      setStreamError("No audio URL available for this track");
+      setErrorTrackId(item.id);
+      setActiveTrackId(item.id);
+      setIsPlaying(false);
+      return;
+    }
+
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    if (activeTrackId === item.id && isPlaying) {
+      audio.pause();
+      return;
+    }
+
+    setStreamError(null);
+    setErrorTrackId(null);
+
+    if (activeTrackId !== item.id) {
+      audio.src = url;
+      setActiveTrackId(item.id);
+      setCurrentTime(0);
+      setDuration(0);
+    }
+
+    try {
+      await audio.play();
+    } catch {
+      setStreamError("Playback blocked or stream unavailable");
+      setErrorTrackId(item.id);
+      setActiveTrackId(item.id);
+      setIsPlaying(false);
+    }
+  }, [activeTrackId, isPlaying]);
+
+  const getPlaybackForRow = useCallback(
+    (id: string): RowPlaybackState => {
+      const isActive = activeTrackId === id || errorTrackId === id;
+      const progressPercent =
+        isActive && duration > 0
+          ? Math.min(100, Math.max(0, (currentTime / duration) * 100))
+          : 0;
+      return {
+        isActive,
+        isPlaying: isActive && isPlaying,
+        currentTime: isActive ? currentTime : 0,
+        duration: isActive ? duration : 0,
+        progressPercent,
+        streamError: errorTrackId === id ? streamError : null,
+      };
+    },
+    [activeTrackId, errorTrackId, isPlaying, currentTime, duration, streamError]
+  );
 
   // enhanced search: support tokens and fielded queries like `artist:Name`, `playlist:Name`, `title:Name`, `creator:Name`
   const filteredLibrary = useMemo(() => filterLibrary(audios, query, activeCategory, playlists), [audios, query, activeCategory, playlists]);
@@ -317,7 +453,25 @@ export default function LibraryAudioClient() {
         setUploadOpen={setUploadOpen}
       />
 
+      <div className="px-6 border-b border-gray-100 bg-white">
+        <AudioToolbar
+          mode="search"
+          query={query}
+          setQuery={setQuery}
+          filteredCount={filteredCount}
+          totalCount={totalCount}
+          page={page}
+          setPage={(n) => startTransition(() => setPage(n))}
+          perPage={perPage}
+          setPerPage={setPerPage}
+          perPageOptions={perPageOptions}
+          totalPages={totalPages}
+          placeholder="Search by title, tag:Lobby, playlist, artist…"
+        />
+      </div>
+
       <AudioTriageBar
+        activeCategory={activeCategory}
         sortBy={sortBy}
         sortDir={sortDir}
         sortOpen={sortOpen}
@@ -374,11 +528,14 @@ export default function LibraryAudioClient() {
                 onDelete={(id) => handleAudioAction("delete", id)}
                 visibleCols={visibleCols}
                 loading={loading}
+                playbackById={getPlaybackForRow}
+                onPlayToggle={handlePlayToggle}
               />
           </div>
 
-          <div className="sticky bottom-0 bg-white border-t border-gray-100 p-3 z-10">
+          <div className="sticky bottom-0 bg-white border-t border-gray-100 z-10">
             <AudioToolbar
+              mode="pagination"
               query={query}
               setQuery={setQuery}
               filteredCount={filteredCount}
@@ -436,6 +593,7 @@ export default function LibraryAudioClient() {
           setSelectedAudioForDelete(null);
         }}
       />
+      <audio ref={audioRef} preload="metadata" className="sr-only" aria-hidden />
     </div>
   );
 }

@@ -1,4 +1,4 @@
-export type ScheduleViewMode = "week" | "month" | "hour";
+export type ScheduleViewMode = "week" | "month" | "hour" | "day";
 
 export const SHORT_DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
 
@@ -8,7 +8,57 @@ export const HOUR_SLOTS = [
   "18:00", "19:00", "20:00", "21:00", "22:00",
 ] as const;
 
+/** Full 24-hour index for single-day vertical timeline (00:00–23:00). */
+export const DAY_TIMELINE_HOURS = Array.from({ length: 24 }, (_, i) =>
+  `${String(i).padStart(2, "0")}:00`
+) as readonly string[];
+
+export const DAY_HOUR_HEIGHT_PX = 60;
+
 export type DayColumn = { short: string; full: string; date: string };
+
+export function formatLocalIsoDate(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+export function dayColumnFromAnchor(anchor = new Date()): DayColumn {
+  const date = formatLocalIsoDate(anchor);
+  return {
+    short: shortDayFromDate(anchor),
+    full: anchor.toLocaleDateString(undefined, { weekday: "long" }),
+    date,
+  };
+}
+
+export function parseEventTimeToMinutes(time: string): number {
+  const trimmed = time.trim();
+  const match = trimmed.match(/^(\d{1,2}):(\d{2})/);
+  if (match) {
+    const h = Number(match[1]);
+    const m = Number(match[2]);
+    if (Number.isFinite(h) && Number.isFinite(m)) {
+      return Math.max(0, Math.min(24 * 60, h * 60 + m));
+    }
+  }
+  return 9 * 60;
+}
+
+export type TimelineBounds = { top: number; height: number };
+
+export function computeEventTimelineBounds(
+  time: string,
+  durationMinutes: number,
+  hourHeightPx = DAY_HOUR_HEIGHT_PX
+): TimelineBounds {
+  const startMin = parseEventTimeToMinutes(time);
+  const endMin = startMin + Math.max(15, durationMinutes);
+  const top = (startMin / 60) * hourHeightPx;
+  const height = Math.max(((endMin - startMin) / 60) * hourHeightPx, 28);
+  return { top, height };
+}
 
 export function buildWeekDays(anchor = new Date()): DayColumn[] {
   const labels = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];

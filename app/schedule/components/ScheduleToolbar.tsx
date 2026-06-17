@@ -5,6 +5,7 @@ import {
   SlidersHorizontal,
   CalendarDays,
   CalendarRange,
+  Calendar,
   Clock3,
   RotateCcw,
   ChevronLeft,
@@ -18,6 +19,11 @@ const VIEW_OPTIONS = [
     mode: "week" as ScheduleViewMode,
     label: "Week",
     icon: CalendarDays,
+  },
+  {
+    mode: "day" as ScheduleViewMode,
+    label: "Day",
+    icon: Calendar,
   },
   {
     mode: "month" as ScheduleViewMode,
@@ -83,6 +89,8 @@ return (
               ? "Monthly Schedule"
               : viewMode === "hour"
               ? "Hourly Schedule"
+              : viewMode === "day"
+              ? "Daily Schedule"
               : "Weekly Schedule"}
           </h1>
   <div>            </div>
@@ -91,6 +99,8 @@ return (
               ? "Calendar month view"
               : viewMode === "hour"
               ? "Hour-by-hour schedule view"
+              : viewMode === "day"
+              ? "24-hour vertical day agenda"
               : "Overview of the current week"}
           </p>
           {calendarPeriodLabel ? (

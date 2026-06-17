@@ -23,11 +23,14 @@ export type ScheduleEventCard = {
 export default function EventCard({
   evt,
   compact = false,
+  timeline = false,
   onDelete,
   onEdit,
 }: {
   evt: ScheduleEventCard;
   compact?: boolean;
+  /** Dense styling for absolute day-timeline blocks. */
+  timeline?: boolean;
   onDelete?: (e: ScheduleEventCard) => void;
   onEdit?: (e: ScheduleEventCard) => void;
 }) {
@@ -50,7 +53,9 @@ export default function EventCard({
           onEdit?.(evt);
         }
       }}
-      className={`relative flex items-center justify-between rounded-md px-3 py-2 transition duration-150 cursor-pointer group ${
+      className={`relative flex items-center justify-between rounded-md px-3 py-2 transition duration-150 cursor-pointer group h-full ${
+        timeline ? "px-2 py-1.5" : ""
+      } ${
         isPlaylist
           ? "bg-gradient-to-r from-purple-50 to-indigo-50 border border-purple-200 hover:from-purple-100 hover:to-indigo-100"
           : "bg-gray-50 border border-transparent hover:bg-gray-100"
@@ -72,15 +77,16 @@ export default function EventCard({
           </div>
           <h4
             className={`font-semibold text-gray-900 ${
-              compact ? "text-sm" : "text-sm"
+              timeline ? "text-xs leading-tight line-clamp-2" : compact ? "text-sm" : "text-sm"
             } whitespace-normal break-words`}
           >
             {evt.title}
           </h4>
-          <span className="text-xs text-gray-500">
+          <span className={`text-gray-500 ${timeline ? "text-[10px]" : "text-xs"}`}>
             {isPlaylist && evt.trackCount != null
               ? `${evt.trackCount} ${evt.trackCount === 1 ? "track" : "tracks"}`
               : `${evt.duration}m`}
+            {timeline ? ` · ${evt.time}` : ""}
           </span>
         </div>
       </div>

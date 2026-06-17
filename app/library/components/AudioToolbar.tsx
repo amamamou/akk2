@@ -16,24 +16,31 @@ interface Props {
   perPageOptions: number[];
   totalPages: number;
   placeholder?: string;
+  /** `search` — top header bar; `pagination` — bottom footer; `full` — both (default). */
+  mode?: "full" | "search" | "pagination";
 }
 
 export default function AudioToolbar(p: Props) {
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const mode = p.mode ?? "full";
+  const showSearch = mode === "full" || mode === "search";
+  const showPagination = mode === "full" || mode === "pagination";
+
   return (
     <div className="border-gray-100 bg-white">
-      <div className="px-6 py-4">
+      <div className={cn("px-6", showSearch && !showPagination ? "py-3" : "py-4")}>
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <div className="flex items-center gap-3 w-full max-w-md">
-            <div className="relative flex-1">
+          {showSearch && (
+          <div className="flex items-center gap-3 w-full sm:max-w-xl flex-1 min-w-0">
+            <div className="relative flex-1 min-w-0">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={16} />
               <input
                 ref={inputRef}
                 aria-label="Search audio"
                 value={p.query}
                 onChange={(e) => p.setQuery(e.target.value)}
-                placeholder={p.placeholder ?? "Search by title, playlist, artist, creator."}
-                className="w-full pl-9 pr-10 py-2 text-sm rounded-md bg-[#F3F4F6]"
+                placeholder={p.placeholder ?? "Search by title, tag, playlist, artist…"}
+                className="w-full pl-9 pr-10 py-2.5 text-sm rounded-xl bg-[#F3F4F6] border border-transparent focus:border-[#A473FF]/30 focus:outline-none focus:ring-2 focus:ring-[#A473FF]/15"
                 suppressHydrationWarning
               />
               {p.query && (
@@ -47,11 +54,11 @@ export default function AudioToolbar(p: Props) {
                 </button>
               )}
             </div>
-
-            <div className="text-sm text-gray-600 whitespace-nowrap"></div>
           </div>
+          )}
 
-          <div className="flex items-center gap-3">
+          {showPagination && (
+          <div className={cn("flex items-center gap-3", showSearch ? "" : "w-full justify-end")}>
             <div className="flex items-center gap-3">
               <div className="hidden md:flex items-center gap-4 text-sm text-gray-600">
                 <div>Showing <span className="text-gray-900 font-medium">{Math.min((p.page - 1) * p.perPage + 1, p.filteredCount || 1)}</span>–<span className="text-gray-900 font-medium">{Math.min(p.page * p.perPage, p.filteredCount)}</span> of <span className="text-gray-900 font-medium">{p.filteredCount}</span></div>
@@ -88,6 +95,7 @@ export default function AudioToolbar(p: Props) {
               </div>
             </div>
           </div>
+          )}
         </div>
       </div>
     </div>

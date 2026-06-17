@@ -2,7 +2,7 @@
 
 import React from "react";
 import type { AudioItem } from "../../components/AudioTile";
-import AudioListItem from "./AudioListItem";
+import AudioListItem, { type RowPlaybackState } from "./AudioListItem";
 import AudioEmpty from "./AudioEmpty";
 
 export default function AudioList({
@@ -14,6 +14,8 @@ export default function AudioList({
   onDelete,
   visibleCols,
   loading,
+  playbackById,
+  onPlayToggle,
 }: {
   items: AudioItem[];
   selectedId: string | null;
@@ -23,6 +25,8 @@ export default function AudioList({
   onDelete: (id: string) => void;
   visibleCols: { duration: boolean; added: boolean; modified: boolean; addedBy: boolean; size: boolean };
   loading?: boolean;
+  playbackById?: (id: string) => RowPlaybackState | undefined;
+  onPlayToggle?: (item: AudioItem) => void;
 }) {
   if (loading) {
     return (
@@ -59,6 +63,8 @@ export default function AudioList({
           onEdit={onEdit}
           onDelete={onDelete}
           visibleCols={visibleCols}
+          playback={playbackById?.(t.id)}
+          onPlayToggle={onPlayToggle}
         />
       ))}
     </div>

@@ -10,6 +10,7 @@ import CalendarCell from "./components/CalendarCell";
 import ScheduleAssignModal, { type PlaylistPick } from "./components/ScheduleAssignModal";
 import EventCard, { type ScheduleEventCard } from "./components/EventCard";
 import InspectorPanel from "./components/InspectorPanel";
+import DayTimelineGrid from "./components/DayTimelineGrid";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import { useAuth } from "@/app/context/AuthContext";
 import { getApiClient } from "@/lib/api-client";
@@ -27,6 +28,7 @@ import {
   shortDayFromDate,
   HOUR_SLOTS,
   eventMatchesHour,
+  dayColumnFromAnchor,
   type ScheduleViewMode,
   type DayColumn,
 } from "@/lib/schedule-calendar";
@@ -97,11 +99,20 @@ export default function ScheduleClientPage() {
 
   const weekDays = useMemo(() => buildWeekDays(calendarAnchor), [calendarAnchor]);
   const monthWeeks = useMemo(() => buildMonthGrid(calendarAnchor), [calendarAnchor]);
+  const dayColumn = useMemo(() => dayColumnFromAnchor(calendarAnchor), [calendarAnchor]);
 
   const calendarPeriodLabel = useMemo(() => {
     if (viewMode === "month") {
       return calendarAnchor.toLocaleDateString(undefined, {
         month: "long",
+        year: "numeric",
+      });
+    }
+    if (viewMode === "day") {
+      return calendarAnchor.toLocaleDateString(undefined, {
+        weekday: "long",
+        month: "long",
+        day: "numeric",
         year: "numeric",
       });
     }
@@ -118,6 +129,8 @@ export default function ScheduleClientPage() {
         const next = new Date(prev);
         if (viewMode === "month") {
           next.setMonth(next.getMonth() + direction);
+        } else if (viewMode === "day") {
+          next.setDate(next.getDate() + direction);
         } else {
           next.setDate(next.getDate() + direction * 7);
         }
@@ -373,7 +386,9 @@ export default function ScheduleClientPage() {
                     ? renderMonthGrid(seg.events, segRooms, seg.tenantId)
                     : viewMode === "hour"
                       ? renderHourGrid(seg.events, segRooms, seg.tenantId)
-                      : renderWeekGrid(seg.events, segRooms, seg.tenantId)}
+                      : viewMode === "day"
+                        ? renderDayGrid(seg.events, segRooms, seg.tenantId)
+                        : renderWeekGrid(seg.events, segRooms, seg.tenantId)}
                 </div>
               </section>
             );
@@ -409,7 +424,9 @@ export default function ScheduleClientPage() {
           ? renderMonthGrid(events, roomsToShow, workspaceTenantId ?? undefined)
           : viewMode === "hour"
             ? renderHourGrid(events, roomsToShow, workspaceTenantId ?? undefined)
-            : renderWeekGrid(events, roomsToShow, workspaceTenantId ?? undefined)}
+            : viewMode === "day"
+              ? renderDayGrid(events, roomsToShow, workspaceTenantId ?? undefined)
+              : renderWeekGrid(events, roomsToShow, workspaceTenantId ?? undefined)}
       </div>
     );
   };
@@ -992,6 +1009,36 @@ export default function ScheduleClientPage() {
     </div>
   );
 
+  const renderDayGrid = (
+    segmentEvents: ScheduleEventCard[],
+    segmentRooms: { id: string; name: string }[],
+    segmentTenantId?: string
+  ) => {
+    const roomsForGrid =
+      selectedRoom === "all"
+        ? segmentRooms
+        : segmentRooms.filter((r) => r.id === selectedRoom);
+    if (roomsForGrid.length === 0) return null;
+
+    const dayEvents = filterEvents(segmentEvents, {
+      calendarDate: dayColumn.date,
+    });
+
+    return (
+      <DayTimelineGrid
+        rooms={roomsForGrid}
+        events={dayEvents}
+        calendarDate={dayColumn.date}
+        dayShort={dayColumn.short}
+        onEventEdit={openEventInspector}
+        onEventDelete={setPendingDeleteEvent}
+        onQuickCreate={(roomId, day, time, cal) =>
+          openAssignPicker(roomId, day, time, cal, segmentTenantId)
+        }
+      />
+    );
+  };
+
   const renderHourGrid = (
     segmentEvents: ScheduleEventCard[],
     segmentRooms: { id: string; name: string }[],
@@ -1104,6 +1151,11 @@ export default function ScheduleClientPage() {
                         ))}
                       </div>
                     </>
+                  ) : viewMode === "day" ? (
+                    <div className="space-y-2">
+                      <div className="h-10 bg-gray-200 rounded w-full" />
+                      <div className="h-[480px] bg-gray-100 rounded-xl" />
+                    </div>
                   ) : (
                     <>
                       <div className="space-y-4">

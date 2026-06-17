@@ -37,10 +37,13 @@ export function filterLibrary(audios: AudioItem[], query: string, activeCategory
         if (pl.title && item.category !== pl.title) return false;
       }
     } else if (activeCategory !== "All" && activeCategory.startsWith("tag:")) {
-      const tagQ = activeCategory.replace("tag:", "");
+      const tagQ = activeCategory.slice(4).trim();
       const { tags } = parseMediaTags(item.category);
       const merged = [...tags, ...(item.tags ?? [])];
-      if (!merged.some((t) => t.toLowerCase() === tagQ.toLowerCase())) return false;
+      const matchesMerged = merged.some(
+        (t) => t.toLowerCase() === tagQ.toLowerCase() || t.toLowerCase().includes(tagQ.toLowerCase())
+      );
+      if (!matchesMerged && !categoryMatchesTag(item.category, tagQ)) return false;
     } else if (activeCategory !== "All" && item.category !== activeCategory) {
       const { baseCategory } = parseMediaTags(item.category);
       if (baseCategory !== activeCategory) return false;
@@ -67,7 +70,12 @@ export function filterLibrary(audios: AudioItem[], query: string, activeCategory
           return (String(item.addedBy ?? '')).toLowerCase().includes(val);
         }
         if (key === 'tag' || key === 'tags') {
-          return categoryMatchesTag(item.category, val);
+          const { tags } = parseMediaTags(item.category);
+          const merged = [...tags, ...(item.tags ?? [])];
+          return (
+            categoryMatchesTag(item.category, val) ||
+            merged.some((t) => t.toLowerCase().includes(val))
+          );
         }
         const haystack = `${item.title} ${item.category} ${(item.tags ?? []).join(' ')} ${item.duration} ${item.singer ?? ''} ${item.addedBy ?? ''} ${(audioToPlaylists[item.id] ?? []).join(' ')}`.toLowerCase();
         return haystack.includes(tok.toLowerCase());
