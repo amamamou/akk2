@@ -60,7 +60,7 @@ export default function DayTimelineGrid({
   };
 
   return (
-    <div className="min-w-0 overflow-x-auto rounded-xl border border-gray-100 bg-white shadow-sm">
+    <div className="min-w-0 overflow-x-auto rounded-xl border border-gray-100 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm dark:shadow-none">
       <div
         className="grid border-b border-gray-200 bg-gradient-to-b from-gray-50 to-white sticky top-0 z-20"
         style={{
@@ -88,7 +88,7 @@ export default function DayTimelineGrid({
         }}
       >
         <div
-          className="relative border-r border-gray-200 bg-gray-50/80"
+          className="relative border-r border-gray-200 dark:border-zinc-800 bg-gray-50/80 dark:bg-zinc-900/60"
           style={{ height: timelineHeight }}
         >
           {DAY_TIMELINE_HOURS.map((hour, i) => (
@@ -105,7 +105,7 @@ export default function DayTimelineGrid({
         {rooms.map((room) => (
           <div
             key={room.id}
-            className="relative border-r border-gray-100 last:border-r-0 bg-white cursor-pointer group/col"
+            className="relative border-r border-gray-100 dark:border-zinc-800 last:border-r-0 bg-white dark:bg-zinc-900 cursor-pointer group/col"
             style={{ height: timelineHeight }}
             onClick={(ev) => handleColumnClick(ev, room.id)}
             role="presentation"

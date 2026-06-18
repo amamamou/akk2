@@ -480,12 +480,12 @@ export default function AnalyticsClient() {
 
   if (isLoading) {
     return (
-      <div className="flex-1 flex flex-col overflow-hidden bg-white">
-        <div className="sticky top-0 z-10 bg-white">
+      <div className="flex-1 flex flex-col overflow-hidden bg-white dark:bg-[#121214]">
+        <div className="sticky top-0 z-10 bg-white dark:bg-[#121214]">
           <div className="px-8 py-6">
             <div className="flex items-center justify-between">
               <div>
-                <h1 className="text-2xl font-semibold text-gray-900">Analytics</h1>
+                <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">Analytics</h1>
                 <p className="mt-1 text-sm text-gray-500">Playback verification and listening metrics</p>
               </div>
 
@@ -495,7 +495,7 @@ export default function AnalyticsClient() {
                     <select
                       value={selectedWorkspaceClientId}
                       onChange={(e) => handleWorkspaceClientChange(e.target.value)}
-                      className="border border-violet-100 rounded-lg text-sm px-3 py-1.5 bg-violet-50 text-gray-900 outline-none focus:border-violet-200 appearance-none pr-8"
+                      className="border border-violet-100 rounded-lg text-sm px-3 py-1.5 bg-violet-50 text-gray-900 dark:text-gray-100 outline-none focus:border-violet-200 appearance-none pr-8"
                       aria-label="Client workspace"
                     >
                       {workspaceSelectOptions.map((c) => (
@@ -514,7 +514,7 @@ export default function AnalyticsClient() {
                   <select
                     value={selectedPlayerId}
                     onChange={(e) => setSelectedPlayerId(e.target.value)}
-                    className="border border-gray-100 rounded-lg text-sm px-3 py-1.5 bg-white text-gray-900 outline-none focus:border-gray-300 focus:ring-0 appearance-none pr-8 transition-colors hover:border-gray-200"
+                    className="border border-gray-100 dark:border-zinc-800 rounded-lg text-sm px-3 py-1.5 bg-white dark:bg-[#121214] text-gray-900 dark:text-gray-100 outline-none focus:border-gray-300 focus:ring-0 appearance-none pr-8 transition-colors hover:border-gray-200"
                   >
                     <option value="all">All Players</option>
                     {playerOptions.map((p) => (
@@ -530,7 +530,7 @@ export default function AnalyticsClient() {
                 </div>
 
                 {selectedPlayerId !== "all" && (
-                  <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-gray-50 rounded-lg border border-gray-100 text-xs">
+                  <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-gray-50 dark:bg-zinc-900/60 rounded-lg border border-gray-100 dark:border-zinc-800 text-xs">
                     <div
                       className={cn(
                         "w-1 h-1 rounded-full",
@@ -549,7 +549,7 @@ export default function AnalyticsClient() {
                   <select
                     value={timeRange}
                     onChange={(e) => setTimeRange(e.target.value as TimeRange)}
-                    className="border border-gray-100 rounded-lg text-sm px-3 py-1.5 bg-white text-gray-900 outline-none focus:border-gray-300 focus:ring-0 appearance-none pr-8 transition-colors hover:border-gray-200"
+                    className="border border-gray-100 dark:border-zinc-800 rounded-lg text-sm px-3 py-1.5 bg-white dark:bg-[#121214] text-gray-900 dark:text-gray-100 outline-none focus:border-gray-300 focus:ring-0 appearance-none pr-8 transition-colors hover:border-gray-200"
                   >
                     <option value="today">Today</option>
                     <option value="7d">Last 7 Days</option>
@@ -565,7 +565,7 @@ export default function AnalyticsClient() {
           </div>
         </div>
 
-        <div className="flex-1 overflow-auto bg-white">
+        <div className="flex-1 overflow-auto bg-white dark:bg-[#121214]">
           <div className="px-6 py-6">
             {/* Quick stats skeleton row */}
             <div className="mb-6">
@@ -600,12 +600,12 @@ export default function AnalyticsClient() {
   }
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden bg-white">
+    <div className="flex-1 flex flex-col overflow-hidden bg-white dark:bg-[#121214]">
       <div className="sticky top-0 z-10 ] ">
         <div className="px-8 py-6">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-2xl font-semibold text-gray-900">Analytics</h1>
+              <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">Analytics</h1>
               <p className="mt-1 text-sm text-gray-500">Playback verification and listening metrics</p>
             </div>
 
@@ -615,7 +615,7 @@ export default function AnalyticsClient() {
                   <select
                     value={selectedWorkspaceClientId}
                     onChange={(e) => handleWorkspaceClientChange(e.target.value)}
-                    className="border border-violet-100 rounded-lg text-sm px-3 py-1.5 bg-violet-50 text-gray-900 outline-none focus:border-violet-200 appearance-none pr-8"
+                    className="border border-violet-100 rounded-lg text-sm px-3 py-1.5 bg-violet-50 text-gray-900 dark:text-gray-100 outline-none focus:border-violet-200 appearance-none pr-8"
                     aria-label="Client workspace"
                   >
                     {workspaceSelectOptions.map((c) => (
@@ -634,7 +634,7 @@ export default function AnalyticsClient() {
                 <select
                   value={selectedPlayerId}
                   onChange={(e) => setSelectedPlayerId(e.target.value)}
-                  className="border border-gray-100 rounded-lg text-sm px-3 py-1.5 bg-white text-gray-900 outline-none focus:border-gray-300 focus:ring-0 appearance-none pr-8 transition-colors hover:border-gray-200"
+                  className="border border-gray-100 dark:border-zinc-800 rounded-lg text-sm px-3 py-1.5 bg-white dark:bg-[#121214] text-gray-900 dark:text-gray-100 outline-none focus:border-gray-300 focus:ring-0 appearance-none pr-8 transition-colors hover:border-gray-200"
                 >
                   <option value="all">All Players</option>
                   {playerOptions.map((p) => (
@@ -650,7 +650,7 @@ export default function AnalyticsClient() {
               </div>
 
               {selectedPlayerId !== "all" && (
-                <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-gray-50 rounded-lg border border-gray-100 text-xs">
+                <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-gray-50 dark:bg-zinc-900/60 rounded-lg border border-gray-100 dark:border-zinc-800 text-xs">
                   <div
                     className={cn(
                       "w-1 h-1 rounded-full",
@@ -669,7 +669,7 @@ export default function AnalyticsClient() {
                 <select
                   value={timeRange}
                   onChange={(e) => setTimeRange(e.target.value as TimeRange)}
-                  className="border border-gray-100 rounded-lg text-sm px-3 py-1.5 bg-white text-gray-900 outline-none focus:border-gray-300 focus:ring-0 appearance-none pr-8 transition-colors hover:border-gray-200"
+                  className="border border-gray-100 dark:border-zinc-800 rounded-lg text-sm px-3 py-1.5 bg-white dark:bg-[#121214] text-gray-900 dark:text-gray-100 outline-none focus:border-gray-300 focus:ring-0 appearance-none pr-8 transition-colors hover:border-gray-200"
                 >
                   <option value="today">Today</option>
                   <option value="7d">Last 7 Days</option>

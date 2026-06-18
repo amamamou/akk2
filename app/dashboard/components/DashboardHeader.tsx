@@ -24,10 +24,10 @@ export default function DashboardHeader({ stats, showStats = true }: { stats: Qu
 				<div className="flex items-center justify-between gap-4 mb-5">
 					<div className="flex items-start gap-4 min-w-0">
 						<div className="flex flex-col gap-1 min-w-0">
-							<h1 className="text-3xl font-semibold text-gray-900 leading-tight">
+							<h1 className="text-3xl font-semibold text-gray-900 dark:text-gray-100 leading-tight">
 								{`Good morning, ${displayName} 👋`}
 							</h1>
-							<p className="text-sm text-gray-500 max-w-xl">
+							<p className="text-sm text-gray-500 dark:text-zinc-400 max-w-xl">
 								Monitor venues, players, and scheduled broadcasts in one place.
 							</p>
 						</div>
@@ -51,13 +51,17 @@ export default function DashboardHeader({ stats, showStats = true }: { stats: Qu
 	h-12
 	px-5
 	bg-white
+	dark:bg-zinc-900
 	text-gray-900
+	dark:text-gray-100
 	font-medium
 	text-sm
 	rounded-2xl
 	border
 	border-gray-100
+	dark:border-zinc-800
 	shadow-[0_8px_30px_rgba(0,0,0,0.04)]
+	dark:shadow-none
 	transition-all
 	"
 >

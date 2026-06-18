@@ -82,7 +82,7 @@ export default function CalendarCell({
       role="list"
       aria-label={`Schedule cell ${day} ${time} for room ${roomId}`}
       className={cn(
-        "group relative min-h-[88px] p-3 transition-all bg-white overflow-visible border-r border-gray-100 last:border-r-0",
+        "group relative min-h-[88px] p-3 transition-all bg-white dark:bg-zinc-900 overflow-visible border-r border-gray-100 dark:border-zinc-800 last:border-r-0",
         isEmpty && "flex flex-col"
       )}
     >

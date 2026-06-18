@@ -19,9 +19,9 @@ interface SystemAlertsProps {
 export default function SystemAlerts({ alerts, isLoading }: SystemAlertsProps) {
   if (isLoading) {
     return (
-      <div className="bg-white border border-gray-200 rounded-lg shadow-sm p-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">System Alerts</h2>
-        <div className="text-center text-sm text-gray-500">Loading alerts...</div>
+      <div className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-lg shadow-sm dark:shadow-none p-6">
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">System Alerts</h2>
+        <div className="text-center text-sm text-gray-500 dark:text-zinc-400">Loading alerts...</div>
       </div>
     );
   }
@@ -66,15 +66,18 @@ strokeWidth={1.9} className="text-red-600" />;
 <div
   className="
     bg-white
+    dark:bg-zinc-900
     rounded-2xl
     border
     border-gray-100
+    dark:border-zinc-800
     shadow-[0_8px_30px_rgba(0,0,0,0.04)]
+    dark:shadow-none
     p-6
   "
->      <h2 className="text-lg font-semibold text-gray-900 mb-4">System Alerts</h2>
+>      <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">System Alerts</h2>
       {alerts.length === 0 ? (
-        <div className="text-center text-sm text-gray-500">
+        <div className="text-center text-sm text-gray-500 dark:text-zinc-400">
 <div className="flex items-center justify-center gap-3">
 <CheckCircle
   size={18}
@@ -106,8 +109,8 @@ strokeWidth={1.9} className="text-red-600" />;
 >                {getSeverityIcon(alert.severity)}
               </div>
               <div className="flex-1 min-w-0">
-<div className="text-sm font-semibold text-gray-900">{alert.title}</div>
-                <div className="text-xs text-gray-500 mt-1">{alert.message}</div>
+<div className="text-sm font-semibold text-gray-900 dark:text-gray-100">{alert.title}</div>
+                <div className="text-xs text-gray-500 dark:text-zinc-400 mt-1">{alert.message}</div>
               </div>
             </div>
           ))}

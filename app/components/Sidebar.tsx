@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { useAuth } from "@/app/context/AuthContext";
+import { useTheme } from "@/app/context/ThemeContext";
 import {
   SunDim,
   MoonStar,
@@ -21,11 +22,10 @@ import { isSuperAdminRole } from "@/lib/rbac";
 
 export default function Sidebar() {
   const { logout, user } = useAuth();
+  const { theme, setTheme } = useTheme();
   const router = useRouter();
   const [showLogoutDialog, setShowLogoutDialog] = useState(false);
 
-  // RBAC: the /clients route is Super Admin only. Use the centralized type-safe helper
-  // instead of a loose /admin/i regex (which would also match CLIENT_ADMIN, etc.).
   const isAdmin = isSuperAdminRole(user?.role);
 
   const handleLogoutConfirm = () => {
@@ -59,15 +59,23 @@ export default function Sidebar() {
 
   return (
     <>
-      <aside className="fixed bottom-0 left-0 right-0 lg:static w-full h-20 lg:h-full lg:w-[76px] bg-white flex lg:flex-col items-center justify-between lg:justify-start lg:py-4 px-4 lg:px-0 border-t lg:border-t-0 border-zinc-200">
-        {/* TOP CAPSULE - Hidden on mobile */}
-        <div className="hidden lg:flex bg-[#F4F4F5] rounded-full px-2 py-2 flex-col items-center gap-2">
-          <SidebarButton icon={<SunDim size={16} strokeWidth={1.9} />} />
-          <SidebarButton icon={<MoonStar size={16} strokeWidth={1.9} />} />
+      <aside className="fixed bottom-0 left-0 right-0 lg:static w-full h-20 lg:h-full lg:w-[76px] bg-white dark:bg-[#121214] flex lg:flex-col items-center justify-between lg:justify-start lg:py-4 px-4 lg:px-0 border-t lg:border-t-0 border-zinc-200 dark:border-zinc-800">
+        <div className="hidden lg:flex bg-[#F4F4F5] dark:bg-zinc-900 rounded-full px-2 py-2 flex-col items-center gap-2">
+          <ThemeSidebarButton
+            icon={<SunDim size={16} strokeWidth={1.9} />}
+            active={theme === "light"}
+            label="Light mode"
+            onClick={() => setTheme("light")}
+          />
+          <ThemeSidebarButton
+            icon={<MoonStar size={16} strokeWidth={1.9} />}
+            active={theme === "dark"}
+            label="Dark mode"
+            onClick={() => setTheme("dark")}
+          />
         </div>
 
-        {/* CENTER CAPSULE */}
-        <div className="flex lg:flex-col lg:mt-6 bg-[#F4F4F5] rounded-full lg:px-2.5 lg:py-3 px-2 py-2 items-center gap-2">
+        <div className="flex lg:flex-col lg:mt-6 bg-[#F4F4F5] dark:bg-zinc-900 rounded-full lg:px-2.5 lg:py-3 px-2 py-2 items-center gap-2">
           <SidebarButton
             href="/dashboard"
             icon={<LayoutDashboard size={15} strokeWidth={1.9} />}
@@ -111,8 +119,7 @@ export default function Sidebar() {
           />
         </div>
 
-        {/* BOTTOM CAPSULE */}
-        <div className="bg-[#F4F4F5] rounded-full px-2 py-2 flex lg:flex-col items-center gap-2 lg:mt-auto">
+        <div className="bg-[#F4F4F5] dark:bg-zinc-900 rounded-full px-2 py-2 flex lg:flex-col items-center gap-2 lg:mt-auto">
           <SidebarButton
             icon={
               <LogOut
@@ -137,6 +144,45 @@ export default function Sidebar() {
         isDangerous={false}
       />
     </>
+  );
+}
+
+function ThemeSidebarButton({
+  icon,
+  active,
+  label,
+  onClick,
+}: {
+  icon: React.ReactNode;
+  active: boolean;
+  label: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={label}
+      aria-pressed={active}
+      className={`
+        flex items-center justify-center
+        h-8 w-8 rounded-full
+        transition-all duration-200
+        relative
+        ${
+          active
+            ? "bg-[#111827] text-white dark:bg-zinc-100 dark:text-zinc-900"
+            : "text-zinc-500 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800 hover:text-zinc-800 dark:hover:text-zinc-200"
+        }
+      `}
+    >
+      {active && (
+        <div className="absolute inset-0 rounded-full overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-b from-white/20 via-transparent to-transparent opacity-50" />
+        </div>
+      )}
+      <span className="relative z-10">{icon}</span>
+    </button>
   );
 }
 
@@ -190,12 +236,11 @@ function SidebarButton({
         group
         ${
           isActive
-            ? "bg-[#111827] text-white"
-            : "text-zinc-500 hover:bg-zinc-50 hover:text-zinc-800"
+            ? "bg-[#111827] text-white dark:bg-zinc-100 dark:text-zinc-900"
+            : "text-zinc-500 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800 hover:text-zinc-800 dark:hover:text-zinc-200"
         }
       `}
     >
-      {/* Subtle shine effect on active state */}
       {isActive && (
         <div className="absolute inset-0 rounded-full overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-b from-white/20 via-transparent to-transparent opacity-50" />

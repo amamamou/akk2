@@ -401,7 +401,7 @@ export default function ScheduleClientPage() {
 
       if (segmentsToRender.length === 0) {
         return (
-          <div className="flex items-center justify-center h-full min-h-[240px] text-sm text-gray-500">
+          <div className="flex items-center justify-center h-full min-h-[240px] text-sm text-gray-500 dark:text-zinc-400">
             No client workspaces available.
           </div>
         );
@@ -440,8 +440,8 @@ export default function ScheduleClientPage() {
       return (
         <div className="flex items-center justify-center h-full min-h-[240px]">
           <div className="text-center">
-            <h2 className="font-semibold text-gray-900">No players yet</h2>
-            <p className="text-sm text-gray-500 mt-1">
+            <h2 className="font-semibold text-gray-900 dark:text-gray-100">No players yet</h2>
+            <p className="text-sm text-gray-500 dark:text-zinc-400 mt-1">
               Create a player in the Players page to get started
             </p>
           </div>
@@ -451,7 +451,7 @@ export default function ScheduleClientPage() {
 
     if (roomsToShow.length === 0) {
       return (
-        <div className="flex items-center justify-center h-full min-h-[240px] text-sm text-gray-500">
+        <div className="flex items-center justify-center h-full min-h-[240px] text-sm text-gray-500 dark:text-zinc-400">
           No room matches the selected filter.
         </div>
       );
@@ -922,7 +922,7 @@ export default function ScheduleClientPage() {
     <>
       {daysToShow.length > 0 && (
         <div
-          className="grid border-b border-gray-200 bg-gray-50 sticky top-0 z-20"
+          className="grid border-b border-gray-200 dark:border-zinc-800 bg-gray-50 dark:bg-zinc-900/60 sticky top-0 z-20"
           style={{
             gridTemplateColumns: `repeat(${daysToShow.length}, minmax(0, 1fr))`,
           }}
@@ -930,7 +930,7 @@ export default function ScheduleClientPage() {
           {daysToShow.map((day) => (
             <div
               key={day.short}
-              className="px-3 py-2 text-center text-xs font-semibold uppercase tracking-wide text-gray-600 border-r border-gray-200 last:border-r-0"
+              className="px-3 py-2 text-center text-xs font-semibold uppercase tracking-wide text-gray-600 dark:text-zinc-400 border-r border-gray-200 dark:border-zinc-800 last:border-r-0"
             >
               {formatDayHeader(day)}
             </div>
@@ -938,8 +938,8 @@ export default function ScheduleClientPage() {
         </div>
       )}
       {roomsForGrid.map((room) => (
-        <div key={room.id} className="border-b border-gray-200">
-          <div className="font-medium px-4 py-2.5 bg-white text-sm text-gray-900 border-b border-gray-100">
+        <div key={room.id} className="border-b border-gray-200 dark:border-zinc-800">
+          <div className="font-medium px-4 py-2.5 bg-white dark:bg-zinc-900 text-sm text-gray-900 dark:text-gray-100 border-b border-gray-100 dark:border-zinc-800">
             {room.name}
           </div>
           <div
@@ -982,7 +982,7 @@ export default function ScheduleClientPage() {
     segmentTenantId?: string
   ) => (
     <div className="min-w-0">
-      <div className="grid grid-cols-7 border-b border-gray-200 bg-gray-50 text-xs font-semibold text-gray-600 uppercase">
+      <div className="grid grid-cols-7 border-b border-gray-200 dark:border-zinc-800 bg-gray-50 dark:bg-zinc-900/60 text-xs font-semibold text-gray-600 dark:text-zinc-400 uppercase">
         {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => (
           <div key={d} className="px-2 py-2 text-center">
             {d}
@@ -990,7 +990,7 @@ export default function ScheduleClientPage() {
         ))}
       </div>
       {monthWeeks.map((week, wi) => (
-        <div key={wi} className="grid grid-cols-7 border-b border-gray-100 min-h-[120px]">
+        <div key={wi} className="grid grid-cols-7 border-b border-gray-100 dark:border-zinc-800 min-h-[120px]">
           {week.map((cell, ci) => {
             const cellEvents =
               cell.inMonth && cell.date
@@ -1007,13 +1007,13 @@ export default function ScheduleClientPage() {
               <div
                 key={`${wi}-${ci}`}
                 className={cn(
-                  "border-r border-gray-100 p-2 min-h-[120px] flex flex-col",
-                  !cell.inMonth && "bg-gray-50/50"
+                  "border-r border-gray-100 dark:border-zinc-800 p-2 min-h-[120px] flex flex-col",
+                  !cell.inMonth && "bg-gray-50 dark:bg-zinc-900/60/50"
                 )}
               >
                 {cell.day != null && cell.inMonth && (
                   <>
-                    <div className="text-[10px] font-medium text-gray-500 mb-1">{cell.day}</div>
+                    <div className="text-[10px] font-medium text-gray-500 dark:text-zinc-400 mb-1">{cell.day}</div>
                     <div className="flex-1 space-y-1 overflow-y-auto max-h-[200px]">
                       {cellEvents.map((evt) => (
                         <EventCard
@@ -1038,7 +1038,7 @@ export default function ScheduleClientPage() {
                             segmentTenantId
                           )
                         }
-                        className="mt-1 w-full flex items-center justify-center rounded border border-dashed border-gray-200 py-1 text-gray-400 hover:border-[#A473FF]/50 hover:text-[#A473FF]"
+                        className="mt-1 w-full flex items-center justify-center rounded border border-dashed border-gray-200 dark:border-zinc-800 py-1 text-gray-400 hover:border-[#A473FF]/50 hover:text-[#A473FF]"
                       >
                         <Plus size={16} />
                       </button>
@@ -1090,18 +1090,18 @@ export default function ScheduleClientPage() {
   ) => (
     <>
       <div
-        className="grid border-b border-gray-200 bg-gray-50 sticky top-0 z-20"
+        className="grid border-b border-gray-200 dark:border-zinc-800 bg-gray-50 dark:bg-zinc-900/60 sticky top-0 z-20"
         style={{
           gridTemplateColumns: `80px repeat(${Math.max(1, hourDayColumns.length)}, minmax(0, 1fr))`,
         }}
       >
-        <div className="px-2 py-2 text-xs font-semibold text-gray-500 border-r border-gray-200">
+        <div className="px-2 py-2 text-xs font-semibold text-gray-500 dark:text-zinc-400 border-r border-gray-200 dark:border-zinc-800">
           Hour
         </div>
         {hourDayColumns.map((day) => (
           <div
             key={day.short}
-            className="px-3 py-2 text-center text-xs font-semibold uppercase tracking-wide text-gray-600 border-r border-gray-200 last:border-r-0"
+            className="px-3 py-2 text-center text-xs font-semibold uppercase tracking-wide text-gray-600 dark:text-zinc-400 border-r border-gray-200 dark:border-zinc-800 last:border-r-0"
           >
             <div>{day.short}</div>
             <div className="text-[10px] text-gray-400 font-normal normal-case">
@@ -1113,12 +1113,12 @@ export default function ScheduleClientPage() {
       {HOUR_SLOTS.map((slot) => (
         <div
           key={slot}
-          className="grid border-b border-gray-100"
+          className="grid border-b border-gray-100 dark:border-zinc-800"
           style={{
             gridTemplateColumns: `80px repeat(${Math.max(1, hourDayColumns.length)}, minmax(0, 1fr))`,
           }}
         >
-          <div className="px-2 py-3 text-xs text-gray-500 border-r border-gray-100 bg-gray-50/80">
+          <div className="px-2 py-3 text-xs text-gray-500 dark:text-zinc-400 border-r border-gray-100 dark:border-zinc-800 bg-gray-50 dark:bg-zinc-900/60/80">
             {slot}
           </div>
           {hourDayColumns.map((day) => {
@@ -1156,7 +1156,7 @@ export default function ScheduleClientPage() {
   if (authLoading || isLoading) {
     return (
       <DndProvider backend={HTML5Backend}>
-        <div className="flex-1 flex flex-col overflow-hidden">
+        <div className="flex-1 flex flex-col overflow-hidden bg-white dark:bg-[#121214]">
           <ScheduleToolbar
             query={query}
             onQueryChange={setQuery}
@@ -1180,7 +1180,7 @@ export default function ScheduleClientPage() {
           />
 
           <div className="px-6 py-6">
-            <div className="bg-white rounded-[28px] border border-gray-100 shadow-[0_8px_30px_rgba(0,0,0,0.04)] flex flex-col min-h-[calc(100vh-220px)] overflow-hidden">
+            <div className="bg-white dark:bg-zinc-900 rounded-[28px] border border-gray-100 dark:border-zinc-800 shadow-[0_8px_30px_rgba(0,0,0,0.04)] flex flex-col min-h-[calc(100vh-220px)] overflow-hidden">
               <div className="flex-1 overflow-auto p-6">
                 <div className="animate-pulse">
                   {viewMode === "month" ? (
@@ -1221,7 +1221,7 @@ export default function ScheduleClientPage() {
 
   return (
     <DndProvider backend={HTML5Backend}>
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="flex-1 flex flex-col overflow-hidden bg-white dark:bg-[#121214]">
         <ScheduleToolbar
           query={query}
           onQueryChange={setQuery}
@@ -1245,7 +1245,7 @@ export default function ScheduleClientPage() {
         />
 
       <div className="px-6 py-6">
-        <div className="bg-white rounded-[28px] border border-gray-100 shadow-[0_8px_30px_rgba(0,0,0,0.04)] flex flex-col min-h-[calc(100vh-220px)] overflow-hidden">
+        <div className="bg-white dark:bg-zinc-900 rounded-[28px] border border-gray-100 dark:border-zinc-800 shadow-[0_8px_30px_rgba(0,0,0,0.04)] flex flex-col min-h-[calc(100vh-220px)] overflow-hidden">
           <div className="flex-1 overflow-auto">
             {error && (
               <div className="mx-4 my-2 p-2 bg-red-50 border border-red-200 rounded text-sm text-red-800 flex gap-2">
@@ -1264,10 +1264,10 @@ export default function ScheduleClientPage() {
             {isSuperAdmin && !workspaceTenantId && !isAllClientsWorkspace ? (
               <div className="flex items-center justify-center h-full min-h-[240px]">
                 <div className="text-center max-w-md px-4">
-                  <h2 className="font-semibold text-gray-900">
+                  <h2 className="font-semibold text-gray-900 dark:text-gray-100">
                     Select a client workspace
                   </h2>
-                  <p className="text-sm text-gray-500 mt-1">
+                  <p className="text-sm text-gray-500 dark:text-zinc-400 mt-1">
                     Choose an active client or All Clients from the dropdown above.
                   </p>
                 </div>

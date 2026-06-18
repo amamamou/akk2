@@ -38,7 +38,7 @@ export default function QuickStatsGrid({ stats }: { stats: QuickStat[] }) {
 				// Attempt to parse trend into delta + label (e.g. "+12% this month")
 				const [delta, ...labelParts] = stat.trend ? stat.trend.split(" ") : ["", ""];
 				const labelText = labelParts.join(" ");
-				const valueTone = stat.valueClassName ?? (isFirst ? "text-white" : "text-zinc-900");
+				const valueTone = stat.valueClassName ?? (isFirst ? "text-white" : "text-zinc-900 dark:text-gray-100");
 
 				return (
 					<div
@@ -47,14 +47,14 @@ export default function QuickStatsGrid({ stats }: { stats: QuickStat[] }) {
 							`relative overflow-hidden rounded-2xl px-6 py-6 flex flex-col transition-all h-[200px] ` +
 							(isFirst
 								? `bg-[linear-gradient(135deg,#111827_0%,#A473FF_100%)] text-white shadow-[0_8px_30px_rgba(0,0,0,0.04)]`
-								: `bg-white border border-gray-100 text-gray-900 shadow-[0_8px_30px_rgba(0,0,0,0.04)]`)
+								: `bg-white dark:bg-zinc-900 border border-gray-100 dark:border-zinc-800 text-gray-900 dark:text-gray-100 shadow-[0_8px_30px_rgba(0,0,0,0.04)] dark:shadow-none`)
 						}
 					>
 
 						{/* header: label left, tiny icon right */}
 						<div className="flex items-center justify-between">
-							<span className={isFirst ? "text-sm font-medium text-white/80" : "text-sm font-medium text-zinc-500"}>{stat.label}</span>
-							{Icon && <Icon size={18} strokeWidth={1.9} className={isFirst ? "text-white/70" : "text-zinc-400"} />}
+							<span className={isFirst ? "text-sm font-medium text-white/80" : "text-sm font-medium text-zinc-500 dark:text-zinc-400"}>{stat.label}</span>
+							{Icon && <Icon size={18} strokeWidth={1.9} className={isFirst ? "text-white/70" : "text-zinc-400 dark:text-zinc-500"} />}
 						</div>
 
 						{/* value */}
@@ -71,7 +71,7 @@ export default function QuickStatsGrid({ stats }: { stats: QuickStat[] }) {
 						)}
 
 						{/* divider + footer (visible) - structured footer + status */}
-						<div className={isFirst ? "mt-auto pt-4 border-t border-white/15" : "mt-auto pt-4 border-t border-gray-100"}>
+						<div className={isFirst ? "mt-auto pt-4 border-t border-white/15" : "mt-auto pt-4 border-t border-gray-100 dark:border-zinc-800"}>
 							<div className="flex items-center justify-between">
 								<div>
 									<div className="flex items-center gap-2">

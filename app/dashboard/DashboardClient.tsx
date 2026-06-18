@@ -250,35 +250,35 @@ export default function DashboardClient() {
 
 if (isLoading) {
   return (
-    <div className="flex-1 flex flex-col overflow-hidden bg-white">
-      <div className="sticky top-0 z-10 bg-white">
+    <div className="flex-1 flex flex-col overflow-hidden bg-white dark:bg-[#121214]">
+      <div className="sticky top-0 z-10 bg-white dark:bg-[#121214]">
         <div className="px-8 py-6">
           <div className="flex items-center justify-between">
             <div>
-              <div className="w-56 h-8 bg-gray-200 rounded-md" aria-hidden="true" />
-              <div className="w-96 h-4 bg-gray-200 rounded-md mt-2" aria-hidden="true" />
+              <div className="w-56 h-8 bg-gray-200 dark:bg-zinc-800 rounded-md" aria-hidden="true" />
+              <div className="w-96 h-4 bg-gray-200 dark:bg-zinc-800 rounded-md mt-2" aria-hidden="true" />
             </div>
 
             <div className="flex items-center gap-3 shrink-0">
               <div className="hidden sm:block">
-                <div className="w-72 h-12 bg-gray-200 rounded-2xl border border-gray-200" aria-hidden="true" />
+                <div className="w-72 h-12 bg-gray-200 dark:bg-zinc-800 rounded-2xl border border-gray-200 dark:border-zinc-700" aria-hidden="true" />
               </div>
-              <div className="w-36 h-12 bg-gray-200 rounded-2xl border border-gray-200" aria-hidden="true" />
+              <div className="w-36 h-12 bg-gray-200 dark:bg-zinc-800 rounded-2xl border border-gray-200 dark:border-zinc-700" aria-hidden="true" />
             </div>
           </div>
         </div>
       </div>
 
-      <div className="flex-1 overflow-auto bg-white">
+      <div className="flex-1 overflow-auto bg-white dark:bg-[#121214]">
         <div className="px-6 py-6">
 
           {/* Quick stats skeleton row */}
           <div className="mb-6">
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 animate-pulse">
-              <div className="h-20 bg-gray-200 rounded-lg border border-gray-200" aria-hidden="true" />
-              <div className="h-20 bg-gray-200 rounded-lg border border-gray-200" aria-hidden="true" />
-              <div className="h-20 bg-gray-200 rounded-lg border border-gray-200" aria-hidden="true" />
-              <div className="h-20 bg-gray-200 rounded-lg border border-gray-200" aria-hidden="true" />
+              <div className="h-20 bg-gray-200 dark:bg-zinc-800 rounded-lg border border-gray-200 dark:border-zinc-700" aria-hidden="true" />
+              <div className="h-20 bg-gray-200 dark:bg-zinc-800 rounded-lg border border-gray-200 dark:border-zinc-700" aria-hidden="true" />
+              <div className="h-20 bg-gray-200 dark:bg-zinc-800 rounded-lg border border-gray-200 dark:border-zinc-700" aria-hidden="true" />
+              <div className="h-20 bg-gray-200 dark:bg-zinc-800 rounded-lg border border-gray-200 dark:border-zinc-700" aria-hidden="true" />
             </div>
           </div>
 
@@ -286,14 +286,14 @@ if (isLoading) {
           <div className="animate-pulse">
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               <div className="lg:col-span-2 space-y-6">
-                <div className="h-40 bg-gray-200 rounded-[12px] border border-gray-200" aria-hidden="true" />
-                <div className="h-60 bg-gray-200 rounded-[12px] border border-gray-200" aria-hidden="true" />
+                <div className="h-40 bg-gray-200 dark:bg-zinc-800 rounded-[12px] border border-gray-200 dark:border-zinc-700" aria-hidden="true" />
+                <div className="h-60 bg-gray-200 dark:bg-zinc-800 rounded-[12px] border border-gray-200 dark:border-zinc-700" aria-hidden="true" />
               </div>
 
               <div className="space-y-6">
-                <div className="h-24 bg-gray-200 rounded-[12px] border border-gray-200" aria-hidden="true" />
-                <div className="h-40 bg-gray-200 rounded-[12px] border border-gray-200" aria-hidden="true" />
-                <div className="h-20 bg-gray-200 rounded-[12px] border border-gray-200" aria-hidden="true" />
+                <div className="h-24 bg-gray-200 dark:bg-zinc-800 rounded-[12px] border border-gray-200 dark:border-zinc-700" aria-hidden="true" />
+                <div className="h-40 bg-gray-200 dark:bg-zinc-800 rounded-[12px] border border-gray-200 dark:border-zinc-700" aria-hidden="true" />
+                <div className="h-20 bg-gray-200 dark:bg-zinc-800 rounded-[12px] border border-gray-200 dark:border-zinc-700" aria-hidden="true" />
               </div>
             </div>
           </div>
@@ -305,9 +305,9 @@ if (isLoading) {
 }
 
   return (
-    <div className="flex-1 overflow-auto bg-white">
+    <div className="flex-1 overflow-auto bg-white dark:bg-[#121214]">
       {error && (
-        <div className="mx-8 mt-6 p-3 rounded-lg bg-red-50 border border-red-200 text-sm text-red-800">
+        <div className="mx-8 mt-6 p-3 rounded-lg bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900/50 text-sm text-red-800 dark:text-red-300">
           {error}
         </div>
       )}

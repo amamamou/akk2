@@ -273,12 +273,12 @@ export default function ClientsClient() {
 
 	if (authLoading || pageLoading) {
 		return (
-			<div className="flex-1 flex flex-col overflow-hidden bg-white">
-				<div className="sticky top-0 z-10 bg-white">
+			<div className="flex-1 flex flex-col overflow-hidden bg-white dark:bg-[#121214]">
+				<div className="sticky top-0 z-10 bg-white dark:bg-[#121214]">
 					<div className="px-8 py-6">
 						<div className="flex items-center justify-between">
 							<div>
-								<h1 className="text-2xl font-semibold text-gray-900">Clients</h1>
+								<h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">Clients</h1>
 								<p className="mt-1 text-sm text-gray-500">Manage tenant accounts, subscription tiers, and operational limits.</p>
 							</div>
 
@@ -287,7 +287,7 @@ export default function ClientsClient() {
 									type="button"
 									onClick={() => setCreateOpen(true)}
 									className={
-										`group inline-flex items-center gap-3 h-12 px-5 bg-white text-gray-900 font-medium text-sm rounded-2xl border border-gray-100 shadow-[0_8px_30px_rgba(0,0,0,0.04)] transition-all hover:shadow-lg hover:translate-y-0.5 cursor-pointer`
+										`group inline-flex items-center gap-3 h-12 px-5 bg-white dark:bg-[#121214] text-gray-900 dark:text-gray-100 font-medium text-sm rounded-2xl border border-gray-100 dark:border-zinc-800 shadow-[0_8px_30px_rgba(0,0,0,0.04)] transition-all hover:shadow-lg hover:translate-y-0.5 cursor-pointer`
 									}
 								>
 									<span className="inline-flex items-center justify-center transition-colors">
@@ -315,10 +315,10 @@ export default function ClientsClient() {
 										h-12
 										pl-11
 										pr-10
-										bg-white
+										bg-white dark:bg-[#121214]
 										rounded-2xl
 										border
-										border-gray-100
+										border-gray-100 dark:border-zinc-800
 										shadow-[0_8px_30px_rgba(0,0,0,0.04)]
 										text-sm
 										text-gray-700
@@ -348,35 +348,35 @@ export default function ClientsClient() {
 						<div className="space-y-6">
 							{[1, 2, 3, 4].map((i) => (
 								<div key={i}>
-									<div className="bg-white rounded-[28px] border border-gray-100 shadow-[0_8px_30px_rgba(0,0,0,0.04)] flex flex-col overflow-hidden animate-pulse">
+									<div className="bg-white dark:bg-[#121214] rounded-[28px] border border-gray-100 dark:border-zinc-800 shadow-[0_8px_30px_rgba(0,0,0,0.04)] flex flex-col overflow-hidden animate-pulse">
 										<div className="px-5 py-5">
 											<div className="flex items-start justify-between gap-4">
 												<div className="min-w-0 flex-1">
 													<div className="flex items-center gap-3">
-														<div className="h-10 w-10 rounded-full bg-gray-200" />
+														<div className="h-10 w-10 rounded-full bg-gray-200 dark:bg-zinc-800" />
 														<div className="flex-1">
-															<div className="h-4 bg-gray-200 rounded w-48 mb-2" />
-															<div className="h-3 bg-gray-200 rounded w-32" />
+															<div className="h-4 bg-gray-200 dark:bg-zinc-800 rounded w-48 mb-2" />
+															<div className="h-3 bg-gray-200 dark:bg-zinc-800 rounded w-32" />
 														</div>
 													</div>
 
 													<div className="mt-4 grid gap-3 text-sm text-gray-600 sm:grid-cols-2 lg:grid-cols-4">
-														<div className="h-3 bg-gray-200 rounded w-full" />
-														<div className="h-3 bg-gray-200 rounded w-full" />
-														<div className="h-3 bg-gray-200 rounded w-full" />
-														<div className="h-3 bg-gray-200 rounded w-full" />
+														<div className="h-3 bg-gray-200 dark:bg-zinc-800 rounded w-full" />
+														<div className="h-3 bg-gray-200 dark:bg-zinc-800 rounded w-full" />
+														<div className="h-3 bg-gray-200 dark:bg-zinc-800 rounded w-full" />
+														<div className="h-3 bg-gray-200 dark:bg-zinc-800 rounded w-full" />
 													</div>
 
 													<div className="mt-4 grid gap-3 sm:grid-cols-3">
-														<div className="h-6 bg-gray-200 rounded w-full" />
-														<div className="h-6 bg-gray-200 rounded w-full" />
-														<div className="h-6 bg-gray-200 rounded w-full" />
+														<div className="h-6 bg-gray-200 dark:bg-zinc-800 rounded w-full" />
+														<div className="h-6 bg-gray-200 dark:bg-zinc-800 rounded w-full" />
+														<div className="h-6 bg-gray-200 dark:bg-zinc-800 rounded w-full" />
 													</div>
 												</div>
 
 												<div className="flex shrink-0 flex-col items-end gap-2 pt-1">
-													<div className="h-8 w-24 bg-gray-200 rounded" />
-													<div className="h-5 w-5 bg-gray-200 rounded-full" />
+													<div className="h-8 w-24 bg-gray-200 dark:bg-zinc-800 rounded" />
+													<div className="h-5 w-5 bg-gray-200 dark:bg-zinc-800 rounded-full" />
 												</div>
 											</div>
 										</div>
@@ -395,7 +395,7 @@ export default function ClientsClient() {
 			<div className="flex-1 overflow-auto ">
 				<div className="px-8 py-8">
 					<div className="max-w-2xl rounded-2xl border border-gray-200  p-8 shadow-sm">
-						<div className="flex items-center gap-3 text-gray-900">
+						<div className="flex items-center gap-3 text-gray-900 dark:text-gray-100">
 							<ShieldAlert className="h-5 w-5 text-amber-500" />
 							<h1 className="text-xl font-semibold">Clients</h1>
 						</div>
@@ -414,12 +414,12 @@ export default function ClientsClient() {
 	}
 
 	return (
-		<div className="flex-1 flex flex-col overflow-hidden bg-white">
-			<div className="sticky top-0 z-10 bg-white">
+		<div className="flex-1 flex flex-col overflow-hidden bg-white dark:bg-[#121214]">
+			<div className="sticky top-0 z-10 bg-white dark:bg-[#121214]">
 				<div className="px-8 py-6">
 					<div className="flex items-center justify-between">
 						<div>
-							<h1 className="text-2xl font-semibold text-gray-900">Clients</h1>
+							<h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">Clients</h1>
 							<p className="mt-1 text-sm text-gray-500">Manage tenant accounts, subscription tiers, and operational limits.</p>
 						</div>
 
@@ -428,7 +428,7 @@ export default function ClientsClient() {
 								type="button"
 								onClick={() => setCreateOpen(true)}
 								className={
-									`group inline-flex items-center gap-3 h-12 px-5 bg-white text-gray-900 font-medium text-sm rounded-2xl border border-gray-100 shadow-[0_8px_30px_rgba(0,0,0,0.04)] transition-all hover:shadow-lg hover:translate-y-0.5 cursor-pointer`
+									`group inline-flex items-center gap-3 h-12 px-5 bg-white dark:bg-[#121214] text-gray-900 dark:text-gray-100 font-medium text-sm rounded-2xl border border-gray-100 dark:border-zinc-800 shadow-[0_8px_30px_rgba(0,0,0,0.04)] transition-all hover:shadow-lg hover:translate-y-0.5 cursor-pointer`
 								}
 							>
 								<span className="inline-flex items-center justify-center transition-colors">
@@ -456,10 +456,10 @@ export default function ClientsClient() {
 									h-12
 									pl-11
 									pr-10
-									bg-white
+									bg-white dark:bg-[#121214]
 									rounded-2xl
 									border
-									border-gray-100
+									border-gray-100 dark:border-zinc-800
 									shadow-[0_8px_30px_rgba(0,0,0,0.04)]
 									text-sm
 									text-gray-700
@@ -493,11 +493,11 @@ export default function ClientsClient() {
 					)}
 
 					{filteredClients.length === 0 ? (
-						<div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-gray-200 bg-white py-16 text-center">
+						<div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-gray-200 bg-white dark:bg-[#121214] py-16 text-center">
 							<div className="rounded-full bg-gray-100 p-3 text-gray-500">
 								<Building2 size={24} />
 							</div>
-							<h2 className="mt-4 text-sm font-semibold text-gray-900">
+							<h2 className="mt-4 text-sm font-semibold text-gray-900 dark:text-gray-100">
 								{query ? "No clients match your search" : "No clients available"}
 							</h2>
 							<p className="mt-2 max-w-sm text-sm text-gray-500">
@@ -609,7 +609,7 @@ export default function ClientsClient() {
 																	onChange={(e) => setForm((prev) => ({ ...prev, maxPlayers: e.target.value }))}
 								placeholder="e.g. 25"
 																	disabled={!isEnterpriseTier}
-																	className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:border-[#A473FF]/40 focus:outline-none focus:ring-2 focus:ring-[#A473FF]/15 disabled:bg-gray-50 disabled:text-gray-500"
+																	className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:border-[#A473FF]/40 focus:outline-none focus:ring-2 focus:ring-[#A473FF]/15 disabled:bg-gray-50 dark:bg-zinc-800/50 disabled:text-gray-500"
 							/>
 																{!isEnterpriseTier && (
 																	<p className="mt-1 text-xs text-gray-500">Locked to the selected tier limit.</p>
@@ -625,7 +625,7 @@ export default function ClientsClient() {
 								onChange={(e) => setForm((prev) => ({ ...prev, maxStorageGb: e.target.value }))}
 								placeholder="e.g. 50"
 																	disabled={!isEnterpriseTier}
-																	className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:border-[#A473FF]/40 focus:outline-none focus:ring-2 focus:ring-[#A473FF]/15 disabled:bg-gray-50 disabled:text-gray-500"
+																	className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:border-[#A473FF]/40 focus:outline-none focus:ring-2 focus:ring-[#A473FF]/15 disabled:bg-gray-50 dark:bg-zinc-800/50 disabled:text-gray-500"
 							/>
 																{!isEnterpriseTier && (
 																	<p className="mt-1 text-xs text-gray-500">Locked to the selected tier limit.</p>
@@ -715,24 +715,24 @@ function ClientCard({
 }) {
 	const statusStyles: Record<ClientInfo["status"], string> = {
 		ACTIVE: "bg-green-50 text-green-700 border-green-100",
-		INACTIVE: "bg-gray-50 text-gray-700 border-gray-200",
+		INACTIVE: "bg-gray-50 dark:bg-zinc-800/50 text-gray-700 border-gray-200",
 		TRIAL: "bg-blue-50 text-blue-700 border-blue-100",
 	};
 
 	const subscriptionStyles: Record<ClientInfo["subscriptionTier"], string> = {
-		STARTER: "bg-gray-50 text-gray-700",
+		STARTER: "bg-gray-50 dark:bg-zinc-800/50 text-gray-700",
 		PROFESSIONAL: "bg-purple-50 text-purple-700",
 		ENTERPRISE: "bg-amber-50 text-amber-700",
 	};
 
 	return (
 		<div className="">
-			<div className="bg-white rounded-[28px] border border-gray-100 shadow-[0_8px_30px_rgba(0,0,0,0.04)] flex flex-col overflow-hidden">
+			<div className="bg-white dark:bg-zinc-900 rounded-[28px] border border-gray-100 dark:border-zinc-800 shadow-[0_8px_30px_rgba(0,0,0,0.04)] dark:shadow-none flex flex-col overflow-hidden">
 				<div className="px-5 py-4">
 					<div className="flex items-start justify-between gap-4">
 						<div className="min-w-0 flex-1">
 							<div className="flex flex-wrap items-center gap-3">
-								<h3 className="truncate text-sm font-semibold text-gray-900">
+								<h3 className="truncate text-sm font-semibold text-gray-900 dark:text-gray-100">
 									{client.name}
 								</h3>
 								<span
@@ -755,16 +755,16 @@ function ClientCard({
 								>
 									{billing?.planName || client.subscriptionTier}
 								</span>
-								<span className="rounded-full bg-gray-50 px-2.5 py-1 text-gray-600">
+								<span className="rounded-full bg-gray-50 dark:bg-zinc-800/50 px-2.5 py-1 text-gray-600">
 									{client.maxPlayers} players max
 								</span>
-								<span className="rounded-full bg-gray-50 px-2.5 py-1 text-gray-600">
+								<span className="rounded-full bg-gray-50 dark:bg-zinc-800/50 px-2.5 py-1 text-gray-600">
 									{client.maxStorageGb} GB storage max
 								</span>
 							</div>
 
 							{billing && (
-								<div className="mt-4 grid gap-3 rounded-xl border border-gray-100 bg-gray-50/80 p-4 sm:grid-cols-3">
+								<div className="mt-4 grid gap-3 rounded-xl border border-gray-100 dark:border-zinc-800 bg-gray-50 dark:bg-zinc-800/50/80 p-4 sm:grid-cols-3">
 									<Info
 										label="Total invoiced"
 										value={formatMoney(billing.totalInvoiced)}
@@ -796,7 +796,7 @@ function ClientCard({
 								type="button"
 								onClick={onIssueInvoice}
 								disabled={!(client.tenantId ?? billing?.tenantId)}
-								className="inline-flex items-center gap-1.5 rounded-md border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 shadow-sm hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+								className="inline-flex items-center gap-1.5 rounded-md border border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-1.5 text-xs font-medium text-gray-700 dark:text-zinc-200 shadow-sm hover:bg-gray-50 dark:hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50"
 							>
 								<Receipt size={14} />
 								Issue invoice

@@ -1,6 +1,7 @@
 export type ThemeMode = "light" | "dark";
 
 const STORAGE_KEY = "akou.theme";
+export const THEME_CHANGED_EVENT = "akou:theme-changed";
 
 export function getStoredTheme(): ThemeMode | null {
   if (typeof window === "undefined") return null;
@@ -19,15 +20,21 @@ export function resolveTheme(): ThemeMode {
 
 export function applyTheme(theme: ThemeMode) {
   if (typeof document === "undefined") return;
-  document.documentElement.classList.toggle("dark", theme === "dark");
+  if (theme === "dark") {
+    document.documentElement.classList.add("dark");
+  } else {
+    document.documentElement.classList.remove("dark");
+  }
 }
 
 export function setTheme(theme: ThemeMode) {
+  applyTheme(theme);
   if (typeof window !== "undefined") {
     window.localStorage.setItem(STORAGE_KEY, theme);
-    window.dispatchEvent(new CustomEvent("akou:theme-changed", { detail: { theme } }));
+    window.dispatchEvent(
+      new CustomEvent(THEME_CHANGED_EVENT, { detail: { theme } })
+    );
   }
-  applyTheme(theme);
 }
 
 export function toggleTheme(): ThemeMode {

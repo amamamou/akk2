@@ -62,7 +62,7 @@ function PlayerStatusRow({ player }: Readonly<{ player: PlayerStatus }>) {
 	const pct = Math.min(100, Math.max(0, (progress / duration) * 100));
 
 	return (
-		<div className="flex items-center gap-4 p-4 rounded-xl bg-[#FAFAFB] hover:bg-[#F6F6F8] transition-all">
+		<div className="flex items-center gap-4 p-4 rounded-xl bg-[#FAFAFB] dark:bg-zinc-800/50 hover:bg-[#F6F6F8] dark:hover:bg-zinc-800 transition-all">
 			<audio
 				ref={audioRef}
 				src={player.playlistUrl || "/audio/demo-loop.mp3"}
@@ -74,7 +74,7 @@ function PlayerStatusRow({ player }: Readonly<{ player: PlayerStatus }>) {
 					type="button"
 					onClick={togglePlay}
 					aria-label={isPlaying ? `Pause ${player.name}` : `Play ${player.name}`}
-					className="flex items-center justify-center h-10 w-10 rounded-xl bg-white hover:bg-[#F3EEFF] transition-colors"
+					className="flex items-center justify-center h-10 w-10 rounded-xl bg-white dark:bg-zinc-900 hover:bg-[#F3EEFF] dark:hover:bg-zinc-700 transition-colors"
 				>
 					{isPlaying ? (
 						<Pause size={16} className="text-[#A473FF]" />
@@ -83,15 +83,15 @@ function PlayerStatusRow({ player }: Readonly<{ player: PlayerStatus }>) {
 					)}
 				</button>
 				<div className="min-w-0">
-					<div className="text-sm font-medium text-gray-900 truncate">{player.name}</div>
-					<div className="text-xs text-gray-400 truncate">{player.player}</div>
+					<div className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{player.name}</div>
+					<div className="text-xs text-gray-400 dark:text-zinc-500 truncate">{player.player}</div>
 				</div>
 			</div>
 
 			<div className="flex-1">
 				<div className="flex items-center gap-3">
 					<div className="flex-1">
-						<div className="h-1.5 bg-[#ECECEF] rounded-full overflow-hidden">
+						<div className="h-1.5 bg-[#ECECEF] dark:bg-zinc-700 rounded-full overflow-hidden">
 							<div
 								className="h-1.5 bg-[#A473FF] transition-[width] duration-500"
 								style={{ width: `${pct}%` }}
@@ -127,12 +127,12 @@ function PlayerStatusRow({ player }: Readonly<{ player: PlayerStatus }>) {
 
 export default function LivePlayerStatus({ players }: Readonly<{ players: PlayerStatus[] }>) {
 	return (
-		<div className="bg-white rounded-2xl border border-gray-100 shadow-[0_8px_30px_rgba(0,0,0,0.04)] overflow-hidden">
-			<div className="px-6 py-5 border-b border-gray-100 flex items-center justify-between">
-				<h2 className="text-lg font-semibold text-gray-900">Live Player Status</h2>
+		<div className="bg-white dark:bg-zinc-900 rounded-2xl border border-gray-100 dark:border-zinc-800 shadow-[0_8px_30px_rgba(0,0,0,0.04)] dark:shadow-none overflow-hidden">
+			<div className="px-6 py-5 border-b border-gray-100 dark:border-zinc-800 flex items-center justify-between">
+				<h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Live Player Status</h2>
 				<Link
 					href="/players"
-					className="text-sm font-medium text-gray-500 hover:text-gray-900 transition-colors"
+					className="text-sm font-medium text-gray-500 dark:text-zinc-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
 				>
 					View All →
 				</Link>

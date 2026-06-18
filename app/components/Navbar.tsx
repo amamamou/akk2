@@ -6,9 +6,10 @@ import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { ChevronDown, LogOut, Moon, Settings, Sun } from "lucide-react";
 import { useAuth } from "@/app/context/AuthContext";
+import { useTheme } from "@/app/context/ThemeContext";
 import { ConfirmDialog } from "./ConfirmDialog";
+
 import type { UserProfileEventDetail } from "@/lib/user-profile-events";
-import { resolveTheme, setTheme, type ThemeMode } from "@/lib/theme";
 
 const USER_STORAGE_KEY = "akou.user";
 
@@ -33,22 +34,10 @@ function readStoredAvatar(): string | null {
 
 export default function Navbar() {
   const { user, logout } = useAuth();
+  const { theme, toggleTheme } = useTheme();
   const router = useRouter();
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [showLogoutDialog, setShowLogoutDialog] = useState(false);
-  const [theme, setThemeState] = useState<ThemeMode>(() =>
-    typeof window !== "undefined" ? resolveTheme() : "light"
-  );
-
-  useEffect(() => {
-    const onThemeChanged = (event: Event) => {
-      const detail = (event as CustomEvent<{ theme?: ThemeMode }>).detail;
-      if (detail?.theme) setThemeState(detail.theme);
-      else setThemeState(resolveTheme());
-    };
-    window.addEventListener("akou:theme-changed", onThemeChanged);
-    return () => window.removeEventListener("akou:theme-changed", onThemeChanged);
-  }, []);
 
   const handleLogoutConfirm = () => {
     try {
@@ -80,9 +69,7 @@ export default function Navbar() {
   };
 
   const toggleDarkMode = () => {
-    const next = theme === "dark" ? "light" : "dark";
-    setTheme(next);
-    setThemeState(next);
+    toggleTheme();
   };
 
   return (

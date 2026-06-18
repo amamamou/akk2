@@ -81,12 +81,12 @@ export default function ScheduleToolbar({
   const [showFilters, setShowFilters] = useState(false);
 
 return (
-  <div className="sticky top-0 z-10 bg-white">
+  <div className="sticky top-0 z-10 bg-white dark:bg-[#121214]">
     {/* Header */}
     <div className="px-8 py-6">
       <div className="flex items-start justify-between gap-8">
         <div>
-          <h1 className="text-2xl font-semibold text-gray-900 tracking-tight">
+          <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100 tracking-tight">
             {viewMode === "month"
               ? "Monthly Schedule"
               : viewMode === "hour"
@@ -96,7 +96,7 @@ return (
               : "Weekly Schedule"}
           </h1>
   <div>            </div>
-          <p className="mt-1 text-sm text-gray-500">
+          <p className="mt-1 text-sm text-gray-500 dark:text-zinc-400">
             {viewMode === "month"
               ? "Calendar month view"
               : viewMode === "hour"
@@ -152,7 +152,7 @@ return (
                 className={cn(
                   "flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium transition-all",
                   viewMode === opt.mode
-                    ? "bg-white text-zinc-950 shadow-sm"
+                    ? "bg-white dark:bg-[#121214] text-zinc-950 shadow-sm"
                     : "text-zinc-500 hover:text-zinc-900"
                 )}
               >
@@ -172,7 +172,7 @@ return (
             id="schedule-view-mode-mobile"
             value={viewMode}
             onChange={(e) => onChangeViewMode(e.target.value as ScheduleViewMode)}
-            className="min-w-[9.5rem] appearance-none rounded-xl border border-zinc-200 bg-white px-3 py-2 pr-8 text-sm font-medium text-zinc-900 shadow-sm focus:border-[#A473FF] focus:outline-none focus:ring-2 focus:ring-[#A473FF]/20"
+            className="min-w-[9.5rem] appearance-none rounded-xl border border-zinc-200 bg-white dark:bg-[#121214] px-3 py-2 pr-8 text-sm font-medium text-zinc-900 shadow-sm focus:border-[#A473FF] focus:outline-none focus:ring-2 focus:ring-[#A473FF]/20"
             style={{
               backgroundImage:
                 "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2371717a' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E\")",
@@ -267,7 +267,7 @@ return (
           className={cn(
             "flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium transition-all",
             showFilters
-              ? "bg-white text-zinc-950 shadow-sm"
+              ? "bg-white dark:bg-[#121214] text-zinc-950 shadow-sm"
               : "text-zinc-600 hover:text-zinc-900"
           )}
         >
@@ -354,7 +354,7 @@ return (
                 text-sm
                 font-medium
                 text-zinc-500
-                hover:bg-white
+                hover:bg-white dark:bg-[#121214]
                 hover:text-zinc-900
                 transition-all
               "

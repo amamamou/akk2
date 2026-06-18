@@ -35,8 +35,16 @@ export default function RootLayout({
     <html
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      suppressHydrationWarning
     >
-      <body suppressHydrationWarning className="min-h-full ">
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var t=localStorage.getItem('akou.theme');var d=t==='dark'||(t!=='light'&&window.matchMedia('(prefers-color-scheme: dark)').matches);var r=document.documentElement;if(d){r.classList.add('dark');}else{r.classList.remove('dark');}}catch(e){}})();`,
+          }}
+        />
+      </head>
+      <body suppressHydrationWarning className="min-h-full bg-background text-foreground">
         <SuppressConsole />
         <AuthProvider>
           <ThemeProvider>

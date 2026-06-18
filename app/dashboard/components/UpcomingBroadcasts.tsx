@@ -17,22 +17,27 @@ export default function UpcomingBroadcasts({ broadcasts: fallbackBroadcasts }: R
 			<div
 				className="
 					bg-white
+					dark:bg-zinc-900
 					rounded-2xl
 					border
 					border-gray-100
+					dark:border-zinc-800
 					shadow-[0_8px_30px_rgba(0,0,0,0.04)]
+					dark:shadow-none
 					overflow-hidden
 				"
 			>
-				<div className="px-6 py-5 border-b border-gray-100 flex items-center justify-between">
-					<h2 className="text-lg font-semibold text-gray-900">Coming Up</h2>
+				<div className="px-6 py-5 border-b border-gray-100 dark:border-zinc-800 flex items-center justify-between">
+					<h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Coming Up</h2>
 					<Link
 						href="/"
 						className="
 							text-sm
 							font-medium
 							text-gray-500
+							dark:text-zinc-400
 							hover:text-gray-900
+							dark:hover:text-gray-100
 							transition-colors
 						"
 					>
@@ -44,24 +49,26 @@ export default function UpcomingBroadcasts({ broadcasts: fallbackBroadcasts }: R
 					<div key={`${broadcast.time}-${broadcast.title}`} className="
 	  p-5
 	  bg-[#FAFAFB]
+	  dark:bg-zinc-800/50
 	  rounded-xl
 	  hover:bg-[#F6F6F8]
+	  dark:hover:bg-zinc-800
 	  transition-all
 	">
 							<div className="flex items-start justify-between mb-2">
-								<span className="text-2xl font-semibold text-gray-900">{broadcast.time}</span>
-								<span className="text-xs bg-white text-gray-600 px-3 py-1 rounded-full font-medium">
+								<span className="text-2xl font-semibold text-gray-900 dark:text-gray-100">{broadcast.time}</span>
+								<span className="text-xs bg-white dark:bg-zinc-900 text-gray-600 dark:text-zinc-300 px-3 py-1 rounded-full font-medium">
 									{broadcast.duration}
 								</span>
 							</div>
-							<h4 className="font-semibold text-gray-900 mb-1">{broadcast.title}</h4>
-							<p className="text-sm text-gray-500">{broadcast.location}</p>
+							<h4 className="font-semibold text-gray-900 dark:text-gray-100 mb-1">{broadcast.title}</h4>
+							<p className="text-sm text-gray-500 dark:text-zinc-400">{broadcast.location}</p>
 						</div>
 				))}
 				{broadcasts.length === 0 && (
 					<div className="p-10 text-center">
-						<Calendar size={32} className="mx-auto mb-3 text-gray-300" />
-						<p className="text-sm text-gray-500">No upcoming broadcasts</p>
+						<Calendar size={32} className="mx-auto mb-3 text-gray-300 dark:text-zinc-600" />
+						<p className="text-sm text-gray-500 dark:text-zinc-400">No upcoming broadcasts</p>
 					</div>
 				)}
 			</div>
