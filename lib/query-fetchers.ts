@@ -19,12 +19,19 @@ import type {
   ActivityLogEntry,
   ClientBillingSummary,
   ClientInfo,
+  InvoiceInfo,
   MediaInfo,
   PlaybackLogEntry,
   PlayerInfo,
   ScheduleEntry,
   SystemHealthMetrics,
 } from "@/types/api";
+
+export type WorkspaceClientsBundle = {
+  workspaceOptions: WorkspaceClientOption[];
+  clients: ClientInfo[];
+  billingByClientId: Record<string, ClientBillingSummary>;
+};
 
 export function getApi() {
   return getApiClient();
@@ -57,37 +64,93 @@ export async function fetchSchedules(tenantId?: string | null): Promise<Schedule
   return res.schedules ?? [];
 }
 
-export async function fetchWorkspaceClients(): Promise<WorkspaceClientOption[]> {
-  const api = getApi();
-  const res = await api.listClients();
-  const eligible = toActiveWorkspaceClients(res?.clients ?? []);
-  const merged = mergeEnterpriseWorkspaceClients(eligible);
-  return workspaceSelectorOptions(merged);
+function normalizeInvoiceRow(raw: Record<string, unknown>): InvoiceInfo {
+  return {
+    id: String(raw.id),
+    tenantId: String(raw.tenantId ?? raw.tenant_id ?? ""),
+    invoiceNumber: String(raw.invoiceNumber ?? raw.invoice_number ?? ""),
+    amount: Number(raw.amount ?? 0),
+    status:
+      String(raw.status ?? "UNPAID").toUpperCase() === "PAID" ? "PAID" : "UNPAID",
+    dueDate: (raw.dueDate ?? raw.due_date) as string | null | undefined,
+    downloadUrl: (raw.downloadUrl ?? raw.download_url) as string | null | undefined,
+    createdAt: (raw.createdAt ?? raw.created_at) as string | null | undefined,
+  };
 }
 
-export async function fetchClientsWithBilling(): Promise<{
-  clients: ClientInfo[];
-  billingByClientId: Record<string, ClientBillingSummary>;
-}> {
+function mergeBillingWithClients(
+  clients: ClientInfo[],
+  billingByClientId: Record<string, ClientBillingSummary>
+): Record<string, ClientBillingSummary> {
+  const merged = { ...billingByClientId };
+  for (const client of clients) {
+    if (merged[client.id]) continue;
+    merged[client.id] = {
+      clientId: client.id,
+      tenantId: client.tenantId ?? null,
+      subscriptionTier: client.subscriptionTier,
+      planName: client.subscriptionTier,
+      maxPlayers: client.maxPlayers,
+      maxStorageGb: client.maxStorageGb,
+      totalInvoiced: 0,
+      outstandingBalance: 0,
+      paidTotal: 0,
+      invoiceCount: 0,
+      recentInvoices: [],
+    };
+  }
+  return merged;
+}
+
+export async function fetchWorkspaceClientsBundle(): Promise<WorkspaceClientsBundle> {
   const api = getApi();
   const [clientsRes, billingRes] = await Promise.all([
-    api.listClients(),
+    api.listClients().catch(() => ({ ok: false, clients: [] })),
     api.getClientsBillingOverview().catch(() => null),
   ]);
 
-  const clients = (clientsRes?.clients ?? []).map((c: Record<string, unknown>) =>
+  const rawClients = clientsRes?.clients ?? [];
+  const clients = rawClients.map((c: Record<string, unknown>) =>
     normalizeClientRow(c)
   );
 
+  const eligible = toActiveWorkspaceClients(rawClients);
+  const mergedWorkspace = mergeEnterpriseWorkspaceClients(eligible);
+  const workspaceOptions = workspaceSelectorOptions(mergedWorkspace);
+
   const billingByClientId: Record<string, ClientBillingSummary> = {};
-  if (billingRes?.summaries) {
-    for (const s of billingRes.summaries) {
-      const normalized = normalizeBillingRow(s as unknown as Record<string, unknown>);
+  for (const summary of billingRes?.summaries ?? []) {
+    const normalized = normalizeBillingRow(
+      summary as unknown as Record<string, unknown>
+    );
+    if (normalized.clientId) {
       billingByClientId[normalized.clientId] = normalized;
     }
   }
 
-  return { clients, billingByClientId };
+  return {
+    workspaceOptions,
+    clients,
+    billingByClientId: mergeBillingWithClients(clients, billingByClientId),
+  };
+}
+
+/** @deprecated Use `fetchWorkspaceClientsBundle` with TanStack Query `select`. */
+export async function fetchWorkspaceClients(): Promise<WorkspaceClientOption[]> {
+  const bundle = await fetchWorkspaceClientsBundle();
+  return bundle.workspaceOptions;
+}
+
+/** @deprecated Use `fetchWorkspaceClientsBundle` with TanStack Query `select`. */
+export async function fetchClientsWithBilling(): Promise<{
+  clients: ClientInfo[];
+  billingByClientId: Record<string, ClientBillingSummary>;
+}> {
+  const bundle = await fetchWorkspaceClientsBundle();
+  return {
+    clients: bundle.clients,
+    billingByClientId: bundle.billingByClientId,
+  };
 }
 
 function normalizeClientRow(client: Record<string, unknown>): ClientInfo {
@@ -121,7 +184,10 @@ function normalizeBillingRow(raw: Record<string, unknown>): ClientBillingSummary
     outstandingBalance: Number(raw.outstandingBalance ?? raw.outstanding_balance ?? 0),
     paidTotal: Number(raw.paidTotal ?? raw.paid_total ?? 0),
     invoiceCount: Number(raw.invoiceCount ?? raw.invoice_count ?? 0),
-    recentInvoices: [],
+    recentInvoices:
+      ((raw.recentInvoices ?? raw.recent_invoices) as unknown[] | undefined)?.map(
+        (inv) => normalizeInvoiceRow(inv as Record<string, unknown>)
+      ) ?? [],
   };
 }
 

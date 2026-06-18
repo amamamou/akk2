@@ -31,7 +31,7 @@ import { getApiClient } from "@/lib/api-client";
 import {
   fetchScheduleAllClients,
   fetchScheduleWorkspace,
-  fetchWorkspaceClients,
+  fetchWorkspaceClientsBundle,
 } from "@/lib/query-fetchers";
 import { queryKeys } from "@/lib/query-keys";
 import {
@@ -203,8 +203,9 @@ export default function ScheduleClientPage() {
 
   const workspaceClientsQuery = useQuery({
     queryKey: queryKeys.workspaceClients(),
-    queryFn: () => fetchWorkspaceClients(),
+    queryFn: fetchWorkspaceClientsBundle,
     enabled: isSuperAdmin && !authLoading,
+    select: (data) => data.workspaceOptions,
   });
 
   useEffect(() => {

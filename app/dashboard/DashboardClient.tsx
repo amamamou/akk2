@@ -19,6 +19,7 @@ import {
   fetchPlayers,
   fetchSchedules,
   fetchSystemHealth,
+  fetchWorkspaceClientsBundle,
 } from "@/lib/query-fetchers";
 import { queryKeys } from "@/lib/query-keys";
 import type { PlayerInfo, ScheduleEntry, ActivityLogEntry } from "@/types/api";
@@ -149,11 +150,9 @@ export default function DashboardClient() {
 
   const clientsQuery = useQuery({
     queryKey: queryKeys.workspaceClients(),
-    queryFn: async () => {
-      const res = await apiClient.listClients().catch(() => ({ ok: false, clients: [] }));
-      return res.clients ?? [];
-    },
+    queryFn: fetchWorkspaceClientsBundle,
     enabled: isSuperAdmin,
+    select: (data) => data.clients,
   });
 
   const healthQuery = useQuery({

@@ -5,13 +5,12 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/app/context/AuthContext";
 import { getApiClient } from "@/lib/api-client";
-import { fetchClientsWithBilling } from "@/lib/query-fetchers";
+import { fetchWorkspaceClientsBundle } from "@/lib/query-fetchers";
 import { queryKeys } from "@/lib/query-keys";
 import type {
 	ClientBillingSummary,
 	ClientCreateInput,
 	ClientInfo,
-	InvoiceInfo,
 } from "@/types/api";
 import IssueInvoiceModal from "./components/IssueInvoiceModal";
 import { formatMoney } from "@/lib/format-currency";
@@ -58,55 +57,6 @@ const tierLocks: Record<Exclude<ClientFormState["subscriptionTier"], "ENTERPRISE
 	PROFESSIONAL: { maxPlayers: 20, maxStorageGb: 20 },
 };
 
-function normalizeBillingSummary(raw: Record<string, unknown>): ClientBillingSummary {
-	return {
-		clientId: String(raw.clientId ?? raw.client_id ?? ""),
-		tenantId: (raw.tenantId ?? raw.tenant_id) as string | null | undefined,
-		subscriptionTier: String(raw.subscriptionTier ?? raw.subscription_tier ?? "STARTER"),
-		planName: (raw.planName ?? raw.plan_name) as string | null | undefined,
-		maxPlayers: Number(raw.maxPlayers ?? raw.max_players ?? 0),
-		maxStorageGb: Number(raw.maxStorageGb ?? raw.max_storage_gb ?? 0),
-		totalInvoiced: Number(raw.totalInvoiced ?? raw.total_invoiced ?? 0),
-		outstandingBalance: Number(raw.outstandingBalance ?? raw.outstanding_balance ?? 0),
-		paidTotal: Number(raw.paidTotal ?? raw.paid_total ?? 0),
-		invoiceCount: Number(raw.invoiceCount ?? raw.invoice_count ?? 0),
-		recentInvoices: ((raw.recentInvoices ?? raw.recent_invoices) as unknown[])?.map(
-			(inv) => normalizeInvoice(inv as Record<string, unknown>)
-		) ?? [],
-	};
-}
-
-function normalizeInvoice(raw: Record<string, unknown>): InvoiceInfo {
-	return {
-		id: String(raw.id),
-		tenantId: String(raw.tenantId ?? raw.tenant_id ?? ""),
-		invoiceNumber: String(raw.invoiceNumber ?? raw.invoice_number ?? ""),
-		amount: Number(raw.amount ?? 0),
-		status: (String(raw.status ?? "UNPAID").toUpperCase() === "PAID" ? "PAID" : "UNPAID"),
-		dueDate: (raw.dueDate ?? raw.due_date) as string | null | undefined,
-		downloadUrl: (raw.downloadUrl ?? raw.download_url) as string | null | undefined,
-		createdAt: (raw.createdAt ?? raw.created_at) as string | null | undefined,
-	};
-}
-
-function normalizeClient(client: any): ClientInfo {
-	return {
-		id: client.id,
-		tenantId: client.tenantId ?? client.tenant_id ?? undefined,
-		name: client.name ?? "Untitled client",
-		businessType: client.businessType ?? client.business_type ?? "",
-		contactPerson: client.contactPerson ?? client.contact_person ?? "",
-		email: client.email ?? "",
-		phone: client.phone ?? "",
-		status: (client.status ?? "INACTIVE") as ClientInfo["status"],
-		subscriptionTier:
-			client.subscriptionTier ?? client.subscription_tier ?? "STARTER",
-		maxPlayers: client.maxPlayers ?? client.max_players ?? 0,
-		maxStorageGb: client.maxStorageGb ?? client.max_storage_gb ?? 0,
-		createdAt: client.createdAt ?? client.created_at ?? undefined,
-	};
-}
-
 export default function ClientsClient() {
 	const apiClient = getApiClient();
 	const { user, isLoading: authLoading } = useAuth();
@@ -129,7 +79,7 @@ export default function ClientsClient() {
 
 	const clientsQuery = useQuery({
 		queryKey: queryKeys.workspaceClients(),
-		queryFn: () => fetchClientsWithBilling(),
+		queryFn: fetchWorkspaceClientsBundle,
 		enabled: isSuperAdmin && !authLoading,
 	});
 
@@ -141,9 +91,18 @@ export default function ClientsClient() {
 		},
 	});
 
-	const clients = clientsQuery.data?.clients ?? [];
-	const billingByClientIdResolved = clientsQuery.data?.billingByClientId ?? {};
-	const pageLoading = authLoading || (isSuperAdmin && clientsQuery.isPending);
+	const clients = useMemo(
+		() => clientsQuery.data?.clients ?? [],
+		[clientsQuery.data]
+	);
+
+	const billingByClientIdResolved = useMemo(
+		() => clientsQuery.data?.billingByClientId ?? {},
+		[clientsQuery.data]
+	);
+
+	const pageLoading =
+		authLoading || (isSuperAdmin && clientsQuery.isPending && !clientsQuery.data);
 
 	const queryError = clientsQuery.error as
 		| { response?: { status?: number; data?: { error?: string } }; message?: string }

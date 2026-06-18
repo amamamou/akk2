@@ -19,7 +19,7 @@ import {
   fetchPlaybackLogs,
   fetchPlayers,
   fetchSystemHealth,
-  fetchWorkspaceClients,
+  fetchWorkspaceClientsBundle,
 } from "@/lib/query-fetchers";
 import { queryKeys } from "@/lib/query-keys";
 import { isManagerRole, isSuperAdminRole } from "@/lib/rbac";
@@ -112,8 +112,9 @@ export default function AnalyticsClient() {
 
   const workspaceClientsQuery = useQuery({
     queryKey: queryKeys.workspaceClients(),
-    queryFn: () => fetchWorkspaceClients(),
+    queryFn: fetchWorkspaceClientsBundle,
     enabled: isSuperAdmin,
+    select: (data) => data.workspaceOptions,
   });
 
   const workspaceClients = useMemo(() => {
