@@ -493,7 +493,7 @@ export default function LibraryAudioClient() {
         setUploadOpen={setUploadOpen}
       />
 
-      <div className="px-6 border-b border-gray-100 dark:border-zinc-800 bg-white dark:bg-zinc-900">
+      <div className="px-6 border-b border-gray-100 dark:border-zinc-800/40 bg-white dark:bg-zinc-900">
         <AudioToolbar
           mode="search"
           query={query}
