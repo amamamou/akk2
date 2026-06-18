@@ -24,7 +24,14 @@ module.exports = {
         '"Segoe UI Emoji"',
       ],
     },
-    extend: {},
+    extend: {
+      colors: {
+        shell: {
+          DEFAULT: '#18181b',
+          elevated: 'rgb(39 39 42 / 0.5)',
+        },
+      },
+    },
   },
   plugins: [],
 };

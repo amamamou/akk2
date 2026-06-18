@@ -26,30 +26,30 @@ export default function PlaybackTable({
   formatLogTime: (iso: string | null | undefined) => string;
 }) {
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 shadow-[0_8px_30px_rgba(0,0,0,0.04)] overflow-hidden">
-      <div className="px-5 py-3 bg-gradient-to-r from-gray-50 to-white">
-        <h3 className="text-sm font-semibold text-gray-950">Playback Verification</h3>
-        <p className="text-xs text-gray-500 mt-0.5">Recent broadcast activity and performance metrics</p>
+    <div className="bg-white dark:bg-zinc-800/50 rounded-2xl border border-gray-100 dark:border-zinc-700/60 shadow-[0_8px_30px_rgba(0,0,0,0.04)] dark:shadow-none overflow-hidden">
+      <div className="px-5 py-3 bg-gradient-to-r from-gray-50 to-white dark:from-zinc-800/80 dark:to-zinc-800/50 border-b border-gray-100 dark:border-zinc-700/60">
+        <h3 className="text-sm font-semibold text-gray-950 dark:text-zinc-100">Playback Verification</h3>
+        <p className="text-xs text-gray-500 dark:text-zinc-400 mt-0.5">Recent broadcast activity and performance metrics</p>
       </div>
 
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
-          <thead className="bg-gray-50 border-b border-gray-100">
+          <thead className="bg-gray-50 dark:bg-zinc-800/80 border-b border-gray-100 dark:border-zinc-700/60">
             <tr>
-              <th className="text-left px-5 py-2 font-medium text-gray-700 text-xs uppercase tracking-wide">File</th>
-              <th className="text-left px-5 py-2 font-medium text-gray-700 text-xs uppercase tracking-wide">Device</th>
-              <th className="text-left px-5 py-2 font-medium text-gray-700 text-xs uppercase tracking-wide">Status</th>
-              <th className="text-left px-5 py-2 font-medium text-gray-700 text-xs uppercase tracking-wide">Latency</th>
-              <th className="text-left px-5 py-2 font-medium text-gray-700 text-xs uppercase tracking-wide">Duration</th>
-              <th className="text-left px-5 py-2 font-medium text-gray-700 text-xs uppercase tracking-wide">Quality</th>
-              <th className="text-left px-5 py-2 font-medium text-gray-700 text-xs uppercase tracking-wide">Session</th>
-              <th className="text-left px-5 py-2 font-medium text-gray-700 text-xs uppercase tracking-wide">Time</th>
+              <th className="text-left px-5 py-2 font-medium text-gray-700 dark:text-zinc-300 text-xs uppercase tracking-wide">File</th>
+              <th className="text-left px-5 py-2 font-medium text-gray-700 dark:text-zinc-300 text-xs uppercase tracking-wide">Device</th>
+              <th className="text-left px-5 py-2 font-medium text-gray-700 dark:text-zinc-300 text-xs uppercase tracking-wide">Status</th>
+              <th className="text-left px-5 py-2 font-medium text-gray-700 dark:text-zinc-300 text-xs uppercase tracking-wide">Latency</th>
+              <th className="text-left px-5 py-2 font-medium text-gray-700 dark:text-zinc-300 text-xs uppercase tracking-wide">Duration</th>
+              <th className="text-left px-5 py-2 font-medium text-gray-700 dark:text-zinc-300 text-xs uppercase tracking-wide">Quality</th>
+              <th className="text-left px-5 py-2 font-medium text-gray-700 dark:text-zinc-300 text-xs uppercase tracking-wide">Session</th>
+              <th className="text-left px-5 py-2 font-medium text-gray-700 dark:text-zinc-300 text-xs uppercase tracking-wide">Time</th>
             </tr>
           </thead>
           <tbody>
             {filteredLogs.length === 0 ? (
               <tr>
-                <td colSpan={8} className="px-5 py-8 text-center text-gray-500 text-sm">No playback logs for this filter.</td>
+                <td colSpan={8} className="px-5 py-8 text-center text-gray-500 dark:text-zinc-400 text-sm">No playback logs for this filter.</td>
               </tr>
             ) : (
               filteredLogs.map((log) => {
@@ -61,7 +61,7 @@ export default function PlaybackTable({
                 const isCompleted = statusUpper === "COMPLETED" || statusUpper === "DEEP" || statusUpper === "ENGAGED";
                 const isPlaying = statusUpper === "STARTED" || statusUpper === "MODERATE";
                 return (
-                  <tr key={log.id} className="border-b border-gray-50 hover:bg-gray-50/60 transition-colors">
+                  <tr key={log.id} className="border-b border-gray-50 dark:border-zinc-700/40 hover:bg-gray-50/60 dark:hover:bg-zinc-800/40 transition-colors">
                     <td className="px-5 py-2.5">
                       <div className="flex items-center gap-2.5">
                         <div className={cn(
@@ -71,8 +71,8 @@ export default function PlaybackTable({
                           <IconComp size={14} className={cn(isCompleted ? "text-emerald-700" : isPlaying ? "text-blue-600" : "text-red-600")} />
                         </div>
                         <div>
-                          <p className="font-medium text-gray-900 text-sm">{resolveMediaLabel(log.mediaId, log.mediaTitle)}</p>
-                          <p className="text-xs text-gray-500">{resolveDeviceLabel(log.playerId, log.playerName)}</p>
+                          <p className="font-medium text-gray-900 dark:text-zinc-100 text-sm">{resolveMediaLabel(log.mediaId, log.mediaTitle)}</p>
+                          <p className="text-xs text-gray-500 dark:text-zinc-400">{resolveDeviceLabel(log.playerId, log.playerName)}</p>
                         </div>
                       </div>
                     </td>

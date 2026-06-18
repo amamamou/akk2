@@ -35,6 +35,12 @@ import {
   tierDisplayLabel,
   type ListenerSegmentation,
 } from "@/lib/analytics-metrics";
+
+const ANALYTICS_SELECT_CLASS =
+  "border border-gray-100 dark:border-zinc-700 rounded-lg text-sm px-3 py-1.5 bg-white dark:bg-zinc-800 text-gray-900 dark:text-zinc-100 outline-none focus:border-gray-300 dark:focus:border-zinc-600 focus:ring-0 appearance-none pr-8 transition-colors hover:border-gray-200 dark:hover:border-zinc-600";
+
+const ANALYTICS_WORKSPACE_SELECT_CLASS =
+  "border border-violet-100 dark:border-zinc-700 rounded-lg text-sm px-3 py-1.5 bg-violet-50 dark:bg-zinc-800 text-gray-900 dark:text-zinc-100 outline-none focus:border-violet-200 dark:focus:border-zinc-600 appearance-none pr-8";
 import {
   FRENCH_DEMO_ENTERPRISES,
   FRENCH_DEMO_PLAYER_REGISTRY,
@@ -465,13 +471,13 @@ export default function AnalyticsClient() {
 
   if (isLoading) {
     return (
-      <div className="flex-1 flex flex-col overflow-hidden bg-white dark:bg-[#121214]">
-        <div className="sticky top-0 z-10 bg-white dark:bg-[#121214]">
+      <div className="flex-1 flex flex-col overflow-hidden bg-white dark:bg-zinc-900">
+        <div className="sticky top-0 z-10 bg-white dark:bg-zinc-900">
           <div className="px-8 py-6">
             <div className="flex items-center justify-between">
               <div>
                 <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">Analytics</h1>
-                <p className="mt-1 text-sm text-gray-500">Playback verification and listening metrics</p>
+                <p className="mt-1 text-sm text-gray-500 dark:text-zinc-400">Playback verification and listening metrics</p>
               </div>
 
               <div className="flex gap-2 items-center flex-wrap justify-end">
@@ -480,7 +486,7 @@ export default function AnalyticsClient() {
                     <select
                       value={selectedWorkspaceClientId}
                       onChange={(e) => handleWorkspaceClientChange(e.target.value)}
-                      className="border border-violet-100 rounded-lg text-sm px-3 py-1.5 bg-violet-50 text-gray-900 dark:text-gray-100 outline-none focus:border-violet-200 appearance-none pr-8"
+                      className={ANALYTICS_WORKSPACE_SELECT_CLASS}
                       aria-label="Client workspace"
                     >
                       {workspaceSelectOptions.map((c) => (
@@ -499,7 +505,7 @@ export default function AnalyticsClient() {
                   <select
                     value={selectedPlayerId}
                     onChange={(e) => setSelectedPlayerId(e.target.value)}
-                    className="border border-gray-100 dark:border-zinc-800 rounded-lg text-sm px-3 py-1.5 bg-white dark:bg-[#121214] text-gray-900 dark:text-gray-100 outline-none focus:border-gray-300 focus:ring-0 appearance-none pr-8 transition-colors hover:border-gray-200"
+                    className={ANALYTICS_SELECT_CLASS}
                   >
                     <option value="all">All Players</option>
                     {playerOptions.map((p) => (
@@ -515,18 +521,18 @@ export default function AnalyticsClient() {
                 </div>
 
                 {selectedPlayerId !== "all" && (
-                  <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-gray-50 dark:bg-zinc-900/60 rounded-lg border border-gray-100 dark:border-zinc-800 text-xs">
+                  <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-gray-50 dark:bg-zinc-800/50 rounded-lg border border-gray-100 dark:border-zinc-700/60 text-xs">
                     <div
                       className={cn(
                         "w-1 h-1 rounded-full",
                         selectedPlayerMeta.status === "online" ? "bg-green-600" : "bg-gray-400"
                       )}
                     />
-                    <span className="text-gray-600 font-medium">
+                    <span className="text-gray-600 dark:text-zinc-300 font-medium">
                       {selectedPlayerMeta.status === "online" ? "Online" : "Offline"}
                     </span>
-                    <span className="text-gray-300 mx-0.5">•</span>
-                    <span className="text-gray-500">{selectedPlayerMeta.device}</span>
+                    <span className="text-gray-300 dark:text-zinc-600 mx-0.5">•</span>
+                    <span className="text-gray-500 dark:text-zinc-400">{selectedPlayerMeta.device}</span>
                   </div>
                 )}
 
@@ -534,7 +540,7 @@ export default function AnalyticsClient() {
                   <select
                     value={timeRange}
                     onChange={(e) => setTimeRange(e.target.value as TimeRange)}
-                    className="border border-gray-100 dark:border-zinc-800 rounded-lg text-sm px-3 py-1.5 bg-white dark:bg-[#121214] text-gray-900 dark:text-gray-100 outline-none focus:border-gray-300 focus:ring-0 appearance-none pr-8 transition-colors hover:border-gray-200"
+                    className={ANALYTICS_SELECT_CLASS}
                   >
                     <option value="today">Today</option>
                     <option value="7d">Last 7 Days</option>
@@ -550,7 +556,7 @@ export default function AnalyticsClient() {
           </div>
         </div>
 
-        <div className="flex-1 overflow-auto bg-white dark:bg-[#121214]">
+        <div className="flex-1 overflow-auto bg-white dark:bg-zinc-900">
           <div className="px-6 py-6">
             {/* Quick stats skeleton row */}
             <div className="mb-6">
@@ -585,13 +591,13 @@ export default function AnalyticsClient() {
   }
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden bg-white dark:bg-[#121214]">
-      <div className="sticky top-0 z-10 ] ">
+    <div className="flex-1 flex flex-col overflow-hidden bg-white dark:bg-zinc-900">
+      <div className="sticky top-0 z-10 bg-white dark:bg-zinc-900">
         <div className="px-8 py-6">
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">Analytics</h1>
-              <p className="mt-1 text-sm text-gray-500">Playback verification and listening metrics</p>
+              <p className="mt-1 text-sm text-gray-500 dark:text-zinc-400">Playback verification and listening metrics</p>
             </div>
 
             <div className="flex gap-2 items-center flex-wrap justify-end">
@@ -600,7 +606,7 @@ export default function AnalyticsClient() {
                   <select
                     value={selectedWorkspaceClientId}
                     onChange={(e) => handleWorkspaceClientChange(e.target.value)}
-                    className="border border-violet-100 rounded-lg text-sm px-3 py-1.5 bg-violet-50 text-gray-900 dark:text-gray-100 outline-none focus:border-violet-200 appearance-none pr-8"
+                    className={ANALYTICS_WORKSPACE_SELECT_CLASS}
                     aria-label="Client workspace"
                   >
                     {workspaceSelectOptions.map((c) => (
@@ -619,7 +625,7 @@ export default function AnalyticsClient() {
                 <select
                   value={selectedPlayerId}
                   onChange={(e) => setSelectedPlayerId(e.target.value)}
-                  className="border border-gray-100 dark:border-zinc-800 rounded-lg text-sm px-3 py-1.5 bg-white dark:bg-[#121214] text-gray-900 dark:text-gray-100 outline-none focus:border-gray-300 focus:ring-0 appearance-none pr-8 transition-colors hover:border-gray-200"
+                  className={ANALYTICS_SELECT_CLASS}
                 >
                   <option value="all">All Players</option>
                   {playerOptions.map((p) => (
@@ -635,7 +641,7 @@ export default function AnalyticsClient() {
               </div>
 
               {selectedPlayerId !== "all" && (
-                <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-gray-50 dark:bg-zinc-900/60 rounded-lg border border-gray-100 dark:border-zinc-800 text-xs">
+                <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-gray-50 dark:bg-zinc-800/50 rounded-lg border border-gray-100 dark:border-zinc-700/60 text-xs">
                   <div
                     className={cn(
                       "w-1 h-1 rounded-full",
@@ -654,7 +660,7 @@ export default function AnalyticsClient() {
                 <select
                   value={timeRange}
                   onChange={(e) => setTimeRange(e.target.value as TimeRange)}
-                  className="border border-gray-100 dark:border-zinc-800 rounded-lg text-sm px-3 py-1.5 bg-white dark:bg-[#121214] text-gray-900 dark:text-gray-100 outline-none focus:border-gray-300 focus:ring-0 appearance-none pr-8 transition-colors hover:border-gray-200"
+                  className={ANALYTICS_SELECT_CLASS}
                 >
                   <option value="today">Today</option>
                   <option value="7d">Last 7 Days</option>
@@ -670,7 +676,7 @@ export default function AnalyticsClient() {
         </div>
       </div>
 
-      <div className="flex-1 overflow-auto">
+      <div className="flex-1 overflow-auto bg-white dark:bg-zinc-900">
         <div className="px-8 py-6 space-y-6">
           {error && (
             <div className="p-3 rounded-2xl bg-red-50 border border-red-200 text-sm text-red-800">

@@ -257,8 +257,8 @@ export default function DashboardClient() {
 
 if (isLoading) {
   return (
-    <div className="flex-1 flex flex-col overflow-hidden bg-white dark:bg-[#121214]">
-      <div className="sticky top-0 z-10 bg-white dark:bg-[#121214]">
+    <div className="flex-1 flex flex-col overflow-hidden bg-white dark:bg-zinc-900">
+      <div className="sticky top-0 z-10 bg-white dark:bg-zinc-900">
         <div className="px-8 py-6">
           <div className="flex items-center justify-between">
             <div>
@@ -276,7 +276,7 @@ if (isLoading) {
         </div>
       </div>
 
-      <div className="flex-1 overflow-auto bg-white dark:bg-[#121214]">
+      <div className="flex-1 overflow-auto bg-white dark:bg-zinc-900">
         <div className="px-6 py-6">
 
           {/* Quick stats skeleton row */}
@@ -312,7 +312,7 @@ if (isLoading) {
 }
 
   return (
-    <div className="flex-1 overflow-auto bg-white dark:bg-[#121214]">
+    <div className="flex-1 overflow-auto bg-white dark:bg-zinc-900">
       {error && (
         <div className="mx-8 mt-6 p-3 rounded-lg bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900/50 text-sm text-red-800 dark:text-red-300">
           {error}

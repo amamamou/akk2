@@ -215,7 +215,7 @@ export default function SettingsClient() {
   }, []);
 
   return (
-    <div className="flex-1 overflow-auto bg-white dark:bg-[#121214]">
+    <div className="flex-1 overflow-auto bg-white dark:bg-zinc-900">
       <div className="">
         <SettingsHeader
           tabs={TABS}
@@ -281,7 +281,7 @@ export default function SettingsClient() {
         />
 
         <div className="px-6 py-6">
-          <div className="bg-white dark:bg-[#121214] rounded-[28px] border border-gray-100 dark:border-zinc-800 shadow-[0_8px_30px_rgba(0,0,0,0.04)] dark:shadow-none flex flex-col min-h-[calc(100vh-220px)] overflow-hidden">
+          <div className="bg-white dark:bg-zinc-900 rounded-[28px] border border-gray-100 dark:border-zinc-800 shadow-[0_8px_30px_rgba(0,0,0,0.04)] dark:shadow-none flex flex-col min-h-[calc(100vh-220px)] overflow-hidden">
             <div className="p-8 flex-1 overflow-auto">
               {activeTab === "my-details" ? (
                 <MyDetailsTab

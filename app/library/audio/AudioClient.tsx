@@ -479,7 +479,7 @@ export default function LibraryAudioClient() {
   // deleteEdit removed — deletion handled directly via handleAudioAction
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden bg-white dark:bg-[#121214]">
+    <div className="flex-1 flex flex-col overflow-hidden bg-white dark:bg-zinc-900">
       {saveNotice && (
         <div className="fixed right-6 bottom-6 z-50 max-w-sm rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-900 shadow-md">
           {saveNotice}
@@ -493,7 +493,7 @@ export default function LibraryAudioClient() {
         setUploadOpen={setUploadOpen}
       />
 
-      <div className="px-6 border-b border-gray-100 dark:border-zinc-800 bg-white dark:bg-[#121214]">
+      <div className="px-6 border-b border-gray-100 dark:border-zinc-800 bg-white dark:bg-zinc-900">
         <AudioToolbar
           mode="search"
           query={query}

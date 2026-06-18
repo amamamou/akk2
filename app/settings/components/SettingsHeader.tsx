@@ -68,8 +68,8 @@ const TAB_ICONS = {
   const activeLabel = tabs.find((t) => t.key === activeTab)?.label ?? "";
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden bg-white dark:bg-[#121214]">
-      <div className="sticky top-0 z-10 bg-white dark:bg-[#121214]">
+    <div className="flex-1 flex flex-col overflow-hidden bg-white dark:bg-zinc-900">
+      <div className="sticky top-0 z-10 bg-white dark:bg-zinc-900">
         <div className="px-8 py-6">
           <div className="flex items-start justify-between gap-8">
            <div className="flex items-start justify-between w-full">

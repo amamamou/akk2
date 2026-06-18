@@ -105,8 +105,8 @@ export default function LibraryPlaylistsClient() {
   };
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden bg-white dark:bg-[#121214]">
-      <div className="sticky top-0 z-10 bg-white dark:bg-[#121214]">
+    <div className="flex-1 flex flex-col overflow-hidden bg-white dark:bg-zinc-900">
+      <div className="sticky top-0 z-10 bg-white dark:bg-zinc-900">
         <div className="px-8 py-6">
           <div className="flex items-center justify-between">
             <div>
@@ -133,7 +133,7 @@ export default function LibraryPlaylistsClient() {
         </div>
       </div>
 
-      <div className="flex-1 overflow-auto bg-white dark:bg-[#121214]">
+      <div className="flex-1 overflow-auto bg-white dark:bg-zinc-900">
         <div className="px-6 py-6">
           <div
             className="

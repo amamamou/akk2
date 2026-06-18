@@ -236,7 +236,7 @@ export default function MyDetailsTab({
               className={`flex items-center gap-4 p-4 rounded-lg transition-colors ${
                 isDragging
                   ? "border border-gray-300 bg-gray-50 dark:border-zinc-600 dark:bg-zinc-900/50"
-                  : "border border-gray-200 bg-white dark:border-zinc-800 dark:bg-[#121214]"
+                  : "border border-gray-200 bg-white dark:border-zinc-800 dark:bg-zinc-900"
               }`}
               role="group"
               aria-label="Profile photo upload"

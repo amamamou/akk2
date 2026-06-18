@@ -74,7 +74,7 @@ export default function Navbar() {
 
   return (
     <>
-      <header className="h-16 lg:h-[76px] bg-white dark:bg-[#121214] px-4 lg:px-5 border-b border-zinc-200 dark:border-zinc-800">
+      <header className="h-16 lg:h-[76px] bg-white dark:bg-zinc-900 px-4 lg:px-5 border-b border-zinc-200 dark:border-zinc-800">
         <div className="flex h-full items-center justify-between lg:grid lg:grid-cols-[300px_1fr_340px]">
           <div className="justify-self-start">
             <div className="flex items-center gap-3 rounded-full bg-[#F4F4F5] dark:bg-zinc-900 px-3 lg:px-4 py-2">

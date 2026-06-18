@@ -209,8 +209,8 @@ export default function ClientsClient() {
 
 	if (authLoading || pageLoading) {
 		return (
-			<div className="flex-1 flex flex-col overflow-hidden bg-white dark:bg-[#121214]">
-				<div className="sticky top-0 z-10 bg-white dark:bg-[#121214]">
+			<div className="flex-1 flex flex-col overflow-hidden bg-white dark:bg-zinc-900">
+				<div className="sticky top-0 z-10 bg-white dark:bg-zinc-900">
 					<div className="px-8 py-6">
 						<div className="flex items-center justify-between">
 							<div>
@@ -223,7 +223,7 @@ export default function ClientsClient() {
 									type="button"
 									onClick={() => setCreateOpen(true)}
 									className={
-										`group inline-flex items-center gap-3 h-12 px-5 bg-white dark:bg-[#121214] text-gray-900 dark:text-gray-100 font-medium text-sm rounded-2xl border border-gray-100 dark:border-zinc-800 shadow-[0_8px_30px_rgba(0,0,0,0.04)] transition-all hover:shadow-lg hover:translate-y-0.5 cursor-pointer`
+										`group inline-flex items-center gap-3 h-12 px-5 bg-white dark:bg-zinc-900 text-gray-900 dark:text-gray-100 font-medium text-sm rounded-2xl border border-gray-100 dark:border-zinc-800 shadow-[0_8px_30px_rgba(0,0,0,0.04)] transition-all hover:shadow-lg hover:translate-y-0.5 cursor-pointer`
 									}
 								>
 									<span className="inline-flex items-center justify-center transition-colors">
@@ -251,7 +251,7 @@ export default function ClientsClient() {
 										h-12
 										pl-11
 										pr-10
-										bg-white dark:bg-[#121214]
+										bg-white dark:bg-zinc-900
 										rounded-2xl
 										border
 										border-gray-100 dark:border-zinc-800
@@ -350,8 +350,8 @@ export default function ClientsClient() {
 	}
 
 	return (
-		<div className="flex-1 flex flex-col overflow-hidden bg-white dark:bg-[#121214]">
-			<div className="sticky top-0 z-10 bg-white dark:bg-[#121214]">
+		<div className="flex-1 flex flex-col overflow-hidden bg-white dark:bg-zinc-900">
+			<div className="sticky top-0 z-10 bg-white dark:bg-zinc-900">
 				<div className="px-8 py-6">
 					<div className="flex items-center justify-between">
 						<div>
@@ -364,7 +364,7 @@ export default function ClientsClient() {
 								type="button"
 								onClick={() => setCreateOpen(true)}
 								className={
-									`group inline-flex items-center gap-3 h-12 px-5 bg-white dark:bg-[#121214] text-gray-900 dark:text-gray-100 font-medium text-sm rounded-2xl border border-gray-100 dark:border-zinc-800 shadow-[0_8px_30px_rgba(0,0,0,0.04)] transition-all hover:shadow-lg hover:translate-y-0.5 cursor-pointer`
+									`group inline-flex items-center gap-3 h-12 px-5 bg-white dark:bg-zinc-900 text-gray-900 dark:text-gray-100 font-medium text-sm rounded-2xl border border-gray-100 dark:border-zinc-800 shadow-[0_8px_30px_rgba(0,0,0,0.04)] transition-all hover:shadow-lg hover:translate-y-0.5 cursor-pointer`
 								}
 							>
 								<span className="inline-flex items-center justify-center transition-colors">
@@ -392,7 +392,7 @@ export default function ClientsClient() {
 									h-12
 									pl-11
 									pr-10
-									bg-white dark:bg-[#121214]
+									bg-white dark:bg-zinc-900
 									rounded-2xl
 									border
 									border-gray-100 dark:border-zinc-800
@@ -429,7 +429,7 @@ export default function ClientsClient() {
 					)}
 
 					{filteredClients.length === 0 ? (
-						<div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-gray-200 bg-white dark:bg-[#121214] py-16 text-center">
+						<div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-gray-200 bg-white dark:bg-zinc-900 py-16 text-center">
 							<div className="rounded-full bg-gray-100 p-3 text-gray-500">
 								<Building2 size={24} />
 							</div>

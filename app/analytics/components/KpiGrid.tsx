@@ -18,15 +18,15 @@ export default function KpiGrid({ stats }: { stats: Stat[] }) {
       {stats.map((stat, i) => (
         <div
           key={i}
-          className="group bg-white rounded-2xl border border-gray-100 shadow-[0_8px_30px_rgba(0,0,0,0.04)] p-5 transition-all duration-200 hover:-translate-y-[1px] hover:shadow-[0_12px_40px_rgba(0,0,0,0.06)]"
+          className="group bg-white dark:bg-zinc-800/50 rounded-2xl border border-gray-100 dark:border-zinc-700/60 shadow-[0_8px_30px_rgba(0,0,0,0.04)] dark:shadow-none p-5 transition-all duration-200 hover:-translate-y-[1px] hover:shadow-[0_12px_40px_rgba(0,0,0,0.06)] dark:hover:shadow-none"
         >
           <div className="flex items-start justify-between mb-2">
             <div className="flex-1">
-              <p className="text-xs font-medium text-gray-500 uppercase tracking-tight leading-tight">
+              <p className="text-xs font-medium text-gray-500 dark:text-zinc-400 uppercase tracking-tight leading-tight">
                 {stat.title}
               </p>
             </div>
-            <div className="w-6 h-6 rounded flex items-center justify-center ml-1 flex-shrink-0 group-hover:bg-[#F3EEFF] transition-colors">
+            <div className="w-6 h-6 rounded flex items-center justify-center ml-1 flex-shrink-0 group-hover:bg-[#F3EEFF] dark:group-hover:bg-zinc-700/80 transition-colors">
               {(() => {
                 const Icon = stat.icon as ElementType;
                 return <Icon size={13} className="text-[#6B46FF]" />;
@@ -35,10 +35,10 @@ export default function KpiGrid({ stats }: { stats: Stat[] }) {
           </div>
           <div className="space-y-1">
             <div className="flex items-baseline gap-1.5">
-              <h3 className="text-xl font-bold text-gray-950 leading-tight">{stat.value}</h3>
-              <span className="text-xs font-medium text-gray-500">{stat.trend}</span>
+              <h3 className="text-xl font-bold text-gray-950 dark:text-zinc-100 leading-tight">{stat.value}</h3>
+              <span className="text-xs font-medium text-gray-500 dark:text-zinc-400">{stat.trend}</span>
             </div>
-            <p className="text-xs text-gray-500 leading-snug">{stat.meta}</p>
+            <p className="text-xs text-gray-500 dark:text-zinc-400 leading-snug">{stat.meta}</p>
           </div>
         </div>
       ))}

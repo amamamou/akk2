@@ -59,7 +59,7 @@ export default function Sidebar() {
 
   return (
     <>
-      <aside className="fixed bottom-0 left-0 right-0 lg:static w-full h-20 lg:h-full lg:w-[76px] bg-white dark:bg-[#121214] flex lg:flex-col items-center justify-between lg:justify-start lg:py-4 px-4 lg:px-0 border-t lg:border-t-0 border-zinc-200 dark:border-zinc-800">
+      <aside className="fixed bottom-0 left-0 right-0 lg:static w-full h-20 lg:h-full lg:w-[76px] bg-white dark:bg-zinc-900 flex lg:flex-col items-center justify-between lg:justify-start lg:py-4 px-4 lg:px-0 border-t lg:border-t-0 border-zinc-200 dark:border-zinc-800">
         <div className="hidden lg:flex bg-[#F4F4F5] dark:bg-zinc-900 rounded-full px-2 py-2 flex-col items-center gap-2">
           <ThemeSidebarButton
             icon={<SunDim size={16} strokeWidth={1.9} />}

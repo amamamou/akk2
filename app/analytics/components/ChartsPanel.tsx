@@ -25,14 +25,14 @@ export default function ChartsPanel({
 }): ReactElement {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-[0_8px_30px_rgba(0,0,0,0.04)] p-6 overflow-hidden">
+      <div className="bg-white dark:bg-zinc-800/50 rounded-2xl border border-gray-100 dark:border-zinc-700/60 shadow-[0_8px_30px_rgba(0,0,0,0.04)] dark:shadow-none p-6 overflow-hidden">
         <div className="mb-5">
-          <h3 className="text-sm font-semibold text-gray-950 leading-tight">Listener Distribution</h3>
-          <p className="text-xs text-gray-500 mt-0.5">Engagement tier segmentation</p>
+          <h3 className="text-sm font-semibold text-gray-950 dark:text-zinc-100 leading-tight">Listener Distribution</h3>
+          <p className="text-xs text-gray-500 dark:text-zinc-400 mt-0.5">Engagement tier segmentation</p>
         </div>
         <div className="h-60 flex items-center justify-center">
           {engagementData.length === 0 ? (
-            <p className="text-sm text-gray-400">No playback data in range</p>
+            <p className="text-sm text-gray-400 dark:text-zinc-500">No playback data in range</p>
           ) : (
             <ResponsiveContainer width="100%" height="100%">
         <PieChart>
@@ -71,14 +71,14 @@ export default function ChartsPanel({
         </div>
       </div>
 
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-[0_8px_30px_rgba(0,0,0,0.04)] p-6 overflow-hidden">
+      <div className="bg-white dark:bg-zinc-800/50 rounded-2xl border border-gray-100 dark:border-zinc-700/60 shadow-[0_8px_30px_rgba(0,0,0,0.04)] dark:shadow-none p-6 overflow-hidden">
         <div className="mb-5">
-          <h3 className="text-sm font-semibold text-gray-950 leading-tight">Traffic Patterns</h3>
-          <p className="text-xs text-gray-500 mt-0.5">Hourly activity by engagement tier (same filtered logs)</p>
+          <h3 className="text-sm font-semibold text-gray-950 dark:text-zinc-100 leading-tight">Traffic Patterns</h3>
+          <p className="text-xs text-gray-500 dark:text-zinc-400 mt-0.5">Hourly activity by engagement tier (same filtered logs)</p>
         </div>
         <div className="h-60 flex items-center justify-center">
           {hourlyTraffic.length === 0 ? (
-            <p className="text-sm text-gray-400">No playback data in range</p>
+            <p className="text-sm text-gray-400 dark:text-zinc-500">No playback data in range</p>
           ) : (
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={hourlyTraffic} margin={{ top: 0, right: 8, left: -20, bottom: 0 }}>

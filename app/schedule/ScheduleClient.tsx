@@ -912,7 +912,7 @@ export default function ScheduleClientPage() {
     <>
       {daysToShow.length > 0 && (
         <div
-          className="grid border-b border-gray-200 dark:border-zinc-800 bg-gray-50 dark:bg-zinc-900/60 sticky top-0 z-20"
+          className="grid border-b border-gray-200 dark:border-zinc-700/60 bg-gray-50 dark:bg-zinc-800/50 sticky top-0 z-20"
           style={{
             gridTemplateColumns: `repeat(${daysToShow.length}, minmax(0, 1fr))`,
           }}
@@ -929,7 +929,7 @@ export default function ScheduleClientPage() {
       )}
       {roomsForGrid.map((room) => (
         <div key={room.id} className="border-b border-gray-200 dark:border-zinc-800">
-          <div className="font-medium px-4 py-2.5 bg-white dark:bg-zinc-900 text-sm text-gray-900 dark:text-gray-100 border-b border-gray-100 dark:border-zinc-800">
+          <div className="font-medium px-4 py-2.5 bg-white dark:bg-zinc-800/50 text-sm text-gray-900 dark:text-gray-100 border-b border-gray-100 dark:border-zinc-700/60">
             {room.name}
           </div>
           <div
@@ -972,7 +972,7 @@ export default function ScheduleClientPage() {
     segmentTenantId?: string
   ) => (
     <div className="min-w-0">
-      <div className="grid grid-cols-7 border-b border-gray-200 dark:border-zinc-800 bg-gray-50 dark:bg-zinc-900/60 text-xs font-semibold text-gray-600 dark:text-zinc-400 uppercase">
+      <div className="grid grid-cols-7 border-b border-gray-200 dark:border-zinc-700/60 bg-gray-50 dark:bg-zinc-800/50 text-xs font-semibold text-gray-600 dark:text-zinc-400 uppercase">
         {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => (
           <div key={d} className="px-2 py-2 text-center">
             {d}
@@ -998,7 +998,7 @@ export default function ScheduleClientPage() {
                 key={`${wi}-${ci}`}
                 className={cn(
                   "border-r border-gray-100 dark:border-zinc-800 p-2 min-h-[120px] flex flex-col",
-                  !cell.inMonth && "bg-gray-50 dark:bg-zinc-900/60/50"
+                  !cell.inMonth && "bg-gray-50 dark:bg-zinc-800/30"
                 )}
               >
                 {cell.day != null && cell.inMonth && (
@@ -1080,7 +1080,7 @@ export default function ScheduleClientPage() {
   ) => (
     <>
       <div
-        className="grid border-b border-gray-200 dark:border-zinc-800 bg-gray-50 dark:bg-zinc-900/60 sticky top-0 z-20"
+        className="grid border-b border-gray-200 dark:border-zinc-700/60 bg-gray-50 dark:bg-zinc-800/50 sticky top-0 z-20"
         style={{
           gridTemplateColumns: `80px repeat(${Math.max(1, hourDayColumns.length)}, minmax(0, 1fr))`,
         }}
@@ -1108,7 +1108,7 @@ export default function ScheduleClientPage() {
             gridTemplateColumns: `80px repeat(${Math.max(1, hourDayColumns.length)}, minmax(0, 1fr))`,
           }}
         >
-          <div className="px-2 py-3 text-xs text-gray-500 dark:text-zinc-400 border-r border-gray-100 dark:border-zinc-800 bg-gray-50 dark:bg-zinc-900/60/80">
+          <div className="px-2 py-3 text-xs text-gray-500 dark:text-zinc-400 border-r border-gray-100 dark:border-zinc-700/60 bg-gray-50 dark:bg-zinc-800/50">
             {slot}
           </div>
           {hourDayColumns.map((day) => {
@@ -1146,7 +1146,7 @@ export default function ScheduleClientPage() {
   if (authLoading || isLoading) {
     return (
       <DndProvider backend={HTML5Backend}>
-        <div className="flex-1 flex flex-col overflow-hidden bg-white dark:bg-[#121214]">
+        <div className="flex-1 flex flex-col overflow-hidden bg-white dark:bg-zinc-900">
           <ScheduleToolbar
             query={query}
             onQueryChange={setQuery}
@@ -1170,7 +1170,7 @@ export default function ScheduleClientPage() {
           />
 
           <div className="px-6 py-6">
-            <div className="bg-white dark:bg-zinc-900 rounded-[28px] border border-gray-100 dark:border-zinc-800 shadow-[0_8px_30px_rgba(0,0,0,0.04)] flex flex-col min-h-[calc(100vh-220px)] overflow-hidden">
+            <div className="bg-white dark:bg-zinc-800/50 rounded-[28px] border border-gray-100 dark:border-zinc-700/60 shadow-[0_8px_30px_rgba(0,0,0,0.04)] dark:shadow-none flex flex-col min-h-[calc(100vh-220px)] overflow-hidden">
               <div className="flex-1 overflow-auto p-6">
                 <div className="animate-pulse">
                   {viewMode === "month" ? (
@@ -1211,7 +1211,7 @@ export default function ScheduleClientPage() {
 
   return (
     <DndProvider backend={HTML5Backend}>
-      <div className="flex-1 flex flex-col overflow-hidden bg-white dark:bg-[#121214]">
+      <div className="flex-1 flex flex-col overflow-hidden bg-white dark:bg-zinc-900">
         <ScheduleToolbar
           query={query}
           onQueryChange={setQuery}
@@ -1235,7 +1235,7 @@ export default function ScheduleClientPage() {
         />
 
       <div className="px-6 py-6">
-        <div className="bg-white dark:bg-zinc-900 rounded-[28px] border border-gray-100 dark:border-zinc-800 shadow-[0_8px_30px_rgba(0,0,0,0.04)] flex flex-col min-h-[calc(100vh-220px)] overflow-hidden">
+        <div className="bg-white dark:bg-zinc-800/50 rounded-[28px] border border-gray-100 dark:border-zinc-700/60 shadow-[0_8px_30px_rgba(0,0,0,0.04)] dark:shadow-none flex flex-col min-h-[calc(100vh-220px)] overflow-hidden">
           <div className="flex-1 overflow-auto">
             {error && (
               <div className="mx-4 my-2 p-2 bg-red-50 border border-red-200 rounded text-sm text-red-800 flex gap-2">
