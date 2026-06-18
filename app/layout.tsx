@@ -5,6 +5,7 @@ import "./globals.css";
 import SuppressConsole from './components/SuppressConsole';
 import { AuthProvider } from "./context/AuthContext";
 import LayoutShell from "./components/LayoutShell";
+import ThemeProvider from "./components/ThemeProvider";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -38,7 +39,9 @@ export default function RootLayout({
       <body suppressHydrationWarning className="min-h-full ">
         <SuppressConsole />
         <AuthProvider>
-          <LayoutShell>{children}</LayoutShell>
+          <ThemeProvider>
+            <LayoutShell>{children}</LayoutShell>
+          </ThemeProvider>
         </AuthProvider>
       </body>
     </html>

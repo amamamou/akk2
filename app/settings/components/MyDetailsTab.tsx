@@ -24,7 +24,6 @@ interface MyDetailsTabProps {
     role: string;
     country: string;
     timezone: string;
-    bio: string;
     avatar?: string | null;
   };
   firstName: string;
@@ -33,7 +32,6 @@ interface MyDetailsTabProps {
   role: string;
   country: string;
   timezone: string;
-  bio: string;
   countries: Country[];
   avatar: string | null;
   setFirstName: (val: string) => void;
@@ -42,10 +40,12 @@ interface MyDetailsTabProps {
   setRole: (val: string) => void;
   setCountry: (val: string) => void;
   setTimezone: (val: string) => void;
-  setBio: (val: string) => void;
   setAvatar: (val: string | null) => void;
   setDirty: (val: boolean) => void;
 }
+
+const INPUT_CLASS =
+  "w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/5 focus:border-gray-900 dark:bg-zinc-900/50 dark:border-zinc-700 dark:text-zinc-100 dark:focus:border-zinc-500 dark:focus:ring-zinc-500/30";
 
 function isRemoteImageUrl(src: string | null | undefined): boolean {
   return (
@@ -62,7 +62,6 @@ export default function MyDetailsTab({
   role,
   country,
   timezone,
-  bio,
   countries,
   avatar,
   setFirstName,
@@ -71,19 +70,15 @@ export default function MyDetailsTab({
   setRole,
   setCountry,
   setTimezone,
-  setBio,
   setAvatar,
   setDirty,
 }: MyDetailsTabProps) {
   const [photoError, setPhotoError] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
-  // Set when the avatar URL (often a Cloudflare R2 link) fails to load, so we render the
-  // styled initials fallback instead of a broken-image icon.
   const [avatarError, setAvatarError] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  // A new/changed avatar source should get a fresh chance to load.
   useEffect(() => {
     setAvatarError(false);
   }, [avatar]);
@@ -92,11 +87,10 @@ export default function MyDetailsTab({
 
   const initials = `${(firstName || "").trim().charAt(0)}${(lastName || "").trim().charAt(0)}`.toUpperCase();
 
-  // RBAC: gate on the authenticated SESSION role (not the editable `role` field value), so a
-  // draft edit to the field can never unlock itself. Only a Super Admin may mutate the role;
-  // the backend also redacts `role` on profile updates as defense-in-depth.
   const { user } = useAuth();
-  const canEditRole = isSuperAdminRole(user?.role);
+  const isProtectedSuperAdmin =
+    isSuperAdminRole(role) || isSuperAdminRole(user?.role);
+  const canEditRole = isSuperAdminRole(user?.role) && !isProtectedSuperAdmin;
 
   function notifyAvatarChange(url: string | null) {
     dispatchUserProfileUpdated({
@@ -211,16 +205,16 @@ export default function MyDetailsTab({
   return (
     <div className="space-y-8">
       <div>
-        <h2 className="text-lg font-semibold text-gray-900 mb-1">
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-1">
           Personal information
         </h2>
-        <p className="text-sm text-gray-600 mb-6">
+        <p className="text-sm text-gray-600 dark:text-zinc-400 mb-6">
           Update your photo and personal details.
         </p>
 
         <div className="space-y-6">
           <div className="py-6">
-            <label className="block text-sm font-medium text-gray-900 mb-3">
+            <label className="block text-sm font-medium text-gray-900 dark:text-gray-100 mb-3">
               Profile photo
             </label>
 
@@ -240,7 +234,9 @@ export default function MyDetailsTab({
               onDragEnter={handleDragEnter}
               onDragLeave={handleDragLeave}
               className={`flex items-center gap-4 p-4 rounded-lg transition-colors ${
-                isDragging ? "border border-gray-300 bg-gray-50" : "border border-gray-200 bg-white"
+                isDragging
+                  ? "border border-gray-300 bg-gray-50 dark:border-zinc-600 dark:bg-zinc-900/50"
+                  : "border border-gray-200 bg-white dark:border-zinc-800 dark:bg-[#121214]"
               }`}
               role="group"
               aria-label="Profile photo upload"
@@ -257,9 +253,8 @@ export default function MyDetailsTab({
                     }
                   }}
                   aria-label={avatar ? "Change profile photo" : "Upload profile photo"}
-                  className={`relative group w-24 h-24 rounded-full focus:outline-none disabled:opacity-60 ${isDragging ? "ring-2 ring-gray-300" : ""}`}
+                  className={`relative group w-24 h-24 rounded-full focus:outline-none disabled:opacity-60 ${isDragging ? "ring-2 ring-gray-300 dark:ring-zinc-600" : ""}`}
                 >
-                  {/* SVG interrupted gradient ring */}
                   <svg className="absolute inset-0 w-full h-full" viewBox="0 0 100 100" aria-hidden>
                     <defs>
                       <linearGradient id={`avatarGrad-${gradientId}`} x1="0%" y1="0%" x2="100%" y2="100%">
@@ -280,31 +275,20 @@ export default function MyDetailsTab({
                     />
                   </svg>
 
-                  {/* Inner white surface */}
-                  <div className="relative bg-white rounded-full h-full w-full flex items-center justify-center overflow-hidden shadow-[inset_0_2px_6px_rgba(0,0,0,0.06)]">
+                  <div className="relative bg-white dark:bg-zinc-900 rounded-full h-full w-full flex items-center justify-center overflow-hidden shadow-[inset_0_2px_6px_rgba(0,0,0,0.06)]">
                     {uploadingPhoto ? (
-                      <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
-                    ) : avatar && !avatarError ? (
-                      isRemoteImageUrl(avatar) ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={avatar}
-                          alt="Profile"
-                          onError={() => setAvatarError(true)}
-                          className="h-full w-full object-cover"
-                        />
-                      ) : (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={avatar}
-                          alt="Profile preview"
-                          onError={() => setAvatarError(true)}
-                          className="h-full w-full object-cover"
-                        />
-                      )
+                      <Loader2 className="h-8 w-8 animate-spin text-gray-400 dark:text-zinc-500" />
+                    ) : avatar && !avatarError && isRemoteImageUrl(avatar) ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={avatar}
+                        alt="Profile"
+                        onError={() => setAvatarError(true)}
+                        className="h-full w-full object-cover"
+                      />
                     ) : (
                       <div
-                        className="h-full w-full flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100 text-gray-700 text-lg font-semibold"
+                        className="h-full w-full flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100 dark:from-zinc-800 dark:to-zinc-900 text-gray-700 dark:text-zinc-200 text-lg font-semibold"
                         aria-hidden
                         title={initials || "Profile"}
                       >
@@ -313,10 +297,9 @@ export default function MyDetailsTab({
                     )}
                   </div>
 
-                  {/* camera overlay */}
                   <span className="pointer-events-none absolute inset-0 flex items-end justify-end p-2 opacity-0 group-hover:opacity-100 group-focus:opacity-100 transition-opacity">
-                    <span className="bg-white/90 p-2 rounded-full shadow">
-                      <Camera size={16} className="text-gray-600" />
+                    <span className="bg-white/90 dark:bg-zinc-800/90 p-2 rounded-full shadow">
+                      <Camera size={16} className="text-gray-600 dark:text-zinc-300" />
                     </span>
                   </span>
                 </button>
@@ -330,13 +313,13 @@ export default function MyDetailsTab({
                         type="button"
                         disabled={uploadingPhoto}
                         onClick={() => fileInputRef.current?.click()}
-                        className="inline-flex items-center gap-2 px-2 py-1 rounded-md bg-white text-sm text-gray-700 border border-gray-200 hover:bg-gray-50 focus:outline-none focus:ring-1 focus:ring-gray-200 disabled:opacity-50"
+                        className="inline-flex items-center gap-2 px-2 py-1 rounded-md bg-white dark:bg-zinc-900 text-sm text-gray-700 dark:text-zinc-200 border border-gray-200 dark:border-zinc-700 hover:bg-gray-50 dark:hover:bg-zinc-800 focus:outline-none focus:ring-1 focus:ring-gray-200 disabled:opacity-50"
                         aria-label="Upload photo"
                       >
-                        <UploadCloud size={14} className="text-gray-500" />
-                        <span className="text-sm text-gray-700">Upload</span>
+                        <UploadCloud size={14} className="text-gray-500 dark:text-zinc-400" />
+                        <span className="text-sm">Upload</span>
                       </button>
-                      <span className="text-sm text-gray-500">Drag & drop or click to upload</span>
+                      <span className="text-sm text-gray-500 dark:text-zinc-400">Drag & drop or click to upload</span>
                     </>
                   ) : (
                     <div className="flex items-center gap-3">
@@ -345,35 +328,35 @@ export default function MyDetailsTab({
                           type="button"
                           disabled={uploadingPhoto}
                           onClick={() => fileInputRef.current?.click()}
-                          className="inline-flex items-center gap-2 text-sm text-gray-700 px-3 py-1 rounded-md border border-gray-200 bg-white hover:bg-gray-50 disabled:opacity-50"
+                          className="inline-flex items-center gap-2 text-sm text-gray-700 dark:text-zinc-200 px-3 py-1 rounded-md border border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 hover:bg-gray-50 dark:hover:bg-zinc-800 disabled:opacity-50"
                         >
-                          <Edit2 size={14} className="text-gray-500" />
+                          <Edit2 size={14} className="text-gray-500 dark:text-zinc-400" />
                           <span>Replace</span>
                         </button>
                         <button
                           type="button"
                           disabled={uploadingPhoto}
                           onClick={() => void removePhoto()}
-                          className="inline-flex items-center gap-2 text-sm text-gray-600 px-3 py-1 rounded-md border border-gray-200 bg-white hover:bg-gray-50 disabled:opacity-50"
+                          className="inline-flex items-center gap-2 text-sm text-gray-600 dark:text-zinc-300 px-3 py-1 rounded-md border border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 hover:bg-gray-50 dark:hover:bg-zinc-800 disabled:opacity-50"
                         >
                           <Trash size={14} className="text-gray-400" />
                           <span>Remove</span>
                         </button>
                       </div>
-                      <div className="text-sm text-gray-400">Stored on Cloudflare R2</div>
+                      <div className="text-sm text-gray-400 dark:text-zinc-500">Stored on Cloudflare R2</div>
                     </div>
                   )}
                 </div>
 
-                <p className="text-xs text-gray-400 mt-2">PNG, JPG, WebP, or GIF — max 2MB.</p>
-                {photoError && <p className="mt-2 text-xs text-red-600">{photoError}</p>}
+                <p className="text-xs text-gray-400 dark:text-zinc-500 mt-2">PNG, JPG, WebP, or GIF — max 2MB.</p>
+                {photoError && <p className="mt-2 text-xs text-red-600 dark:text-red-400">{photoError}</p>}
               </div>
             </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-gray-700 dark:text-zinc-300 mb-1">
                 First name
               </label>
               <input
@@ -382,11 +365,11 @@ export default function MyDetailsTab({
                   setFirstName(e.target.value);
                   setDirty(true);
                 }}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900/5 focus:border-gray-900"
+                className={INPUT_CLASS}
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-gray-700 dark:text-zinc-300 mb-1">
                 Last name
               </label>
               <input
@@ -395,14 +378,14 @@ export default function MyDetailsTab({
                   setLastName(e.target.value);
                   setDirty(true);
                 }}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900/5 focus:border-gray-900"
+                className={INPUT_CLASS}
               />
             </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-gray-700 dark:text-zinc-300 mb-1">
                 Email
               </label>
               <input
@@ -412,11 +395,11 @@ export default function MyDetailsTab({
                   setEmail(e.target.value);
                   setDirty(true);
                 }}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900/5 focus:border-gray-900"
+                className={INPUT_CLASS}
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-gray-700 dark:text-zinc-300 mb-1">
                 Role
               </label>
               <input
@@ -424,14 +407,22 @@ export default function MyDetailsTab({
                 readOnly={!canEditRole}
                 disabled={!canEditRole}
                 aria-readonly={!canEditRole}
-                title={canEditRole ? undefined : "Role can only be changed by a Super Admin"}
+                title={
+                  isProtectedSuperAdmin
+                    ? "Super Admin role cannot be changed"
+                    : canEditRole
+                      ? undefined
+                      : "Role can only be changed by a Super Admin"
+                }
                 onChange={(e) => {
                   if (!canEditRole) return;
                   setRole(e.target.value);
                   setDirty(true);
                 }}
-                className={`w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900/5 focus:border-gray-900 ${
-                  canEditRole ? "" : "bg-gray-50 text-gray-500 cursor-not-allowed"
+                className={`${INPUT_CLASS} ${
+                  canEditRole
+                    ? ""
+                    : "bg-gray-50 text-gray-500 cursor-not-allowed dark:bg-zinc-900/80 dark:text-zinc-500"
                 }`}
               />
             </div>
@@ -439,7 +430,7 @@ export default function MyDetailsTab({
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-gray-700 dark:text-zinc-300 mb-1">
                 Country
               </label>
               <select
@@ -448,7 +439,7 @@ export default function MyDetailsTab({
                   setCountry(e.target.value);
                   setDirty(true);
                 }}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900/5 focus:border-gray-900 bg-white"
+                className={INPUT_CLASS}
               >
                 {countries.map((c) => (
                   <option key={c.name} value={c.name}>
@@ -459,7 +450,7 @@ export default function MyDetailsTab({
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-gray-700 dark:text-zinc-300 mb-1">
                 Timezone
               </label>
               <select
@@ -468,7 +459,7 @@ export default function MyDetailsTab({
                   setTimezone(e.target.value);
                   setDirty(true);
                 }}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900/5 focus:border-gray-900 bg-white"
+                className={INPUT_CLASS}
               >
                 <option value={initial.timezone}>{initial.timezone}</option>
                 <option value="Central European Time (CET) UTC+01:00">
@@ -479,24 +470,6 @@ export default function MyDetailsTab({
                 </option>
               </select>
             </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Bio
-            </label>
-            <textarea
-              value={bio}
-              onChange={(e) => {
-                setBio(e.target.value);
-                setDirty(true);
-              }}
-              rows={4}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900/5 focus:border-gray-900"
-            />
-            <p className="mt-1 text-xs text-gray-500">
-              Brief description for your profile.
-            </p>
           </div>
         </div>
       </div>

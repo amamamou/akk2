@@ -21,7 +21,6 @@ type UserProfile = {
   role: string;
   country: string;
   timezone: string;
-  bio: string;
   avatar?: string | null;
 };
 
@@ -38,7 +37,6 @@ const defaultProfile: UserProfile = {
   role: "",
   country: "United States",
   timezone: "Pacific Standard Time (PST) UTC-08:00",
-  bio: "",
   avatar: null,
 };
 
@@ -52,7 +50,6 @@ export default function SettingsClient() {
   const [role, setRole] = useState(defaultProfile.role);
   const [country, setCountry] = useState(defaultProfile.country);
   const [timezone, setTimezone] = useState(defaultProfile.timezone);
-  const [bio, setBio] = useState(defaultProfile.bio);
   const [avatar, setAvatar] = useState<string | null>(defaultProfile.avatar ?? null);
   const [dirty, setDirty] = useState(false);
   const [activeTab, setActiveTab] = useState<string>("my-details");
@@ -65,7 +62,6 @@ export default function SettingsClient() {
     { name: "France", code: "FR", emoji: "🇫🇷" },
   ]);
 
-  // Load user profile from API when authenticated, else localStorage / auth defaults
   useEffect(() => {
     let cancelled = false;
 
@@ -78,7 +74,6 @@ export default function SettingsClient() {
       setRole(profileToUse.role);
       setCountry(profileToUse.country);
       setTimezone(profileToUse.timezone);
-      setBio(profileToUse.bio);
       setAvatar(profileToUse.avatar ?? null);
       setDirty(false);
     };
@@ -98,7 +93,6 @@ export default function SettingsClient() {
           role: stored.role || "",
           country: stored.country ?? defaultProfile.country,
           timezone: stored.timezone ?? defaultProfile.timezone,
-          bio: stored.bio || "",
           avatar: stored.avatar || null,
         };
       } catch {
@@ -119,18 +113,15 @@ export default function SettingsClient() {
             role: u.role || authUser.role || "",
             country: u.country ?? defaultProfile.country,
             timezone: u.timezone ?? defaultProfile.timezone,
-            bio: u.bio ?? "",
             avatar: u.profilePhotoUrl ?? null,
           };
           applyProfile(profileToUse);
-          if (profileToUse.avatar) {
-            dispatchUserProfileUpdated({
-              firstName: profileToUse.firstName,
-              lastName: profileToUse.lastName,
-              role: profileToUse.role,
-              avatar: profileToUse.avatar,
-            });
-          }
+          dispatchUserProfileUpdated({
+            firstName: profileToUse.firstName,
+            lastName: profileToUse.lastName,
+            role: profileToUse.role,
+            avatar: profileToUse.avatar,
+          });
         } catch {
           const fallback: UserProfile = {
             firstName: authUser.name?.split(" ")[0] || "",
@@ -139,7 +130,6 @@ export default function SettingsClient() {
             role: authUser.role || "",
             country: defaultProfile.country,
             timezone: defaultProfile.timezone,
-            bio: "",
             avatar: loadFromStorage()?.avatar ?? null,
           };
           applyProfile(fallback);
@@ -152,22 +142,20 @@ export default function SettingsClient() {
 
     let profileToUse: UserProfile = defaultProfile;
 
-    if (typeof window !== 'undefined') {
-      // Priority 2: Fall back to localStorage
+    if (typeof window !== "undefined") {
       try {
         const raw = window.localStorage.getItem(USER_STORAGE_KEY);
         if (raw) {
           const parsed: unknown = JSON.parse(raw);
-          if (parsed && typeof parsed === 'object') {
+          if (parsed && typeof parsed === "object") {
             const stored = parsed as Partial<UserProfile>;
             profileToUse = {
-              firstName: stored.firstName || '',
-              lastName: stored.lastName || '',
-              email: stored.email || '',
-              role: stored.role || '',
+              firstName: stored.firstName || "",
+              lastName: stored.lastName || "",
+              email: stored.email || "",
+              role: stored.role || "",
               country: stored.country ?? profileToUse.country,
               timezone: stored.timezone ?? profileToUse.timezone,
-              bio: stored.bio || '',
               avatar: stored.avatar || null,
             };
           }
@@ -227,7 +215,7 @@ export default function SettingsClient() {
   }, []);
 
   return (
-    <div className="flex-1 overflow-auto bg-white">
+    <div className="flex-1 overflow-auto bg-white dark:bg-[#121214]">
       <div className="">
         <SettingsHeader
           tabs={TABS}
@@ -241,7 +229,6 @@ export default function SettingsClient() {
             setRole(initialProfile.role);
             setCountry(initialProfile.country);
             setTimezone(initialProfile.timezone);
-            setBio(initialProfile.bio);
             setAvatar(initialProfile.avatar ?? null);
             setDirty(false);
           }}
@@ -254,7 +241,6 @@ export default function SettingsClient() {
                 role,
                 country,
                 timezone,
-                bio,
                 avatar,
               };
 
@@ -268,7 +254,6 @@ export default function SettingsClient() {
                   lastName: profile.lastName,
                   country: profile.country,
                   timezone: profile.timezone,
-                  bio: profile.bio,
                   profilePhotoUrl: isAvatarUrl ? profile.avatar : profile.avatar ?? null,
                 });
               } catch (err) {
@@ -296,7 +281,7 @@ export default function SettingsClient() {
         />
 
         <div className="px-6 py-6">
-          <div className="bg-white rounded-[28px] border border-gray-100 shadow-[0_8px_30px_rgba(0,0,0,0.04)] flex flex-col min-h-[calc(100vh-220px)] overflow-hidden">
+          <div className="bg-white dark:bg-[#121214] rounded-[28px] border border-gray-100 dark:border-zinc-800 shadow-[0_8px_30px_rgba(0,0,0,0.04)] dark:shadow-none flex flex-col min-h-[calc(100vh-220px)] overflow-hidden">
             <div className="p-8 flex-1 overflow-auto">
               {activeTab === "my-details" ? (
                 <MyDetailsTab
@@ -307,7 +292,6 @@ export default function SettingsClient() {
                   role={role}
                   country={country}
                   timezone={timezone}
-                  bio={bio}
                   countries={countries}
                   avatar={avatar}
                   setFirstName={setFirstName}
@@ -316,7 +300,6 @@ export default function SettingsClient() {
                   setRole={setRole}
                   setCountry={setCountry}
                   setTimezone={setTimezone}
-                  setBio={setBio}
                   setAvatar={setAvatar}
                   setDirty={setDirty}
                 />

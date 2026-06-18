@@ -59,45 +59,45 @@ export default function BillingTab() {
 
   if (isLoading) {
     return (
-      <div className="rounded-lg border border-gray-100 overflow-hidden">
+      <div className="rounded-lg border border-gray-100 dark:border-zinc-800 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="bg-gray-50 border-b border-gray-100">
+            <thead className="bg-gray-50 dark:bg-zinc-900/60 border-b border-gray-100 dark:border-zinc-800">
               <tr>
                 <th className="text-left px-4 py-3">
-                  <div className="h-3 bg-gray-200 rounded w-32" />
+                  <div className="h-3 bg-gray-200 dark:bg-zinc-800 rounded w-32" />
                 </th>
                 <th className="text-left px-4 py-3">
-                  <div className="h-3 bg-gray-200 rounded w-20" />
+                  <div className="h-3 bg-gray-200 dark:bg-zinc-800 rounded w-20" />
                 </th>
                 <th className="text-left px-4 py-3">
-                  <div className="h-3 bg-gray-200 rounded w-24" />
+                  <div className="h-3 bg-gray-200 dark:bg-zinc-800 rounded w-24" />
                 </th>
                 <th className="text-left px-4 py-3">
-                  <div className="h-3 bg-gray-200 rounded w-24" />
+                  <div className="h-3 bg-gray-200 dark:bg-zinc-800 rounded w-24" />
                 </th>
                 <th className="text-left px-4 py-3">
-                  <div className="h-3 bg-gray-200 rounded w-16" />
+                  <div className="h-3 bg-gray-200 dark:bg-zinc-800 rounded w-16" />
                 </th>
               </tr>
             </thead>
             <tbody className="animate-pulse">
               {Array.from({ length: 3 }).map((_, i) => (
-                <tr key={i} className="border-b border-gray-50">
+                <tr key={i} className="border-b border-gray-50 dark:border-zinc-800/80">
                   <td className="px-4 py-3">
-                    <div className="h-4 bg-gray-200 rounded w-24" />
+                    <div className="h-4 bg-gray-200 dark:bg-zinc-800 rounded w-24" />
                   </td>
                   <td className="px-4 py-3">
-                    <div className="h-4 bg-gray-200 rounded w-16" />
+                    <div className="h-4 bg-gray-200 dark:bg-zinc-800 rounded w-16" />
                   </td>
                   <td className="px-4 py-3">
-                    <div className="h-4 bg-gray-200 rounded w-20" />
+                    <div className="h-4 bg-gray-200 dark:bg-zinc-800 rounded w-20" />
                   </td>
                   <td className="px-4 py-3">
-                    <div className="h-4 bg-gray-200 rounded w-20" />
+                    <div className="h-4 bg-gray-200 dark:bg-zinc-800 rounded w-20" />
                   </td>
                   <td className="px-4 py-3">
-                    <div className="h-4 bg-gray-200 rounded w-12" />
+                    <div className="h-4 bg-gray-200 dark:bg-zinc-800 rounded w-12" />
                   </td>
                 </tr>
               ))}
@@ -110,7 +110,7 @@ export default function BillingTab() {
 
   if (error) {
     return (
-      <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+      <div className="rounded-lg border border-amber-200 dark:border-amber-900/50 bg-amber-50 dark:bg-amber-950/30 px-4 py-3 text-sm text-amber-900 dark:text-amber-200">
         {error}
       </div>
     );
@@ -119,8 +119,8 @@ export default function BillingTab() {
   if (invoices.length === 0) {
     return (
       <div className="px-6 py-8 text-center">
-        <p className="text-sm font-medium text-gray-900">No invoices yet</p>
-        <p className="text-xs text-gray-500 mt-1">
+        <p className="text-sm font-medium text-gray-900 dark:text-gray-100">No invoices yet</p>
+        <p className="text-xs text-gray-500 dark:text-zinc-400 mt-1">
           Manual invoices for your tenant will appear here once registered.
         </p>
       </div>
@@ -128,24 +128,24 @@ export default function BillingTab() {
   }
 
   return (
-    <div className="rounded-lg border border-gray-100 overflow-hidden">
+    <div className="rounded-lg border border-gray-100 dark:border-zinc-800 overflow-hidden">
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
-          <thead className="bg-gray-50 border-b border-gray-100">
+          <thead className="bg-gray-50 dark:bg-zinc-900/60 border-b border-gray-100 dark:border-zinc-800">
             <tr>
-              <th className="text-left px-4 py-3 font-medium text-gray-700 text-xs uppercase tracking-wide">
+              <th className="text-left px-4 py-3 font-medium text-gray-700 dark:text-zinc-300 text-xs uppercase tracking-wide">
                 Invoice #
               </th>
-              <th className="text-left px-4 py-3 font-medium text-gray-700 text-xs uppercase tracking-wide">
+              <th className="text-left px-4 py-3 font-medium text-gray-700 dark:text-zinc-300 text-xs uppercase tracking-wide">
                 Amount
               </th>
-              <th className="text-left px-4 py-3 font-medium text-gray-700 text-xs uppercase tracking-wide">
+              <th className="text-left px-4 py-3 font-medium text-gray-700 dark:text-zinc-300 text-xs uppercase tracking-wide">
                 Status
               </th>
-              <th className="text-left px-4 py-3 font-medium text-gray-700 text-xs uppercase tracking-wide">
+              <th className="text-left px-4 py-3 font-medium text-gray-700 dark:text-zinc-300 text-xs uppercase tracking-wide">
                 Due date
               </th>
-              <th className="text-left px-4 py-3 font-medium text-gray-700 text-xs uppercase tracking-wide">
+              <th className="text-left px-4 py-3 font-medium text-gray-700 dark:text-zinc-300 text-xs uppercase tracking-wide">
                 Download
               </th>
             </tr>
@@ -154,12 +154,12 @@ export default function BillingTab() {
             {invoices.map((invoice) => (
               <tr
                 key={invoice.id}
-                className="border-b border-gray-50 hover:bg-gray-50/80 transition-colors"
+                className="border-b border-gray-50 dark:border-zinc-800/80 hover:bg-gray-50/80 dark:hover:bg-zinc-900/40 transition-colors"
               >
-                <td className="px-4 py-3 font-medium text-gray-900">
+                <td className="px-4 py-3 font-medium text-gray-900 dark:text-gray-100">
                   {invoice.invoiceNumber}
                 </td>
-                <td className="px-4 py-3 text-gray-700">{formatMoney(invoice.amount)}</td>
+                <td className="px-4 py-3 text-gray-700 dark:text-zinc-300">{formatMoney(invoice.amount)}</td>
                 <td className="px-4 py-3">
                   <span
                     className={cn(
@@ -172,7 +172,7 @@ export default function BillingTab() {
                     {invoice.status}
                   </span>
                 </td>
-                <td className="px-4 py-3 text-gray-600">{formatDate(invoice.dueDate)}</td>
+                <td className="px-4 py-3 text-gray-600 dark:text-zinc-400">{formatDate(invoice.dueDate)}</td>
                 <td className="px-4 py-3">
                   {invoice.downloadUrl ? (
                     <a
@@ -185,7 +185,7 @@ export default function BillingTab() {
                       <ExternalLink size={12} />
                     </a>
                   ) : (
-                    <span className="text-gray-400 text-xs">—</span>
+                    <span className="text-gray-400 dark:text-zinc-500 text-xs">—</span>
                   )}
                 </td>
               </tr>

@@ -68,18 +68,18 @@ const TAB_ICONS = {
   const activeLabel = tabs.find((t) => t.key === activeTab)?.label ?? "";
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden bg-white">
-      <div className="sticky top-0 z-10 bg-white">
+    <div className="flex-1 flex flex-col overflow-hidden bg-white dark:bg-[#121214]">
+      <div className="sticky top-0 z-10 bg-white dark:bg-[#121214]">
         <div className="px-8 py-6">
           <div className="flex items-start justify-between gap-8">
            <div className="flex items-start justify-between w-full">
   <div>
   <div>
-              <h1 className="text-2xl font-semibold text-gray-900">Settings</h1>
-              <p className="mt-1 text-sm text-gray-500">{activeLabel}</p>
+              <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">Settings</h1>
+              <p className="mt-1 text-sm text-gray-500 dark:text-zinc-400">{activeLabel}</p>
             </div>
   </div>
-<div className="hidden lg:flex items-center gap-1 rounded-2xl bg-zinc-100 p-1">
+<div className="hidden lg:flex items-center gap-1 rounded-2xl bg-zinc-100 dark:bg-zinc-900 p-1">
   {tabs.map((t) => {
     const isActive = activeTab === t.key;
     const Icon =
@@ -101,8 +101,8 @@ const TAB_ICONS = {
           transition-all
           ${
             isActive
-              ? "bg-white text-zinc-950 shadow-sm"
-              : "text-zinc-500 hover:text-zinc-900"
+              ? "bg-white dark:bg-zinc-800 text-zinc-950 dark:text-zinc-50 shadow-sm"
+              : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200"
           }
         `}
       >
@@ -119,7 +119,7 @@ const TAB_ICONS = {
                 <div className="flex items-center justify-end gap-3">
                   <button
                     onClick={onCancel}
-                    className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-md hover:bg-gray-50 transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-blue-400"
+                    className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 dark:text-zinc-200 bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700 rounded-md hover:bg-gray-50 dark:hover:bg-zinc-800 transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-blue-400"
                   >
                     <X size={16} /> Cancel
                   </button>
