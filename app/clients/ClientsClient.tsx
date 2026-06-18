@@ -284,7 +284,7 @@ export default function ClientsClient() {
 						<div className="space-y-6">
 							{[1, 2, 3, 4].map((i) => (
 								<div key={i}>
-									<div className="bg-white dark:bg-[#121214] rounded-[28px] border border-gray-100 dark:border-zinc-800 shadow-[0_8px_30px_rgba(0,0,0,0.04)] flex flex-col overflow-hidden animate-pulse">
+									<div className="bg-white dark:bg-zinc-900/90 rounded-[28px] border border-gray-100 dark:border-zinc-800/80 shadow-[0_8px_30px_rgba(0,0,0,0.04)] dark:shadow-none flex flex-col overflow-hidden animate-pulse">
 										<div className="px-5 py-5">
 											<div className="flex items-start justify-between gap-4">
 												<div className="min-w-0 flex-1">
@@ -664,7 +664,7 @@ function ClientCard({
 
 	return (
 		<div className="">
-			<div className="bg-white dark:bg-zinc-900 rounded-[28px] border border-gray-100 dark:border-zinc-800 shadow-[0_8px_30px_rgba(0,0,0,0.04)] dark:shadow-none flex flex-col overflow-hidden">
+			<div className="bg-white dark:bg-zinc-900/90 rounded-[28px] border border-gray-100 dark:border-zinc-800/80 shadow-[0_8px_30px_rgba(0,0,0,0.04)] dark:shadow-none flex flex-col overflow-hidden">
 				<div className="px-5 py-4">
 					<div className="flex items-start justify-between gap-4">
 						<div className="min-w-0 flex-1">
@@ -679,7 +679,7 @@ function ClientCard({
 								</span>
 							</div>
 
-							<div className="mt-3 grid gap-3 text-sm text-gray-600 sm:grid-cols-2 lg:grid-cols-4">
+							<div className="mt-3 grid gap-3 text-sm text-gray-600 dark:text-zinc-300 sm:grid-cols-2 lg:grid-cols-4">
 								<Info label="Business Type" value={client.businessType || "—"} />
 								<Info label="Contact" value={client.contactPerson || "—"} />
 								<Info label="Email" value={client.email || "—"} icon={<Mail size={14} />} />
@@ -692,16 +692,16 @@ function ClientCard({
 								>
 									{billing?.planName || client.subscriptionTier}
 								</span>
-								<span className="rounded-full bg-gray-50 dark:bg-zinc-800/50 px-2.5 py-1 text-gray-600">
+								<span className="rounded-full bg-gray-50 dark:bg-zinc-800/50 px-2.5 py-1 text-gray-600 dark:text-zinc-300">
 									{client.maxPlayers} players max
 								</span>
-								<span className="rounded-full bg-gray-50 dark:bg-zinc-800/50 px-2.5 py-1 text-gray-600">
+								<span className="rounded-full bg-gray-50 dark:bg-zinc-800/50 px-2.5 py-1 text-gray-600 dark:text-zinc-300">
 									{client.maxStorageGb} GB storage max
 								</span>
 							</div>
 
 							{billing && (
-								<div className="mt-4 grid gap-3 rounded-xl border border-gray-100 dark:border-zinc-800 bg-gray-50 dark:bg-zinc-800/50/80 p-4 sm:grid-cols-3">
+								<div className="mt-4 grid gap-3 rounded-xl border border-gray-100 dark:border-zinc-800/80 bg-gray-50 dark:bg-zinc-800/80 p-4 sm:grid-cols-3">
 									<Info
 										label="Total invoiced"
 										value={formatMoney(billing.totalInvoiced)}
@@ -718,8 +718,8 @@ function ClientCard({
 							)}
 
 							{billing && billing.recentInvoices.length > 0 && (
-								<div className="mt-3 text-xs text-gray-500">
-									<span className="font-medium text-gray-700">Recent: </span>
+								<div className="mt-3 text-xs text-gray-500 dark:text-zinc-400">
+									<span className="font-medium text-gray-700 dark:text-zinc-300">Recent: </span>
 									{billing.recentInvoices
 										.slice(0, 3)
 										.map((inv) => inv.invoiceNumber)
@@ -760,8 +760,8 @@ function Info({
 }) {
 	return (
 		<div className="min-w-0">
-			<div className="text-xs uppercase tracking-wide text-gray-400">{label}</div>
-			<div className="mt-1 flex items-center gap-1.5 truncate text-sm text-gray-700">
+			<div className="text-xs uppercase tracking-wide text-gray-400 dark:text-zinc-500">{label}</div>
+			<div className="mt-1 flex items-center gap-1.5 truncate text-sm text-gray-700 dark:text-zinc-200">
 				{icon}
 				<span className="truncate">{value}</span>
 			</div>

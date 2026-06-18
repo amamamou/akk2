@@ -105,13 +105,13 @@ export default function LibraryPlaylistsClient() {
   };
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden bg-white">
-      <div className="sticky top-0 z-10 bg-white ">
+    <div className="flex-1 flex flex-col overflow-hidden bg-white dark:bg-[#121214]">
+      <div className="sticky top-0 z-10 bg-white dark:bg-[#121214]">
         <div className="px-8 py-6">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-2xl font-semibold text-gray-900">Playlists</h1>
-              <p className="mt-1 text-sm text-gray-500">
+              <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">Playlists</h1>
+              <p className="mt-1 text-sm text-gray-500 dark:text-zinc-400">
                 Create and manage playback programs for your spaces
               </p>
             </div>
@@ -120,7 +120,7 @@ export default function LibraryPlaylistsClient() {
               type="button"
               onClick={() => setPlaylistModalOpen(true)}
               className={
-                `group inline-flex items-center gap-3 h-12 px-5 bg-white text-gray-900 font-medium text-sm rounded-2xl border border-gray-100 shadow-[0_8px_30px_rgba(0,0,0,0.04)] transition-all hover:shadow-lg hover:translate-y-0.5 cursor-pointer`
+                `group inline-flex items-center gap-3 h-12 px-5 bg-white dark:bg-zinc-900/40 text-gray-900 dark:text-gray-100 font-medium text-sm rounded-2xl border border-gray-100 dark:border-zinc-800 shadow-[0_8px_30px_rgba(0,0,0,0.04)] dark:shadow-none transition-all hover:shadow-lg hover:translate-y-0.5 cursor-pointer`
               }
             >
               <span className="inline-flex items-center justify-center transition-colors">
@@ -133,15 +133,15 @@ export default function LibraryPlaylistsClient() {
         </div>
       </div>
 
-      <div className="flex-1 overflow-auto bg-white">
+      <div className="flex-1 overflow-auto bg-white dark:bg-[#121214]">
         <div className="px-6 py-6">
           <div
             className="
-              bg-white
+              bg-white dark:bg-zinc-900/40
               rounded-[28px]
               border
-              border-gray-100
-              shadow-[0_8px_30px_rgba(0,0,0,0.04)]
+              border-gray-100 dark:border-zinc-800
+              shadow-[0_8px_30px_rgba(0,0,0,0.04)] dark:shadow-none
               flex
               flex-col
               min-h-[calc(100vh-220px)]
@@ -161,18 +161,18 @@ export default function LibraryPlaylistsClient() {
                 <div className="animate-pulse">
                   <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
                     {Array.from({ length: perPage || 6 }).map((_, i) => (
-                      <div key={i} className="h-36 bg-gray-200 rounded-xl border border-gray-200" aria-hidden="true" />
+                      <div key={i} className="h-36 bg-gray-200 dark:bg-zinc-800 rounded-xl border border-gray-200 dark:border-zinc-800" aria-hidden="true" />
                     ))}
                   </div>
                 </div>
               ) : paginatedPlaylists.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-16">
                   <div className="text-center space-y-4 max-w-sm">
-                    <div className="inline-flex items-center justify-center w-14 h-14 rounded-lg bg-gray-100">
-                      <Music size={28} className="text-gray-400" />
+                    <div className="inline-flex items-center justify-center w-14 h-14 rounded-lg bg-gray-100 dark:bg-zinc-800">
+                      <Music size={28} className="text-gray-400 dark:text-zinc-500" />
                     </div>
-                    <h2 className="text-lg font-semibold text-gray-900">No playlists yet</h2>
-                    <p className="text-sm text-gray-600">
+                    <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">No playlists yet</h2>
+                    <p className="text-sm text-gray-600 dark:text-zinc-400">
                       Create your first playlist to organize tracks for scheduling and playback.
                     </p>
                     <button

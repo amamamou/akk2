@@ -60,14 +60,14 @@ export default function AudioListItem({
         }
       }}
       className={cn(
-        "group grid grid-cols-[56px_1fr] md:grid-cols-[56px_1fr_auto] gap-5 items-center px-5 py-4 rounded-2xl bg-[#FAFAFB] border border-transparent transition-all duration-200",
+        "group grid grid-cols-[56px_1fr] md:grid-cols-[56px_1fr_auto] gap-5 items-center px-5 py-4 rounded-2xl bg-[#FAFAFB] dark:bg-zinc-900/60 border border-transparent dark:border-zinc-800 transition-all duration-200",
         isSelected
-          ? "bg-white border-[#A473FF]/20 shadow-[0_8px_30px_rgba(164,115,255,0.08)]"
-          : "hover:bg-white hover:border-gray-100 hover:shadow-[0_8px_24px_rgba(0,0,0,0.04)]",
+          ? "bg-white dark:bg-zinc-900/80 border-[#A473FF]/20 shadow-[0_8px_30px_rgba(164,115,255,0.08)]"
+          : "hover:bg-white dark:hover:bg-zinc-900/80 hover:border-gray-100 dark:hover:border-zinc-700 hover:shadow-[0_8px_24px_rgba(0,0,0,0.04)] dark:hover:shadow-none",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-blue-400"
       )}
     >
-      <div className={cn("flex items-center justify-center rounded-2xl w-14 h-14 bg-white", "transition-transform")}>
+      <div className={cn("flex items-center justify-center rounded-2xl w-14 h-14 bg-white dark:bg-zinc-800/80", "transition-transform")}>
         <AudioVisual
           size={44}
           color={item.color ?? "#A473FF"}
@@ -79,8 +79,8 @@ export default function AudioListItem({
       </div>
 
       <div className="min-w-0">
-        <div className="text-[15px] font-semibold text-zinc-900 truncate">{item.title}</div>
-        <div className="mt-1 flex items-center gap-2 text-xs text-zinc-500">
+        <div className="text-[15px] font-semibold text-zinc-900 dark:text-zinc-100 truncate">{item.title}</div>
+        <div className="mt-1 flex items-center gap-2 text-xs text-zinc-500 dark:text-zinc-400">
           <span className="truncate">{item.singer ?? "Unknown Artist"}</span>
           {visibleCols.size && typeof item.size === "number" && (
             <>

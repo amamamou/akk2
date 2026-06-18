@@ -499,7 +499,7 @@ export default function PlayersClient() {
   );
 
    return (
-     <div className="flex-1 flex flex-col overflow-hidden bg-white">
+     <div className="flex-1 flex flex-col overflow-hidden bg-white dark:bg-[#121214]">
        <PlayersHeader
          view={view}
          onToggleView={(v) => setView(v)}
@@ -556,7 +556,7 @@ export default function PlayersClient() {
       />
 
       <div className="px-6 py-6">
-        <div className="bg-white rounded-[28px] border border-gray-100 shadow-[0_8px_30px_rgba(0,0,0,0.04)] flex flex-col min-h-[calc(100vh-220px)] overflow-hidden">
+        <div className="bg-white dark:bg-zinc-900/60 rounded-[28px] border border-gray-100 dark:border-zinc-800 shadow-[0_8px_30px_rgba(0,0,0,0.04)] dark:shadow-none flex flex-col min-h-[calc(100vh-220px)] overflow-hidden">
           <div className="flex-1 overflow-y-auto p-6">
             {loadError && (
               <div className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
@@ -586,20 +586,20 @@ export default function PlayersClient() {
                     if (groupPlayers.length === 0) return null;
                     const expanded = expandedClients[client.id] ?? true;
                     return (
-                      <div key={client.id} className="rounded-lg border border-gray-200 overflow-hidden bg-white shadow-sm">
+                      <div key={client.id} className="rounded-lg border border-gray-200 dark:border-zinc-800 overflow-hidden bg-white dark:bg-zinc-900/60 shadow-sm">
                         <button
                           type="button"
                           onClick={() => toggleClientAccordion(client.id)}
-                          className="w-full flex items-center justify-between gap-3 px-4 py-3 bg-gradient-to-r from-violet-50 to-white hover:from-violet-100/80 transition-colors text-left"
+                          className="w-full flex items-center justify-between gap-3 px-4 py-3 bg-gradient-to-r from-violet-50 to-white dark:from-zinc-800/80 dark:to-zinc-900/60 hover:from-violet-100/80 dark:hover:from-zinc-800 transition-colors text-left"
                         >
                           <div>
-                            <span className="font-semibold text-gray-900">{client.name}</span>
-                            <span className="ml-2 text-xs text-gray-500">{groupPlayers.length} {groupPlayers.length === 1 ? "player" : "players"}</span>
+                            <span className="font-semibold text-gray-900 dark:text-gray-100">{client.name}</span>
+                            <span className="ml-2 text-xs text-gray-500 dark:text-zinc-400">{groupPlayers.length} {groupPlayers.length === 1 ? "player" : "players"}</span>
                           </div>
                           <ChevronDown size={18} className={`text-gray-500 shrink-0 transition-transform duration-200 ${expanded ? "rotate-180" : ""}`} />
                         </button>
                         {expanded && (
-                          <div className="border-t border-gray-100 px-2 py-3">
+                          <div className="border-t border-gray-100 dark:border-zinc-800 px-2 py-3">
                             {view === "list" ? (
                               <div className="space-y-2">
                                 {groupPlayers.map((p) => (
@@ -675,7 +675,7 @@ export default function PlayersClient() {
             )}
           </div>
 
-          <div className="sticky bottom-0 bg-white border-t border-gray-100 p-3 z-10">
+          <div className="sticky bottom-0 bg-white dark:bg-zinc-900/60 border-t border-gray-100 dark:border-zinc-800 p-3 z-10">
             <AudioToolbar
               query={query}
               setQuery={setQuery}

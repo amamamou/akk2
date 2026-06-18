@@ -131,14 +131,14 @@ export default function PlayerRow({ player, onPlayPause, onSkip, onRename, onDel
 
         "rounded-2xl",
 
-        "bg-[#FAFAFB]",
+        "bg-[#FAFAFB] dark:bg-zinc-900/60",
 
-        "border border-transparent",
+        "border border-transparent dark:border-zinc-800",
 
         "transition-all duration-200",
 
-        "hover:bg-white",
-        "hover:border-gray-100",
+        "hover:bg-white dark:hover:bg-zinc-900/80",
+        "hover:border-gray-100 dark:hover:border-zinc-700",
         "hover:shadow-[0_8px_24px_rgba(0,0,0,0.04)]",
 
         "focus-visible:outline-none",
@@ -161,7 +161,7 @@ export default function PlayerRow({ player, onPlayPause, onSkip, onRename, onDel
 
       {/* MAIN */}
       <div className="min-w-0">
-        <div className="text-[15px] font-semibold text-zinc-900 truncate">
+        <div className="text-[15px] font-semibold text-zinc-900 dark:text-zinc-100 truncate">
           {isEditing ? (
             <input
               ref={inputRef}

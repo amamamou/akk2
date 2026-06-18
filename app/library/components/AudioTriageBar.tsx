@@ -92,7 +92,7 @@ export default function AudioTriageBar(props: Props) {
     !!selectedTag;
 
   return (
-    <div className="px-4 sm:px-8 py-3 border-b border-gray-100 bg-white">
+    <div className="px-4 sm:px-8 py-3 border-b border-gray-100 dark:border-zinc-800 bg-white dark:bg-[#121214]">
       <div className="flex flex-col gap-3">
         {/* Tag filter chips */}
         <div className="flex items-center gap-2 min-w-0">

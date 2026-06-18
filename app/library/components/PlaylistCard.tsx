@@ -179,11 +179,11 @@ export default function PlaylistCard({
                 setIsEditing(false);
               }
             }}
-            className={`w-full text-sm font-medium text-gray-900 rounded-md border px-2 py-1 focus:outline-none focus:ring-1 focus:ring-gray-300`}
+            className={`w-full text-sm font-medium text-gray-900 dark:text-gray-100 rounded-md border border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-900/40 px-2 py-1 focus:outline-none focus:ring-1 focus:ring-gray-300 dark:focus:ring-zinc-600`}
           />
         ) : (
           <h3
-            className="text-sm font-medium text-gray-900 line-clamp-2 cursor-pointer"
+            className="text-sm font-medium text-gray-900 dark:text-gray-100 line-clamp-2 cursor-pointer"
             title={playlist.title}
             onClick={(e) => {
               e.stopPropagation();
@@ -194,7 +194,7 @@ export default function PlaylistCard({
             {playlist.title}
           </h3>
         )}
-        <div className="mt-1 text-xs text-gray-400 flex items-center gap-1">
+        <div className="mt-1 text-xs text-gray-400 dark:text-zinc-400 flex items-center gap-1">
           <span>
             {playlist.trackCount} {playlist.trackCount === 1 ? "track" : "tracks"}
           </span>

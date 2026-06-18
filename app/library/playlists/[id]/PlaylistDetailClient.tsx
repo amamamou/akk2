@@ -268,19 +268,19 @@ export default function PlaylistDetailClient({
 
               <div className="flex-1">
                 {isEditing ? (
-                  <div className="mt-2 p-4 bg-white rounded-lg border border-gray-100 shadow-sm">
-                    <label className="text-xs text-gray-500">Title</label>
+                  <div className="mt-2 p-4 bg-white dark:bg-zinc-900/40 rounded-lg border border-gray-100 dark:border-zinc-800 shadow-sm">
+                    <label className="text-xs text-gray-500 dark:text-zinc-400">Title</label>
                     <input
                       ref={titleRef}
                       value={name}
                       onChange={(e) => setName(e.target.value)}
-                      className="w-full mt-1 text-2xl font-semibold text-gray-900 border-0 focus:outline-none"
+                      className="w-full mt-1 text-2xl font-semibold text-gray-900 dark:text-gray-100 border-0 focus:outline-none bg-transparent"
                     />
-                    <label className="mt-3 block text-xs text-gray-500">Description</label>
+                    <label className="mt-3 block text-xs text-gray-500 dark:text-zinc-400">Description</label>
                     <textarea
                       value={description}
                       onChange={(e) => setDescription(e.target.value)}
-                      className="w-full mt-1 text-sm text-gray-600 border-0 focus:outline-none"
+                      className="w-full mt-1 text-sm text-gray-600 dark:text-zinc-300 border-0 focus:outline-none bg-transparent"
                       rows={3}
                     />
                     <div className="mt-4 flex justify-end gap-3">
@@ -314,7 +314,7 @@ export default function PlaylistDetailClient({
                 ) : (
                   <>
                     <div className="flex items-center gap-3">
-                      <h1 className="text-2xl md:text-3xl font-semibold text-gray-900 truncate">
+                      <h1 className="text-2xl md:text-3xl font-semibold text-gray-900 dark:text-gray-100 truncate">
                         {displayTitle}
                       </h1>
                       <button
@@ -324,7 +324,7 @@ export default function PlaylistDetailClient({
                           setName(playlist.title ?? "");
                           setDescription(playlist.description ?? "");
                         }}
-                        className="p-1 rounded-md text-gray-600 hover:bg-gray-100"
+                        className="p-1 rounded-md text-gray-600 dark:text-zinc-400 hover:bg-gray-100 dark:hover:bg-zinc-800"
                       >
                         <Edit size={16} />
                       </button>
@@ -337,19 +337,19 @@ export default function PlaylistDetailClient({
                       </button>
                     </div>
                     {playlist.description ? (
-                      <p className="mt-1 text-sm text-gray-500">{playlist.description}</p>
+                      <p className="mt-1 text-sm text-gray-500 dark:text-zinc-400">{playlist.description}</p>
                     ) : null}
                   </>
                 )}
 
-                <div className="mt-4 flex items-center gap-6 text-sm text-gray-600">
+                <div className="mt-4 flex items-center gap-6 text-sm text-gray-600 dark:text-zinc-400">
                   <div>
-                    <span className="text-xs text-gray-500">Duration </span>
-                    <span className="font-semibold text-gray-900">{playlist.totalDuration}</span>
+                    <span className="text-xs text-gray-500 dark:text-zinc-500">Duration </span>
+                    <span className="font-semibold text-gray-900 dark:text-gray-100">{playlist.totalDuration}</span>
                   </div>
                   <div>
-                    <span className="text-xs text-gray-500">Tracks </span>
-                    <span className="font-semibold text-gray-900">{playlist.trackCount}</span>
+                    <span className="text-xs text-gray-500 dark:text-zinc-500">Tracks </span>
+                    <span className="font-semibold text-gray-900 dark:text-gray-100">{playlist.trackCount}</span>
                   </div>
                 </div>
               </div>
@@ -360,10 +360,10 @@ export default function PlaylistDetailClient({
 
       <main className="mt-6 pb-24">
         <div className="max-w-8xl mx-auto px-6">
-          <div className="bg-white rounded-xl shadow-sm overflow-hidden border border-gray-100">
-            <div className="px-6 py-4 border-b flex justify-between">
-              <div className="text-sm font-semibold text-gray-700">Tracks</div>
-              <div className="text-sm text-gray-500">{tracks.length} items</div>
+          <div className="bg-white dark:bg-zinc-900/40 rounded-xl shadow-sm dark:shadow-none overflow-hidden border border-gray-100 dark:border-zinc-800">
+            <div className="px-6 py-4 border-b border-gray-100 dark:border-zinc-800 flex justify-between">
+              <div className="text-sm font-semibold text-gray-700 dark:text-zinc-200">Tracks</div>
+              <div className="text-sm text-gray-500 dark:text-zinc-400">{tracks.length} items</div>
             </div>
             {tracks.length === 0 ? (
               <div className="px-6 py-12 text-center text-sm text-gray-500">
@@ -373,14 +373,14 @@ export default function PlaylistDetailClient({
               tracks.map((t) => (
                 <div
                   key={t.id}
-                  className="grid grid-cols-[48px_1fr_96px_40px] gap-4 items-center px-6 py-4 hover:bg-gray-50 border-t border-gray-50"
+                  className="grid grid-cols-[48px_1fr_96px_40px] gap-4 items-center px-6 py-4 hover:bg-gray-50 dark:hover:bg-zinc-800/60 border-t border-gray-50 dark:border-zinc-800"
                 >
-                  <Music size={20} className="text-gray-400 mx-auto" />
+                  <Music size={20} className="text-gray-400 dark:text-zinc-500 mx-auto" />
                   <div>
-                    <div className="text-sm font-medium text-gray-900">{t.title}</div>
-                    <div className="text-xs text-gray-500">{formatDuration(t.duration)}</div>
+                    <div className="text-sm font-medium text-gray-900 dark:text-gray-100">{t.title}</div>
+                    <div className="text-xs text-gray-500 dark:text-zinc-400">{formatDuration(t.duration)}</div>
                   </div>
-                  <div className="text-sm text-gray-500 text-right">
+                  <div className="text-sm text-gray-500 dark:text-zinc-400 text-right">
                     #{t.position + 1}
                   </div>
                   <button
@@ -400,9 +400,9 @@ export default function PlaylistDetailClient({
 
       {mediaPickerOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-md rounded-lg bg-white shadow-lg">
-            <div className="flex items-center justify-between border-b px-4 py-3">
-              <h3 className="font-semibold text-gray-900">Add track from library</h3>
+          <div className="w-full max-w-md rounded-lg bg-white dark:bg-zinc-900 border border-gray-100 dark:border-zinc-800 shadow-lg">
+            <div className="flex items-center justify-between border-b border-gray-100 dark:border-zinc-800 px-4 py-3">
+              <h3 className="font-semibold text-gray-900 dark:text-gray-100">Add track from library</h3>
               <button type="button" onClick={() => setMediaPickerOpen(false)}>
                 <X size={18} />
               </button>
@@ -418,7 +418,7 @@ export default function PlaylistDetailClient({
                     <button
                       type="button"
                       onClick={() => void addTrack(m.id)}
-                      className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50"
+                      className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-zinc-200 hover:bg-gray-50 dark:hover:bg-zinc-800"
                     >
                       {m.title}
                     </button>

@@ -81,7 +81,7 @@ export default function PlayerCard({
           e.preventDefault();
         }
       }}
-      className={"group bg-[#FAFAFB] rounded-[24px] border border-transparent hover:bg-white hover:border-gray-100 hover:shadow-[0_12px_32px_rgba(0,0,0,0.05)] transition-all duration-200 p-4 min-h-[72px]"}
+      className={"group bg-[#FAFAFB] dark:bg-zinc-900/60 rounded-[24px] border border-transparent dark:border-zinc-800 hover:bg-white dark:hover:bg-zinc-900/80 hover:border-gray-100 dark:hover:border-zinc-700 hover:shadow-[0_12px_32px_rgba(0,0,0,0.05)] dark:hover:shadow-none transition-all duration-200 p-4 min-h-[72px]"}
       onClick={() => { /* keep card click available for parent if needed */ }}
     >
       {/* ICON with status overlay */}

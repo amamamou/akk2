@@ -479,7 +479,7 @@ export default function LibraryAudioClient() {
   // deleteEdit removed — deletion handled directly via handleAudioAction
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden bg-white">
+    <div className="flex-1 flex flex-col overflow-hidden bg-white dark:bg-[#121214]">
       {saveNotice && (
         <div className="fixed right-6 bottom-6 z-50 max-w-sm rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-900 shadow-md">
           {saveNotice}
@@ -493,7 +493,7 @@ export default function LibraryAudioClient() {
         setUploadOpen={setUploadOpen}
       />
 
-      <div className="px-6 border-b border-gray-100 bg-white">
+      <div className="px-6 border-b border-gray-100 dark:border-zinc-800 bg-white dark:bg-[#121214]">
         <AudioToolbar
           mode="search"
           query={query}
@@ -557,7 +557,7 @@ export default function LibraryAudioClient() {
       />
 
       <div className="px-6 py-6">
-        <div className="bg-white rounded-[28px] border border-gray-100 shadow-[0_8px_30px_rgba(0,0,0,0.04)] flex flex-col min-h-[calc(100vh-220px)] overflow-hidden">
+        <div className="bg-white dark:bg-zinc-900/60 rounded-[28px] border border-gray-100 dark:border-zinc-800 shadow-[0_8px_30px_rgba(0,0,0,0.04)] dark:shadow-none flex flex-col min-h-[calc(100vh-220px)] overflow-hidden">
           <div className="flex-1 overflow-y-auto p-6">
               <AudioList
                 items={paginatedLibrary}
@@ -573,7 +573,7 @@ export default function LibraryAudioClient() {
               />
           </div>
 
-          <div className="sticky bottom-0 bg-white border-t border-gray-100 z-10">
+          <div className="sticky bottom-0 bg-white dark:bg-zinc-900/60 border-t border-gray-100 dark:border-zinc-800 z-10">
             <AudioToolbar
               mode="pagination"
               query={query}
