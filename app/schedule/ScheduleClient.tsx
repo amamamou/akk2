@@ -1,26 +1,12 @@
 "use client";
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSearchParams } from "next/navigation";
 import { DndProvider } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
-import { AlertCircle } from "lucide-react";
+import { AlertCircle, Plus } from "lucide-react";
 import { cn } from "@/utils/cn";
-import ScheduleToolbar from "./components/ScheduleToolbar";
-import CalendarCell from "./components/CalendarCell";
-import ScheduleAssignModal, { type PlaylistPick } from "./components/ScheduleAssignModal";
-import EventCard, { type ScheduleEventCard } from "./components/EventCard";
-import InspectorPanel from "./components/InspectorPanel";
-import DayTimelineGrid from "./components/DayTimelineGrid";
-import ConfirmDialog from "@/components/ui/ConfirmDialog";
-import { useAuth } from "@/app/context/AuthContext";
-import { getApiClient } from "@/lib/api-client";
-import {
-  toActiveWorkspaceClients,
-  workspaceSelectorOptions,
-  isAllClientsSelection,
-} from "@/lib/workspace-clients";
-import { Plus } from "lucide-react";
 import {
   buildWeekDays,
   buildMonthGrid,
@@ -33,10 +19,24 @@ import {
   type ScheduleViewMode,
   type DayColumn,
 } from "@/lib/schedule-calendar";
+import ScheduleToolbar from "./components/ScheduleToolbar";
+import CalendarCell from "./components/CalendarCell";
+import ScheduleAssignModal, { type PlaylistPick } from "./components/ScheduleAssignModal";
+import EventCard, { type ScheduleEventCard } from "./components/EventCard";
+import InspectorPanel from "./components/InspectorPanel";
+import DayTimelineGrid from "./components/DayTimelineGrid";
+import ConfirmDialog from "@/components/ui/ConfirmDialog";
+import { useAuth } from "@/app/context/AuthContext";
+import { getApiClient } from "@/lib/api-client";
 import {
-  loadAllClientScheduleSegments,
-  resolveAllClientsEnterpriseRows,
+  fetchScheduleAllClients,
+  fetchScheduleWorkspace,
+  fetchWorkspaceClients,
+} from "@/lib/query-fetchers";
+import { queryKeys } from "@/lib/query-keys";
+import {
   scheduleEntryToEventCard,
+  resolveAllClientsEnterpriseRows,
   type TenantScheduleSegment,
 } from "@/lib/schedule-all-clients";
 import {
@@ -44,8 +44,8 @@ import {
   frenchDemoPlayerName,
   frenchDemoTenantForPlayer,
   frenchDemoTenantSlug,
-  mergeEnterpriseWorkspaceClients,
 } from "@/lib/french-demo-seed";
+import { isAllClientsSelection } from "@/lib/workspace-clients";
 import { ALL_CLIENTS_WORKSPACE_ID } from "@/lib/demo-workspaces";
 
 type AudioItem = {
@@ -80,6 +80,7 @@ function pickSelectedRoom(
 
 export default function ScheduleClientPage() {
   const apiClient = getApiClient();
+  const queryClient = useQueryClient();
   const searchParams = useSearchParams();
   const roomIdParam = searchParams.get("roomId");
   const { user, isLoading: authLoading } = useAuth();
@@ -200,69 +201,73 @@ export default function ScheduleClientPage() {
     return user?.tenantId || apiClient.getEffectiveTenantId() || null;
   }, [pickerCell?.tenantId, isSuperAdmin, workspaceTenantId, user?.tenantId, apiClient]);
 
-  useEffect(() => {
-    if (!isSuperAdmin || authLoading) return;
-
-    let cancelled = false;
-    void (async () => {
-      try {
-        const res = await apiClient.listClients();
-        if (cancelled) return;
-        const eligible = toActiveWorkspaceClients(res?.clients ?? []);
-        const merged = mergeEnterpriseWorkspaceClients(eligible);
-        const options = workspaceSelectorOptions(merged);
-        setWorkspaceClients(options);
-        if (options.length > 0) {
-          setSelectedWorkspaceClientId((prev) => {
-            if (prev && options.some((o) => o.id === prev)) return prev;
-            const allClients = options.find((c) => isAllClientsSelection(c.id));
-            return allClients?.id ?? ALL_CLIENTS_WORKSPACE_ID;
-          });
-        }
-      } catch (err: unknown) {
-        if (cancelled) return;
-        const ax = err as { response?: { data?: { error?: string } } };
-        setError(ax?.response?.data?.error || "Failed to load client workspaces");
-        setWorkspaceClients([]);
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-      apiClient.clearWorkspaceTenant();
-    };
-  }, [apiClient, isSuperAdmin, authLoading]);
+  const workspaceClientsQuery = useQuery({
+    queryKey: queryKeys.workspaceClients(),
+    queryFn: () => fetchWorkspaceClients(),
+    enabled: isSuperAdmin && !authLoading,
+  });
 
   useEffect(() => {
-    if (authLoading) return;
+    if (!workspaceClientsQuery.data?.length) return;
+    setWorkspaceClients(workspaceClientsQuery.data);
+    setSelectedWorkspaceClientId((prev) => {
+      if (prev && workspaceClientsQuery.data.some((o) => o.id === prev)) return prev;
+      const allClients = workspaceClientsQuery.data.find((c) =>
+        isAllClientsSelection(c.id)
+      );
+      return allClients?.id ?? ALL_CLIENTS_WORKSPACE_ID;
+    });
+  }, [workspaceClientsQuery.data]);
 
-    if (isSuperAdmin && isAllClientsWorkspace) {
-      let cancelled = false;
-      void (async () => {
-        try {
-          setIsLoading(true);
-          setError(null);
-          const enterpriseRows = resolveAllClientsEnterpriseRows(workspaceClients);
-          const segments = await loadAllClientScheduleSegments(
-            apiClient,
-            enterpriseRows
-          );
-          if (cancelled) return;
-          setTenantSegments(segments);
-          setRooms([]);
-          setAudio([]);
-          setEvents([]);
-        } catch (err: unknown) {
-          if (cancelled) return;
-          const ax = err as { response?: { data?: { error?: string } } };
-          setError(ax?.response?.data?.error || "Failed to load schedules for all clients");
-        } finally {
-          if (!cancelled) setIsLoading(false);
-        }
-      })();
-      return () => {
-        cancelled = true;
+  useEffect(() => {
+    if (workspaceClientsQuery.error) {
+      const ax = workspaceClientsQuery.error as {
+        response?: { data?: { error?: string } };
       };
+      setError(ax?.response?.data?.error || "Failed to load client workspaces");
+      setWorkspaceClients([]);
+    }
+  }, [workspaceClientsQuery.error]);
+
+  const scheduleWorkspaceKey = workspaceTenantId ?? user?.tenantId ?? "session";
+
+  const scheduleWorkspaceQuery = useQuery({
+    queryKey: queryKeys.schedule(scheduleWorkspaceKey),
+    queryFn: async () => {
+      const tenantId =
+        workspaceTenantId ?? user?.tenantId ?? apiClient.getEffectiveTenantId();
+      if (!tenantId) throw new Error("No tenant context for schedule");
+      return fetchScheduleWorkspace(tenantId);
+    },
+    enabled:
+      !authLoading &&
+      !isAllClientsWorkspace &&
+      (!isSuperAdmin || Boolean(workspaceTenantId)),
+  });
+
+  const allClientsScheduleQuery = useQuery({
+    queryKey: queryKeys.scheduleAllClients(selectedWorkspaceClientId),
+    queryFn: () => fetchScheduleAllClients(workspaceClients),
+    enabled:
+      !authLoading && isAllClientsWorkspace && workspaceClients.length > 0,
+  });
+
+  useEffect(() => {
+    if (isAllClientsWorkspace) {
+      if (allClientsScheduleQuery.data) {
+        setTenantSegments(allClientsScheduleQuery.data);
+        setRooms([]);
+        setAudio([]);
+        setEvents([]);
+      }
+      setIsLoading(allClientsScheduleQuery.isPending);
+      if (allClientsScheduleQuery.error) {
+        const ax = allClientsScheduleQuery.error as {
+          response?: { data?: { error?: string } };
+        };
+        setError(ax?.response?.data?.error || "Failed to load schedules for all clients");
+      }
+      return;
     }
 
     if (isSuperAdmin && !workspaceTenantId) {
@@ -274,76 +279,57 @@ export default function ScheduleClientPage() {
       return;
     }
 
-    if (isSuperAdmin && workspaceTenantId) {
-      apiClient.setWorkspaceTenant(
-        workspaceTenantId,
-        frenchDemoTenantSlug(workspaceTenantId)
-      );
+    if (scheduleWorkspaceQuery.data) {
+      setTenantSegments([]);
+      setRooms(scheduleWorkspaceQuery.data.rooms);
+      setAudio(scheduleWorkspaceQuery.data.audio);
+      setEvents(scheduleWorkspaceQuery.data.events);
     }
-
-    let cancelled = false;
-
-    const loadData = async () => {
-      try {
-        setIsLoading(true);
-        setError(null);
-        setTenantSegments([]);
-        const [playersRes, mediaRes, schedulesRes] = await Promise.all([
-          apiClient.listPlayers(),
-          apiClient.listMedia(),
-          apiClient.listSchedules(),
-        ]);
-        if (cancelled) return;
-
-        setRooms(
-          playersRes.players.map((p) => ({
-            id: p.id,
-            name:
-              p.roomName ||
-              p.playerName ||
-              frenchDemoPlayerName(p.id) ||
-              "Unnamed",
-          }))
-        );
-
-        setAudio(
-          mediaRes.media.map((m) => ({
-            id: m.id,
-            title: m.title,
-            duration:
-              m.durationMinutes && m.durationMinutes > 0
-                ? m.durationMinutes
-                : 60,
-            type: m.category || "Audio",
-            url: m.url,
-          }))
-        );
-
-        setEvents(
-          (schedulesRes.schedules ?? []).map((s) => scheduleEntryToEventCard(s))
-        );
-      } catch (err: unknown) {
-        if (cancelled) return;
-        const ax = err as { response?: { data?: { error?: string } } };
-        setError(ax?.response?.data?.error || "Failed to load schedule");
-      } finally {
-        if (!cancelled) setIsLoading(false);
-      }
-    };
-
-    void loadData();
-
-    return () => {
-      cancelled = true;
-    };
+    setIsLoading(scheduleWorkspaceQuery.isPending);
+    if (scheduleWorkspaceQuery.error) {
+      const ax = scheduleWorkspaceQuery.error as {
+        response?: { data?: { error?: string } };
+      };
+      setError(ax?.response?.data?.error || "Failed to load schedule");
+    }
   }, [
-    apiClient,
-    authLoading,
+    isAllClientsWorkspace,
     isSuperAdmin,
     workspaceTenantId,
-    isAllClientsWorkspace,
-    workspaceClients,
+    allClientsScheduleQuery.data,
+    allClientsScheduleQuery.isPending,
+    allClientsScheduleQuery.error,
+    scheduleWorkspaceQuery.data,
+    scheduleWorkspaceQuery.isPending,
+    scheduleWorkspaceQuery.error,
   ]);
+
+  const invalidateScheduleQueries = useCallback(() => {
+    void queryClient.invalidateQueries({ queryKey: ["schedule"] });
+    void queryClient.invalidateQueries({ queryKey: queryKeys.schedules() });
+  }, [queryClient]);
+
+  const createScheduleMutation = useMutation({
+    mutationFn: (payload: Parameters<typeof apiClient.createSchedule>[0]) =>
+      apiClient.createSchedule(payload),
+    onSuccess: () => invalidateScheduleQueries(),
+  });
+
+  const updateScheduleMutation = useMutation({
+    mutationFn: ({
+      id,
+      data,
+    }: {
+      id: string;
+      data: Parameters<typeof apiClient.updateSchedule>[1];
+    }) => apiClient.updateSchedule(id, data),
+    onSuccess: () => invalidateScheduleQueries(),
+  });
+
+  const deleteScheduleMutation = useMutation({
+    mutationFn: (id: string) => apiClient.deleteSchedule(id),
+    onSuccess: () => invalidateScheduleQueries(),
+  });
 
   const handleWorkspaceClientChange = (clientId: string) => {
     const match = workspaceClients.find((c) => c.id === clientId);
@@ -577,7 +563,7 @@ export default function ScheduleClientPage() {
       setError("Invalid time range - end time must be after start time");
       return;
     }
-    const res = await apiClient.createSchedule({
+    const res = await createScheduleMutation.mutateAsync({
       playerId: roomId,
       mediaId: item.id,
       startTime: start.toISOString(),
@@ -614,7 +600,7 @@ export default function ScheduleClientPage() {
       setError("Invalid time range - end time must be after start time");
       return;
     }
-    const res = await apiClient.createSchedule({
+    const res = await createScheduleMutation.mutateAsync({
       playerId: roomId,
       playlistId: playlist.playlistId,
       startTime: start.toISOString(),
@@ -727,7 +713,7 @@ export default function ScheduleClientPage() {
     const deleted = pendingDeleteEvent;
     try {
       await withScheduleTenant(deleted.tenantId);
-      await apiClient.deleteSchedule(deleted.id);
+      await deleteScheduleMutation.mutateAsync(deleted.id);
 
       if (isAllClientsWorkspace && deleted.tenantId) {
         setTenantSegments((prev) =>
@@ -827,11 +813,14 @@ export default function ScheduleClientPage() {
         return;
       }
 
-      const res = await apiClient.updateSchedule(inspectorEvent.id, {
-        playerId: inspectorEvent.roomId,
-        startTime: start.toISOString(),
-        endTime: end.toISOString(),
-        recurrence: inspectorEvent.loopPlayback ? "DAILY" : "ONCE",
+      const res = await updateScheduleMutation.mutateAsync({
+        id: inspectorEvent.id,
+        data: {
+          playerId: inspectorEvent.roomId,
+          startTime: start.toISOString(),
+          endTime: end.toISOString(),
+          recurrence: inspectorEvent.loopPlayback ? "DAILY" : "ONCE",
+        },
       });
 
       const mapped = scheduleEntryToEventCard(res.schedule);

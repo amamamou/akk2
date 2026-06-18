@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import {
   PlayCircle,
   Clock,
@@ -14,12 +15,15 @@ import {
 import { cn } from "@/utils/cn";
 import { useAuth } from "@/app/context/AuthContext";
 import { getApiClient } from "@/lib/api-client";
+import {
+  fetchPlaybackLogs,
+  fetchPlayers,
+  fetchSystemHealth,
+  fetchWorkspaceClients,
+} from "@/lib/query-fetchers";
+import { queryKeys } from "@/lib/query-keys";
 import { isManagerRole, isSuperAdminRole } from "@/lib/rbac";
-import type {
-  PlaybackLogEntry,
-  PlayerInfo,
-  SystemHealthMetrics,
-} from "@/types/api";
+import type { PlayerInfo } from "@/types/api";
 import {
   buildEngagementData,
   buildHourlyTrafficFromLogs,
@@ -38,12 +42,8 @@ import {
   frenchDemoPlayerIdsForTenant,
   frenchDemoPlayerName,
   frenchDemoTenantSlug,
-  mergeEnterpriseWorkspaceClients,
 } from "@/lib/french-demo-seed";
-import {
-  toActiveWorkspaceClients,
-  type WorkspaceClientOption,
-} from "@/lib/workspace-clients";
+import { type WorkspaceClientOption } from "@/lib/workspace-clients";
 import { ANALYTICS_ALL_CLIENTS_ID } from "@/lib/global-admin-tenant";
 
 import KpiGrid from "./components/KpiGrid";
@@ -100,21 +100,31 @@ export default function AnalyticsClient() {
   const isSuperAdmin = isSuperAdminRole(user?.role);
   const sessionTenantId =
     user?.tenantId || apiClient.getTenantId() || apiClient.getEffectiveTenantId();
-  const [workspaceClients, setWorkspaceClients] = useState<WorkspaceClientOption[]>([]);
   const [selectedWorkspaceClientId, setSelectedWorkspaceClientId] = useState(
     ANALYTICS_ALL_CLIENTS_ID
   );
   const [workspaceTenantId, setWorkspaceTenantId] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [health, setHealth] = useState<SystemHealthMetrics | null>(null);
-  const [logs, setLogs] = useState<PlaybackLogEntry[]>([]);
-  const [players, setPlayers] = useState<PlayerInfo[]>([]);
   const [selectedPlayerId, setSelectedPlayerId] = useState<string>("all");
   const [timeRange, setTimeRange] = useState<TimeRange>("7d");
 
   const analyticsScopeAll =
     isSuperAdmin && selectedWorkspaceClientId === ANALYTICS_ALL_CLIENTS_ID;
+
+  const workspaceClientsQuery = useQuery({
+    queryKey: queryKeys.workspaceClients(),
+    queryFn: () => fetchWorkspaceClients(),
+    enabled: isSuperAdmin,
+  });
+
+  const workspaceClients = useMemo(() => {
+    if (!isSuperAdmin) return [] as WorkspaceClientOption[];
+    if (workspaceClientsQuery.data?.length) return workspaceClientsQuery.data;
+    return FRENCH_DEMO_ENTERPRISES.map((e) => ({
+      id: e.clientId,
+      name: e.name,
+      tenantId: e.tenantId,
+    }));
+  }, [isSuperAdmin, workspaceClientsQuery.data]);
 
   const workspaceSelectOptions = useMemo((): WorkspaceClientOption[] => {
     if (!isSuperAdmin) return workspaceClients;
@@ -149,139 +159,113 @@ export default function AnalyticsClient() {
     return sessionTenantId;
   }, [analyticsScopeAll, isManager, isSuperAdmin, workspaceTenantId, sessionTenantId]);
 
-  useEffect(() => {
-    if (!isSuperAdmin) return;
-    let cancelled = false;
-    void (async () => {
-      try {
-        const res = await apiClient.listClients();
-        if (cancelled) return;
-        const merged = mergeEnterpriseWorkspaceClients(
-          toActiveWorkspaceClients(res?.clients ?? [])
-        );
-        setWorkspaceClients(merged);
-        setSelectedWorkspaceClientId((prev) => {
-          if (prev === ANALYTICS_ALL_CLIENTS_ID) return prev;
-          if (prev && merged.some((c) => c.id === prev)) return prev;
-          return ANALYTICS_ALL_CLIENTS_ID;
-        });
-      } catch {
-        if (cancelled) return;
-        const fallback = FRENCH_DEMO_ENTERPRISES.map((e) => ({
-          id: e.clientId,
-          name: e.name,
-          tenantId: e.tenantId,
-        }));
-        setWorkspaceClients(fallback);
-        setSelectedWorkspaceClientId((prev) =>
-          prev === ANALYTICS_ALL_CLIENTS_ID ||
-          (prev && fallback.some((c) => c.id === prev))
-            ? prev
-            : ANALYTICS_ALL_CLIENTS_ID
-        );
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [apiClient, isSuperAdmin]);
+  const telemetryScope = analyticsScopeAll ? ("all" as const) : undefined;
+  const telemetryScopeKey = telemetryScope ?? activeAnalyticsTenantId ?? "tenant";
+  const telemetryEnabled =
+    Boolean(activeAnalyticsTenantId) &&
+    (!isSuperAdmin || Boolean(workspaceTenantId) || analyticsScopeAll);
 
-  useEffect(() => {
-    let cancelled = false;
-
-    const tenantForFetch = activeAnalyticsTenantId;
-    if (!tenantForFetch) {
-      setIsLoading(false);
-      return;
-    }
-    if (isSuperAdmin && !workspaceTenantId && !analyticsScopeAll) {
-      setIsLoading(false);
-      return;
-    }
-
+  const applyAnalyticsTenantScope = useCallback(() => {
     if (analyticsScopeAll && sessionTenantId) {
       apiClient.setWorkspaceTenant(
         sessionTenantId,
         frenchDemoTenantSlug(sessionTenantId) ?? user?.tenantSlug
       );
-    } else if (tenantForFetch) {
+      return;
+    }
+    if (activeAnalyticsTenantId) {
       apiClient.setWorkspaceTenant(
-        tenantForFetch,
-        frenchDemoTenantSlug(tenantForFetch) ?? user?.tenantSlug
+        activeAnalyticsTenantId,
+        frenchDemoTenantSlug(activeAnalyticsTenantId) ?? user?.tenantSlug
       );
     }
-
-    const telemetryScope = analyticsScopeAll ? ("all" as const) : undefined;
-
-    const load = async () => {
-      try {
-        setIsLoading(true);
-        setError(null);
-        const [healthRes, logsRes, playersRes] = await Promise.all([
-          apiClient.getSystemHealth(telemetryScope),
-          apiClient.getPlaybackLogs(200, telemetryScope),
-          apiClient.listPlayers().catch(() => ({ ok: false, players: [] as PlayerInfo[] })),
-        ]);
-        if (cancelled) return;
-
-        const tenantPlayerIds = analyticsScopeAll
-          ? new Set(
-              FRENCH_DEMO_ENTERPRISES.flatMap((e) =>
-                Array.from(frenchDemoPlayerIdsForTenant(e.tenantId))
-              )
-            )
-          : frenchDemoPlayerIdsForTenant(tenantForFetch);
-        const shouldScope = !analyticsScopeAll && (isManager || Boolean(workspaceTenantId));
-
-        const scopedLogs = (logsRes.logs ?? []).filter((log) => {
-          if (!shouldScope || tenantPlayerIds.size === 0) return true;
-          return (
-            tenantPlayerIds.has(log.playerId) ||
-            Array.from(tenantPlayerIds).some(
-              (id) => normalizePlayerId(id) === normalizePlayerId(log.playerId)
-            )
-          );
-        });
-
-        const scopedPlayers = (playersRes.players ?? []).filter((p) => {
-          if (!shouldScope || tenantPlayerIds.size === 0) return true;
-          return (
-            tenantPlayerIds.has(p.id) ||
-            Array.from(tenantPlayerIds).some(
-              (id) => normalizePlayerId(id) === normalizePlayerId(p.id)
-            )
-          );
-        });
-
-        setHealth(healthRes);
-        setLogs(scopedLogs);
-        setPlayers(scopedPlayers);
-      } catch (err: unknown) {
-        if (!cancelled) {
-          const ax = err as { response?: { data?: { error?: string } }; message?: string };
-          setError(ax?.response?.data?.error || ax?.message || "Failed to load analytics");
-        }
-      } finally {
-        if (!cancelled) setIsLoading(false);
-      }
-    };
-    void load();
-    return () => {
-      cancelled = true;
-      if (isManager || isSuperAdmin) {
-        apiClient.clearWorkspaceTenant();
-      }
-    };
   }, [
-    apiClient,
-    isManager,
-    isSuperAdmin,
-    activeAnalyticsTenantId,
-    user?.tenantSlug,
-    workspaceTenantId,
     analyticsScopeAll,
     sessionTenantId,
+    activeAnalyticsTenantId,
+    apiClient,
+    user?.tenantSlug,
   ]);
+
+  const healthQuery = useQuery({
+    queryKey: queryKeys.systemHealth(telemetryScopeKey),
+    queryFn: async () => {
+      applyAnalyticsTenantScope();
+      return fetchSystemHealth(telemetryScope);
+    },
+    enabled: telemetryEnabled,
+  });
+
+  const logsQuery = useQuery({
+    queryKey: queryKeys.playbackLogs(telemetryScopeKey),
+    queryFn: async () => {
+      applyAnalyticsTenantScope();
+      return fetchPlaybackLogs(200, telemetryScope);
+    },
+    enabled: telemetryEnabled,
+  });
+
+  const playersQuery = useQuery({
+    queryKey: queryKeys.players(telemetryScopeKey),
+    queryFn: async () => {
+      applyAnalyticsTenantScope();
+      return fetchPlayers(activeAnalyticsTenantId ?? undefined);
+    },
+    enabled: telemetryEnabled,
+  });
+
+  const tenantPlayerIds = useMemo(() => {
+    if (analyticsScopeAll) {
+      return new Set(
+        FRENCH_DEMO_ENTERPRISES.flatMap((e) =>
+          Array.from(frenchDemoPlayerIdsForTenant(e.tenantId))
+        )
+      );
+    }
+    return frenchDemoPlayerIdsForTenant(activeAnalyticsTenantId ?? "");
+  }, [analyticsScopeAll, activeAnalyticsTenantId]);
+
+  const shouldScope =
+    !analyticsScopeAll && (isManager || Boolean(workspaceTenantId));
+
+  const logs = useMemo(() => {
+    const raw = logsQuery.data ?? [];
+    return raw.filter((log) => {
+      if (!shouldScope || tenantPlayerIds.size === 0) return true;
+      return (
+        tenantPlayerIds.has(log.playerId) ||
+        Array.from(tenantPlayerIds).some(
+          (id) => normalizePlayerId(id) === normalizePlayerId(log.playerId)
+        )
+      );
+    });
+  }, [logsQuery.data, shouldScope, tenantPlayerIds]);
+
+  const players = useMemo(() => {
+    const raw = playersQuery.data ?? [];
+    return raw.filter((p) => {
+      if (!shouldScope || tenantPlayerIds.size === 0) return true;
+      return (
+        tenantPlayerIds.has(p.id) ||
+        Array.from(tenantPlayerIds).some(
+          (id) => normalizePlayerId(id) === normalizePlayerId(p.id)
+        )
+      );
+    });
+  }, [playersQuery.data, shouldScope, tenantPlayerIds]);
+
+  const health = healthQuery.data ?? null;
+  const isLoading =
+    healthQuery.isPending || logsQuery.isPending || playersQuery.isPending;
+  const error =
+    healthQuery.error || logsQuery.error || playersQuery.error
+      ? String(
+          (healthQuery.error as Error | undefined)?.message ||
+            (logsQuery.error as Error | undefined)?.message ||
+            (playersQuery.error as Error | undefined)?.message ||
+            "Failed to load analytics"
+        )
+      : null;
 
   const resolveDeviceLabel = useCallback(
     (playerId: string | null | undefined, apiName?: string | null) => {

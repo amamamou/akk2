@@ -2,7 +2,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import DashboardHeader from "./components/DashboardHeader";
 import LivePlayerStatus, { type PlayerStatus } from "./components/LivePlayerStatus";
 import RecentActivityFeed, { type ActivityItem } from "./components/RecentActivityFeed";
@@ -12,7 +13,15 @@ import SystemAlerts from "./components/SystemAlerts";
 import { useAuth } from "@/app/context/AuthContext";
 import { isSuperAdminRole } from "@/lib/rbac";
 import { getApiClient } from "@/lib/api-client";
-import type { MediaInfo, PlayerInfo, ScheduleEntry, SystemHealthMetrics, ActivityLogEntry, ClientInfo } from "@/types/api";
+import {
+  fetchDashboardActivity,
+  fetchMedia,
+  fetchPlayers,
+  fetchSchedules,
+  fetchSystemHealth,
+} from "@/lib/query-fetchers";
+import { queryKeys } from "@/lib/query-keys";
+import type { PlayerInfo, ScheduleEntry, ActivityLogEntry } from "@/types/api";
 import type { QuickStat } from "./components/QuickStatsGrid";
 
 const dayLabel = new Intl.DateTimeFormat(undefined, { weekday: "short" });
@@ -118,90 +127,89 @@ function mapRecentActivity(schedules: ScheduleEntry[], players: PlayerInfo[], ac
 
 export default function DashboardClient() {
   const apiClient = getApiClient();
+  const queryClient = useQueryClient();
   const { user } = useAuth();
   const isSuperAdmin = isSuperAdminRole(user?.role);
-  const [players, setPlayers] = useState<PlayerInfo[]>([]);
-  // _media is reserved for future use (fetched media) — keep setter for API response
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const [_media, setMedia] = useState<MediaInfo[]>([]);
-  const [schedules, setSchedules] = useState<ScheduleEntry[]>([]);
-  const [clients, setClients] = useState<ClientInfo[]>([]);
-  const [systemHealth, setSystemHealth] = useState<SystemHealthMetrics | null>(null);
-  const [activityLogs, setActivityLogs] = useState<ActivityLogEntry[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
-   useEffect(() => {
-     let cancelled = false;
-     const load = async () => {
-       try {
-         setIsLoading(true);
-         setError(null);
-         
-         // Fetch players, media, schedules, and clients in parallel
-         const [playersRes, mediaRes, schedulesRes, clientsRes, healthRes, activityRes] = await Promise.all([
-           apiClient.listPlayers().catch(() => ({ ok: false, players: [] })),
-           apiClient.listMedia().catch(() => ({ ok: false, media: [] })),
-           apiClient.listSchedules().catch(() => ({ ok: false, schedules: [] })),
-           apiClient.listClients().catch(() => ({ ok: false, clients: [] })),
-           apiClient.getSystemHealth().catch(() => null),
-           // Try the new dashboard activity endpoint first, fall back to list activity logs
-           apiClient.getDashboardActivity(1, 10)
-             .catch(() => apiClient.listActivityLogs(10))
-             .catch(() => ({ ok: false, activities: [], activityLogs: [] })),
-         ]);
-         
-         if (cancelled) return;
-         
-         setPlayers(playersRes?.players || []);
-         setMedia(mediaRes?.media || []);
-         setSchedules(schedulesRes?.schedules || []);
-         setClients(clientsRes?.clients || []);
-         setSystemHealth(healthRes);
-         
-         // Handle both activity response formats
-         const activities = activityRes?.activities || activityRes?.activityLogs || [];
-         setActivityLogs(activities);
-       } catch (err: any) {
-         if (!cancelled) {
-           const errorMsg = err?.response?.data?.error || err?.message || "Failed to load dashboard data";
-           setError(errorMsg);
-         }
-       } finally {
-         if (!cancelled) setIsLoading(false);
-       }
-     };
+  const playersQuery = useQuery({
+    queryKey: queryKeys.players(),
+    queryFn: () => fetchPlayers(),
+    refetchInterval: 30_000,
+  });
 
-     load();
+  const mediaQuery = useQuery({
+    queryKey: queryKeys.media(),
+    queryFn: () => fetchMedia(),
+  });
 
-     // Re-fetch players every 30 seconds so the live status updates without a
-     // full page refresh. We only refresh the players list on interval to
-     // avoid reloading media/schedules unnecessarily.
-     const intervalId = typeof window !== "undefined" ? window.setInterval(async () => {
-       try {
-         const playersRes = await apiClient.listPlayers();
-         if (!cancelled) setPlayers(playersRes?.players || []);
-       } catch {
-         // ignore transient errors on polling
-       }
-     }, 30_000) : undefined;
+  const schedulesQuery = useQuery({
+    queryKey: queryKeys.schedules(),
+    queryFn: () => fetchSchedules(),
+  });
 
-     const onPlayersUpdated = () => {
-       void load();
-     };
+  const clientsQuery = useQuery({
+    queryKey: queryKeys.workspaceClients(),
+    queryFn: async () => {
+      const res = await apiClient.listClients().catch(() => ({ ok: false, clients: [] }));
+      return res.clients ?? [];
+    },
+    enabled: isSuperAdmin,
+  });
 
-     if (typeof window !== "undefined") {
-       window.addEventListener("akou:players-updated", onPlayersUpdated);
-     }
+  const healthQuery = useQuery({
+    queryKey: queryKeys.systemHealth(),
+    queryFn: () => fetchSystemHealth(),
+  });
 
-     return () => {
-       cancelled = true;
-       if (typeof window !== "undefined") {
-         window.removeEventListener("akou:players-updated", onPlayersUpdated);
-       }
-       if (intervalId) window.clearInterval(intervalId);
-     };
-   }, [apiClient]);
+  const activityQuery = useQuery({
+    queryKey: queryKeys.dashboardActivity(),
+    queryFn: () => fetchDashboardActivity(),
+  });
+
+  const players = playersQuery.data ?? [];
+  const schedules = schedulesQuery.data ?? [];
+  const clients = clientsQuery.data ?? [];
+  const systemHealth = healthQuery.data ?? null;
+  const activityLogs = activityQuery.data ?? [];
+
+  const isLoading =
+    playersQuery.isPending ||
+    mediaQuery.isPending ||
+    schedulesQuery.isPending ||
+    healthQuery.isPending ||
+    activityQuery.isPending;
+
+  const error =
+    playersQuery.error ||
+    schedulesQuery.error ||
+    healthQuery.error ||
+    activityQuery.error
+      ? String(
+          (playersQuery.error as Error | undefined)?.message ||
+            (schedulesQuery.error as Error | undefined)?.message ||
+            (healthQuery.error as Error | undefined)?.message ||
+            (activityQuery.error as Error | undefined)?.message ||
+            "Failed to load dashboard data"
+        )
+      : null;
+
+  useEffect(() => {
+    const onPlayersUpdated = () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.players() });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.schedules() });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.dashboardActivity() });
+    };
+
+    if (typeof window !== "undefined") {
+      window.addEventListener("akou:players-updated", onPlayersUpdated);
+    }
+
+    return () => {
+      if (typeof window !== "undefined") {
+        window.removeEventListener("akou:players-updated", onPlayersUpdated);
+      }
+    };
+  }, [queryClient]);
 
   const quickStats: QuickStat[] = useMemo(() => {
     const activePlayers = players.filter((player) => {

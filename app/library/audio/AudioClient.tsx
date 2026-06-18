@@ -1,6 +1,7 @@
 "use client";
 
 import React, { startTransition, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 // icons are used in child components
 import EditAudioModal from "../components/EditAudioModal";
 import ViewAudioModal from "../components/ViewAudioModal";
@@ -16,6 +17,8 @@ import type { RowPlaybackState } from "./components/AudioListItem";
 import { filterLibrary } from "@/lib/audioFilters";
 import { sortAndFilterByDate, paginate } from "@/lib/audioSortPaginate";
 import { getApiClient } from "@/lib/api-client";
+import { fetchMedia } from "@/lib/query-fetchers";
+import { queryKeys } from "@/lib/query-keys";
 import { parseMediaTags } from "@/lib/media-tags";
 import type { MediaInfo } from "@/types/api";
 
@@ -40,6 +43,7 @@ function mapMediaToAudioItem(item: MediaInfo): AudioItem {
 
 export default function LibraryAudioClient() {
   const apiClient = getApiClient();
+  const queryClient = useQueryClient();
   const [query, setQuery] = useState("");
   const [activeCategory, setActiveCategory] = useState<string>("All");
   const [uploadOpen, setUploadOpen] = useState(false);
@@ -96,23 +100,27 @@ export default function LibraryAudioClient() {
     void loadPlaylists();
   }, [apiClient]);
 
-  useEffect(() => {
-    const loadMedia = async () => {
-      setLoading(true);
-      try {
-        const response = await apiClient.listMedia();
-        const mapped = response.media.map(mapMediaToAudioItem);
-        startTransition(() => setAudios(mapped));
-      } catch (err) {
-        console.error("Failed to load media library", err);
-        startTransition(() => setAudios([]));
-      } finally {
-        setLoading(false);
-      }
-    };
+  const mediaQuery = useQuery({
+    queryKey: queryKeys.media(),
+    queryFn: () => fetchMedia(),
+  });
 
-    loadMedia();
-  }, [apiClient]);
+  const updateMediaMutation = useMutation({
+    mutationFn: ({ id, title }: { id: string; title: string }) =>
+      apiClient.updateMedia(id, { title }),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.media() });
+    },
+  });
+
+  useEffect(() => {
+    if (mediaQuery.data) {
+      startTransition(() =>
+        setAudios(mediaQuery.data.map(mapMediaToAudioItem))
+      );
+    }
+    setLoading(mediaQuery.isPending);
+  }, [mediaQuery.data, mediaQuery.isPending]);
 
   // Selected item for list view (used to apply sidebar-like active styling)
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -445,7 +453,10 @@ export default function LibraryAudioClient() {
 
   const saveEdit = async (v: { id: string; title: string; singer?: string }) => {
     try {
-      const res = await apiClient.updateMedia(v.id, { title: v.title.trim() });
+      const res = await updateMediaMutation.mutateAsync({
+        id: v.id,
+        title: v.title.trim(),
+      });
       setAudios((s) =>
         s.map((a) =>
           a.id === v.id
@@ -459,8 +470,6 @@ export default function LibraryAudioClient() {
       );
       setSaveNotice("Audio updated successfully.");
       setEditing(null);
-      const refreshed = await apiClient.listMedia();
-      setAudios(refreshed.media.map(mapMediaToAudioItem));
     } catch (err) {
       console.error("Failed to update audio", err);
       setSaveNotice("Could not save changes. Please try again.");

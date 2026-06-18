@@ -1,12 +1,14 @@
 "use client";
 
 import React, { useCallback, useEffect, useState, useRef } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter, useParams } from "next/navigation";
 import { Music, Plus, Edit, Trash, Check, Loader2, X } from "lucide-react";
 import { cn } from "@/utils/cn";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import type { Playlist } from "../../components/PlaylistModal";
 import { getApiClient } from "@/lib/api-client";
+import { queryKeys } from "@/lib/query-keys";
 import { apiPlaylistToUi, isValidPlaylistId } from "@/lib/playlist-mapper";
 import type { PlaylistTrackInfo } from "@/types/api";
 
@@ -16,6 +18,7 @@ export default function PlaylistDetailClient({
   playlistId?: string;
 }) {
   const apiClient = getApiClient();
+  const queryClient = useQueryClient();
   const router = useRouter();
   const routeParams = useParams();
   const routeId =
@@ -52,37 +55,68 @@ export default function PlaylistDetailClient({
     return () => window.clearTimeout(timer);
   }, [toast]);
 
-  const loadPlaylist = useCallback(async () => {
-    if (!isValidPlaylistId(playlistId)) {
-      setLoading(false);
-      setError("Invalid playlist link.");
-      setPlaylist(null);
-      return;
-    }
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await apiClient.getPlaylist(playlistId);
-      const ui = apiPlaylistToUi(res.playlist);
-      if (!ui) {
-        setError("Playlist response is missing an id.");
-        setPlaylist(null);
-        return;
+  const playlistQuery = useQuery({
+    queryKey: queryKeys.playlist(playlistId ?? ""),
+    queryFn: async () => {
+      if (!isValidPlaylistId(playlistId)) {
+        throw new Error("Invalid playlist link.");
       }
-      setPlaylist(ui);
-      setTracks(res.playlist.tracks ?? []);
-      setName(ui.title);
-      setDescription(ui.description ?? "");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load playlist");
-    } finally {
-      setLoading(false);
-    }
-  }, [apiClient, playlistId]);
+      return apiClient.getPlaylist(playlistId);
+    },
+    enabled: isValidPlaylistId(playlistId),
+  });
+
+  const invalidatePlaylistQueries = useCallback(async () => {
+    if (!isValidPlaylistId(playlistId)) return;
+    await queryClient.invalidateQueries({ queryKey: queryKeys.playlist(playlistId) });
+    await queryClient.invalidateQueries({ queryKey: queryKeys.playlists() });
+  }, [playlistId, queryClient]);
+
+  const updatePlaylistMutation = useMutation({
+    mutationFn: (data: { title: string; description: string }) =>
+      apiClient.updatePlaylist(playlistId, data),
+    onSuccess: () => void invalidatePlaylistQueries(),
+  });
+
+  const addPlaylistItemMutation = useMutation({
+    mutationFn: (mediaId: string) =>
+      apiClient.addPlaylistItem(playlistId, { mediaId }),
+    onSuccess: () => void invalidatePlaylistQueries(),
+  });
+
+  const removePlaylistItemMutation = useMutation({
+    mutationFn: (itemId: string) =>
+      apiClient.removePlaylistItem(playlistId, itemId),
+    onSuccess: () => void invalidatePlaylistQueries(),
+  });
 
   useEffect(() => {
-    void loadPlaylist();
-  }, [loadPlaylist]);
+    if (!playlistQuery.data) {
+      if (playlistQuery.error) {
+        setError(
+          playlistQuery.error instanceof Error
+            ? playlistQuery.error.message
+            : "Failed to load playlist"
+        );
+        setPlaylist(null);
+      }
+      setLoading(playlistQuery.isPending);
+      return;
+    }
+    const ui = apiPlaylistToUi(playlistQuery.data.playlist);
+    if (!ui) {
+      setError("Playlist response is missing an id.");
+      setPlaylist(null);
+      setLoading(false);
+      return;
+    }
+    setPlaylist(ui);
+    setTracks(playlistQuery.data.playlist.tracks ?? []);
+    setName(ui.title);
+    setDescription(ui.description ?? "");
+    setLoading(false);
+    setError(null);
+  }, [playlistQuery.data, playlistQuery.error, playlistQuery.isPending]);
 
   useEffect(() => {
     if (!isEditing) return;
@@ -111,7 +145,7 @@ export default function PlaylistDetailClient({
     const descTrim = description.trim();
     setSaving(true);
     try {
-      const res = await apiClient.updatePlaylist(playlist.id, {
+      const res = await updatePlaylistMutation.mutateAsync({
         title: trimmed || playlist.title,
         description: descTrim,
       });
@@ -128,7 +162,7 @@ export default function PlaylistDetailClient({
 
   async function removeTrack(itemId: string) {
     try {
-      const res = await apiClient.removePlaylistItem(playlistId, itemId);
+      const res = await removePlaylistItemMutation.mutateAsync(itemId);
       const ui = apiPlaylistToUi(res.playlist);
       setPlaylist(ui);
       setTracks(res.playlist.tracks ?? []);
@@ -143,7 +177,7 @@ export default function PlaylistDetailClient({
       return;
     }
     try {
-      const res = await apiClient.addPlaylistItem(playlistId, { mediaId });
+      const res = await addPlaylistItemMutation.mutateAsync(mediaId);
       const ui = apiPlaylistToUi(res.playlist);
       setPlaylist(ui);
       setTracks(res.playlist.tracks ?? []);

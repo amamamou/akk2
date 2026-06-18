@@ -1,9 +1,12 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/app/context/AuthContext";
 import { getApiClient } from "@/lib/api-client";
+import { fetchClientsWithBilling } from "@/lib/query-fetchers";
+import { queryKeys } from "@/lib/query-keys";
 import type {
 	ClientBillingSummary,
 	ClientCreateInput,
@@ -110,73 +113,48 @@ export default function ClientsClient() {
 	const role = String(user?.role || "").toUpperCase();
 	const isSuperAdmin = role === "SUPER_ADMIN";
 
-	const [clients, setClients] = useState<ClientInfo[]>([]);
 	const [query, setQuery] = useState("");
-	const [pageLoading, setPageLoading] = useState(true);
-	const [error, setError] = useState<string | null>(null);
 	const [createOpen, setCreateOpen] = useState(false);
 	const [createLoading, setCreateLoading] = useState(false);
 	const [toastOpen, setToastOpen] = useState(false);
 	const [toastMessage, setToastMessage] = useState("Client created successfully");
 	const [form, setForm] = useState<ClientFormState>(initialFormState);
 	const [formError, setFormError] = useState<string | null>(null);
-	const [billingByClientId, setBillingByClientId] = useState<
-		Record<string, ClientBillingSummary>
-	>({});
 	const [invoiceClient, setInvoiceClient] = useState<ClientInfo | null>(null);
 	const [invoiceModalOpen, setInvoiceModalOpen] = useState(false);
 	const nameRef = useRef<HTMLInputElement>(null);
 	const isEnterpriseTier = form.subscriptionTier === "ENTERPRISE";
 
-	const loadClients = useCallback(async () => {
-		if (!isSuperAdmin) {
-			setPageLoading(false);
-			setClients([]);
-			return;
-		}
+	const queryClient = useQueryClient();
 
-		let cancelled = false;
-		setPageLoading(true);
-		setError(null);
+	const clientsQuery = useQuery({
+		queryKey: queryKeys.workspaceClients(),
+		queryFn: () => fetchClientsWithBilling(),
+		enabled: isSuperAdmin && !authLoading,
+	});
 
-		try {
-			const [clientsRes, billingRes] = await Promise.all([
-				apiClient.listClients(),
-				apiClient.getClientsBillingOverview().catch(() => null),
-			]);
-			if (cancelled) return;
-			setClients((clientsRes?.clients || []).map(normalizeClient));
-			if (billingRes?.summaries) {
-				const map: Record<string, ClientBillingSummary> = {};
-				for (const s of billingRes.summaries) {
-					const normalized = normalizeBillingSummary(s as unknown as Record<string, unknown>);
-					map[normalized.clientId] = normalized;
-				}
-				setBillingByClientId(map);
-			}
-		} catch (err: any) {
-			if (cancelled) return;
-			const status = err?.response?.status;
-			if (status === 403) {
-				setError("You do not have permission to view this page.");
-			} else {
-				setError(
-					err?.response?.data?.error || err?.message || "Failed to load clients"
-				);
-			}
-			setClients([]);
-		} finally {
-			if (!cancelled) setPageLoading(false);
-		}
+	const createClientMutation = useMutation({
+		mutationFn: (payload: ClientCreateInput) => apiClient.createClient(payload),
+		onSuccess: async () => {
+			await queryClient.invalidateQueries({ queryKey: queryKeys.workspaceClients() });
+			await queryClient.invalidateQueries({ queryKey: queryKeys.clientsBilling() });
+		},
+	});
 
-		return () => {
-			cancelled = true;
-		};
-	}, [apiClient, isSuperAdmin]);
+	const clients = clientsQuery.data?.clients ?? [];
+	const billingByClientIdResolved = clientsQuery.data?.billingByClientId ?? {};
+	const pageLoading = authLoading || (isSuperAdmin && clientsQuery.isPending);
 
-	useEffect(() => {
-		void loadClients();
-	}, [loadClients]);
+	const queryError = clientsQuery.error as
+		| { response?: { status?: number; data?: { error?: string } }; message?: string }
+		| undefined;
+	const loadError = queryError
+		? queryError.response?.status === 403
+			? "You do not have permission to view this page."
+			: queryError.response?.data?.error ||
+				queryError.message ||
+				"Failed to load clients"
+		: null;
 
 	useEffect(() => {
 		if (!createOpen) {
@@ -258,8 +236,7 @@ export default function ClientsClient() {
 				maxStorageGb: tierLock ? tierLock.maxStorageGb : maxStorageGb,
 			};
 
-			await apiClient.createClient(payload);
-			await loadClients();
+			await createClientMutation.mutateAsync(payload);
 			setCreateOpen(false);
 			setToastMessage(`Created client: ${trimmedName}`);
 			setToastOpen(true);
@@ -486,9 +463,9 @@ export default function ClientsClient() {
 
 			<div className="flex-1 overflow-auto">
 				<div className="px-8 py-6">
-					{error && (
+					{loadError && (
 						<div className="mb-6 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">
-							{error}
+							{loadError}
 						</div>
 					)}
 
@@ -509,7 +486,7 @@ export default function ClientsClient() {
 					) : (
 						<div className="space-y-3">
 							{filteredClients.map((client) => {
-								const billing = billingByClientId[client.id];
+								const billing = billingByClientIdResolved[client.id];
 								return (
 									<ClientCard
 										key={client.id}
@@ -673,7 +650,8 @@ export default function ClientsClient() {
 					setInvoiceClient(null);
 				}}
 				onSuccess={() => {
-					void loadClients();
+					void queryClient.invalidateQueries({ queryKey: queryKeys.workspaceClients() });
+					void queryClient.invalidateQueries({ queryKey: queryKeys.clientsBilling() });
 					setToastMessage("Invoice registered successfully");
 					setToastOpen(true);
 				}}
