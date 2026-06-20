@@ -298,6 +298,7 @@ export default function LibraryPlaylistsClient() {
             perPageOptions={perPageOptions}
             totalPages={totalPages}
             disabled={loading || refreshing}
+            showTopBorder={false}
           />
         )}
       </div>
