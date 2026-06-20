@@ -10,6 +10,10 @@ export const dashboardHeroSectionClass = "pb-1";
 export const dashboardCardClass =
   "rounded-2xl border border-gray-100 bg-white shadow-[0_8px_30px_rgba(0,0,0,0.04)] dark:border-zinc-700/60 dark:bg-zinc-900 dark:shadow-none";
 
+/** Lighter grouping surface — structure without heavy card weight. */
+export const dashboardSubtlePanelClass =
+  "overflow-hidden rounded-2xl border border-gray-100/80 bg-gray-50/40 dark:border-zinc-800/80 dark:bg-zinc-900/40";
+
 export const dashboardCardPadding = "p-6";
 
 export const dashboardGridGap = "gap-6";

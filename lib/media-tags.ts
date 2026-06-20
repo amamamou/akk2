@@ -2,6 +2,12 @@
 
 const TAG_REGEX = /TAG:([^,]+)/g;
 
+export function parseMediaArtist(category: string): string | undefined {
+  const match = (category || "").match(/(?:^|,\s*)ARTIST:([^,]+)/i);
+  const value = match?.[1]?.trim();
+  return value || undefined;
+}
+
 export function parseMediaTags(category: string): { baseCategory: string; tags: string[] } {
   const raw = (category || "").trim();
   const tags: string[] = [];

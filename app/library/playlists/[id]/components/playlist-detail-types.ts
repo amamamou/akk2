@@ -6,6 +6,7 @@ export type TrackPreviewState = {
 
 export type PreviewPlayerState = {
   trackTitle: string;
+  trackArtist?: string;
   isPlaying: boolean;
   currentTime: number;
   duration: number;

@@ -12,6 +12,9 @@ interface PlaylistsPaginationProps {
   perPageOptions: number[];
   totalPages: number;
   disabled?: boolean;
+  /** @default true */
+  showTopBorder?: boolean;
+  ariaLabel?: string;
 }
 
 export default function PlaylistsPagination({
@@ -22,14 +25,19 @@ export default function PlaylistsPagination({
   perPageOptions,
   totalPages,
   disabled = false,
+  showTopBorder = true,
+  ariaLabel = "Playlist pagination",
 }: PlaylistsPaginationProps) {
   const atFirst = page <= 1;
   const atLast = page >= totalPages;
 
   return (
     <nav
-      aria-label="Playlist pagination"
-      className="flex min-h-[52px] flex-col items-center justify-between gap-3 border-t border-gray-100 pt-4 dark:border-zinc-800 sm:flex-row"
+      aria-label={ariaLabel}
+      className={cn(
+        "flex min-h-[52px] flex-col items-center justify-between gap-3 sm:flex-row",
+        showTopBorder && "border-t border-gray-100 pt-4 dark:border-zinc-800"
+      )}
     >
       <label
         className={cn(

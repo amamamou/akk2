@@ -69,6 +69,9 @@ export interface MediaInfo {
   tags?: string[];
   fileSize?: number;
   url: string;
+  /** When provided by the API */
+  artist?: string;
+  singer?: string;
   tenantId?: string;
   tenant_id?: string;
 }

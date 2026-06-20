@@ -70,6 +70,10 @@ export default function PreviewPlayer({
             </p>
           </div>
 
+          {state.trackArtist ? (
+            <p className="mt-0.5 truncate text-xs text-gray-400">{state.trackArtist}</p>
+          ) : null}
+
           {state.streamError ? (
             <p className="mt-1 flex items-center gap-1 text-xs text-amber-700 dark:text-amber-400">
               <AlertCircle size={12} />
