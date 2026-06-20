@@ -7,12 +7,10 @@ import {
   Clock,
   CheckCircle,
   AlertCircle,
-  ChevronDown,
   TrendingUp,
   Users,
   Activity,
 } from "lucide-react";
-import { cn } from "@/utils/cn";
 import { useAuth } from "@/app/context/AuthContext";
 import { getApiClient } from "@/lib/api-client";
 import {
@@ -35,12 +33,10 @@ import {
   tierDisplayLabel,
   type ListenerSegmentation,
 } from "@/lib/analytics-metrics";
-
-const ANALYTICS_SELECT_CLASS =
-  "border border-gray-100 dark:border-zinc-700 rounded-lg text-sm px-3 py-1.5 bg-white dark:bg-zinc-800 text-gray-900 dark:text-zinc-100 outline-none focus:border-gray-300 dark:focus:border-zinc-600 focus:ring-0 appearance-none pr-8 transition-colors hover:border-gray-200 dark:hover:border-zinc-600";
-
-const ANALYTICS_WORKSPACE_SELECT_CLASS =
-  "border border-violet-100 dark:border-zinc-700 rounded-lg text-sm px-3 py-1.5 bg-violet-50 dark:bg-zinc-800 text-gray-900 dark:text-zinc-100 outline-none focus:border-violet-200 dark:focus:border-zinc-600 appearance-none pr-8";
+import {
+  dashboardContainerClass,
+  dashboardPageClass,
+} from "@/app/dashboard/dashboard-styles";
 import {
   FRENCH_DEMO_ENTERPRISES,
   FRENCH_DEMO_PLAYER_REGISTRY,
@@ -55,6 +51,9 @@ import { ANALYTICS_ALL_CLIENTS_ID } from "@/lib/global-admin-tenant";
 import KpiGrid from "./components/KpiGrid";
 import ChartsPanel from "./components/ChartsPanel";
 import PlaybackTable from "./components/PlaybackTable";
+import AnalyticsHero from "./components/AnalyticsHero";
+import AnalyticsToolbar from "./components/AnalyticsToolbar";
+import AnalyticsPageSkeleton from "./components/AnalyticsPageSkeleton";
 
 type TimeRange = "today" | "7d" | "month";
 
@@ -469,240 +468,52 @@ export default function AnalyticsClient() {
     ];
   }, [segmentation]);
 
-  if (isLoading) {
-    return (
-      <div className="flex-1 flex flex-col overflow-hidden bg-white dark:bg-zinc-900">
-        <div className="sticky top-0 z-10 bg-white dark:bg-zinc-900">
-          <div className="px-8 py-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">Analytics</h1>
-                <p className="mt-1 text-sm text-gray-500 dark:text-zinc-400">Playback verification and listening metrics</p>
-              </div>
-
-              <div className="flex gap-2 items-center flex-wrap justify-end">
-                {isSuperAdmin && workspaceSelectOptions.length > 0 && (
-                  <div className="relative">
-                    <select
-                      value={selectedWorkspaceClientId}
-                      onChange={(e) => handleWorkspaceClientChange(e.target.value)}
-                      className={ANALYTICS_WORKSPACE_SELECT_CLASS}
-                      aria-label="Client workspace"
-                    >
-                      {workspaceSelectOptions.map((c) => (
-                        <option key={c.id} value={c.id}>
-                          {c.name}
-                        </option>
-                      ))}
-                    </select>
-                    <ChevronDown
-                      size={14}
-                      className="absolute right-2.5 top-1/2 transform -translate-y-1/2 pointer-events-none text-gray-400"
-                    />
-                  </div>
-                )}
-                <div className="relative">
-                  <select
-                    value={selectedPlayerId}
-                    onChange={(e) => setSelectedPlayerId(e.target.value)}
-                    className={ANALYTICS_SELECT_CLASS}
-                  >
-                    <option value="all">All Players</option>
-                    {playerOptions.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {resolveDeviceLabel(p.id, p.roomName || p.playerName)}
-                      </option>
-                    ))}
-                  </select>
-                  <ChevronDown
-                    size={14}
-                    className="absolute right-2.5 top-1/2 transform -translate-y-1/2 pointer-events-none text-gray-400"
-                  />
-                </div>
-
-                {selectedPlayerId !== "all" && (
-                  <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-gray-50 dark:bg-zinc-800/50 rounded-lg border border-gray-100 dark:border-zinc-700/60 text-xs">
-                    <div
-                      className={cn(
-                        "w-1 h-1 rounded-full",
-                        selectedPlayerMeta.status === "online" ? "bg-green-600" : "bg-gray-400"
-                      )}
-                    />
-                    <span className="text-gray-600 dark:text-zinc-300 font-medium">
-                      {selectedPlayerMeta.status === "online" ? "Online" : "Offline"}
-                    </span>
-                    <span className="text-gray-300 dark:text-zinc-600 mx-0.5">•</span>
-                    <span className="text-gray-500 dark:text-zinc-400">{selectedPlayerMeta.device}</span>
-                  </div>
-                )}
-
-                <div className="relative">
-                  <select
-                    value={timeRange}
-                    onChange={(e) => setTimeRange(e.target.value as TimeRange)}
-                    className={ANALYTICS_SELECT_CLASS}
-                  >
-                    <option value="today">Today</option>
-                    <option value="7d">Last 7 Days</option>
-                    <option value="month">This Month</option>
-                  </select>
-                  <ChevronDown
-                    size={14}
-                    className="absolute right-2.5 top-1/2 transform -translate-y-1/2 pointer-events-none text-gray-400"
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="flex-1 overflow-auto bg-white dark:bg-zinc-900">
-          <div className="px-6 py-6">
-            {/* Quick stats skeleton row */}
-            <div className="mb-6">
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 animate-pulse">
-                <div className="h-20 bg-gray-200 rounded-2xl shadow-[0_8px_30px_rgba(0,0,0,0.04)] border border-gray-200" aria-hidden="true" />
-                <div className="h-20 bg-gray-200 rounded-2xl shadow-[0_8px_30px_rgba(0,0,0,0.04)] border border-gray-200" aria-hidden="true" />
-                <div className="h-20 bg-gray-200 rounded-2xl shadow-[0_8px_30px_rgba(0,0,0,0.04)] border border-gray-200" aria-hidden="true" />
-                <div className="h-20 bg-gray-200 rounded-2xl shadow-[0_8px_30px_rgba(0,0,0,0.04)] border border-gray-200" aria-hidden="true" />
-              </div>
-            </div>
-
-            {/* Skeleton / wireframe grid */}
-            <div className="animate-pulse">
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                  <div className="lg:col-span-2 space-y-6">
-                  <div className="h-40 bg-gray-200 rounded-2xl shadow-[0_8px_30px_rgba(0,0,0,0.04)] border border-gray-200" aria-hidden="true" />
-                  <div className="h-60 bg-gray-200 rounded-2xl shadow-[0_8px_30px_rgba(0,0,0,0.04)] border border-gray-200" aria-hidden="true" />
-                </div>
-
-                <div className="space-y-6">
-                  <div className="h-24 bg-gray-200 rounded-2xl shadow-[0_8px_30px_rgba(0,0,0,0.04)] border border-gray-200" aria-hidden="true" />
-                  <div className="h-40 bg-gray-200 rounded-2xl shadow-[0_8px_30px_rgba(0,0,0,0.04)] border border-gray-200" aria-hidden="true" />
-                  <div className="h-20 bg-gray-200 rounded-2xl shadow-[0_8px_30px_rgba(0,0,0,0.04)] border border-gray-200" aria-hidden="true" />
-                </div>
-              </div>
-            </div>
-
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="flex-1 flex flex-col overflow-hidden bg-white dark:bg-zinc-900">
-      <div className="sticky top-0 z-10 bg-white dark:bg-zinc-900">
-        <div className="px-8 py-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">Analytics</h1>
-              <p className="mt-1 text-sm text-gray-500 dark:text-zinc-400">Playback verification and listening metrics</p>
-            </div>
+    <div className={dashboardPageClass}>
+      <div className={dashboardContainerClass}>
+        <AnalyticsHero />
 
-            <div className="flex gap-2 items-center flex-wrap justify-end">
-              {isSuperAdmin && workspaceSelectOptions.length > 0 && (
-                <div className="relative">
-                  <select
-                    value={selectedWorkspaceClientId}
-                    onChange={(e) => handleWorkspaceClientChange(e.target.value)}
-                    className={ANALYTICS_WORKSPACE_SELECT_CLASS}
-                    aria-label="Client workspace"
-                  >
-                    {workspaceSelectOptions.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name}
-                      </option>
-                    ))}
-                  </select>
-                  <ChevronDown
-                    size={14}
-                    className="absolute right-2.5 top-1/2 transform -translate-y-1/2 pointer-events-none text-gray-400"
-                  />
-                </div>
-              )}
-              <div className="relative">
-                <select
-                  value={selectedPlayerId}
-                  onChange={(e) => setSelectedPlayerId(e.target.value)}
-                  className={ANALYTICS_SELECT_CLASS}
-                >
-                  <option value="all">All Players</option>
-                  {playerOptions.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {resolveDeviceLabel(p.id, p.roomName || p.playerName)}
-                    </option>
-                  ))}
-                </select>
-                <ChevronDown
-                  size={14}
-                  className="absolute right-2.5 top-1/2 transform -translate-y-1/2 pointer-events-none text-gray-400"
-                />
+        <AnalyticsToolbar
+          isSuperAdmin={isSuperAdmin}
+          workspaceSelectOptions={workspaceSelectOptions}
+          selectedWorkspaceClientId={selectedWorkspaceClientId}
+          onWorkspaceClientChange={handleWorkspaceClientChange}
+          selectedPlayerId={selectedPlayerId}
+          onPlayerChange={setSelectedPlayerId}
+          playerOptions={playerOptions}
+          resolveDeviceLabel={resolveDeviceLabel}
+          selectedPlayerMeta={selectedPlayerMeta}
+          timeRange={timeRange}
+          onTimeRangeChange={setTimeRange}
+        />
+
+        {isLoading ? (
+          <AnalyticsPageSkeleton />
+        ) : (
+          <>
+            {error && (
+              <div className="rounded-2xl border border-red-200 bg-red-50 p-3 text-sm text-red-800 dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-200">
+                {error}
               </div>
+            )}
 
-              {selectedPlayerId !== "all" && (
-                <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-gray-50 dark:bg-zinc-800/50 rounded-lg border border-gray-100 dark:border-zinc-700/60 text-xs">
-                  <div
-                    className={cn(
-                      "w-1 h-1 rounded-full",
-                      selectedPlayerMeta.status === "online" ? "bg-green-600" : "bg-gray-400"
-                    )}
-                  />
-                  <span className="text-gray-600 font-medium">
-                    {selectedPlayerMeta.status === "online" ? "Online" : "Offline"}
-                  </span>
-                  <span className="text-gray-300 mx-0.5">•</span>
-                  <span className="text-gray-500">{selectedPlayerMeta.device}</span>
-                </div>
-              )}
+            <KpiGrid stats={kpiCards} />
 
-              <div className="relative">
-                <select
-                  value={timeRange}
-                  onChange={(e) => setTimeRange(e.target.value as TimeRange)}
-                  className={ANALYTICS_SELECT_CLASS}
-                >
-                  <option value="today">Today</option>
-                  <option value="7d">Last 7 Days</option>
-                  <option value="month">This Month</option>
-                </select>
-                <ChevronDown
-                  size={14}
-                  className="absolute right-2.5 top-1/2 transform -translate-y-1/2 pointer-events-none text-gray-400"
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
+            <ChartsPanel engagementData={engagementData} hourlyTraffic={hourlyTraffic} />
 
-      <div className="flex-1 overflow-auto bg-white dark:bg-zinc-900">
-        <div className="px-8 py-6 space-y-6">
-          {error && (
-            <div className="p-3 rounded-2xl bg-red-50 border border-red-200 text-sm text-red-800">
-              {error}
-            </div>
-          )}
-
-          {/* Removed the global 'No playback logs returned' banner so the page shows KPIs/charts immediately.
-              The PlaybackTable already renders a contextual 'No playback logs for this filter.' row when appropriate. */}
-
-          <KpiGrid stats={kpiCards} />
-
-          <ChartsPanel engagementData={engagementData} hourlyTraffic={hourlyTraffic} />
-
-          <PlaybackTable
-            filteredLogs={filteredLogs}
-            resolveMediaLabel={resolveMediaLabel}
-            resolveDeviceLabel={resolveDeviceLabel}
-            logIconForStatus={logIconForStatus}
-            isEngagementTier={isEngagementTier}
-            tierDisplayLabel={tierDisplayLabel}
-            tierChipClass={tierChipClass}
-            formatDuration={formatDuration}
-            formatLogTime={formatLogTime}
-          />
-        </div>
+            <PlaybackTable
+              filteredLogs={filteredLogs}
+              resolveMediaLabel={resolveMediaLabel}
+              resolveDeviceLabel={resolveDeviceLabel}
+              logIconForStatus={logIconForStatus}
+              isEngagementTier={isEngagementTier}
+              tierDisplayLabel={tierDisplayLabel}
+              tierChipClass={tierChipClass}
+              formatDuration={formatDuration}
+              formatLogTime={formatLogTime}
+            />
+          </>
+        )}
       </div>
     </div>
   );
