@@ -205,10 +205,6 @@ export default function DashboardClient() {
             <BroadcastActivity summary={broadcastActivity} />
             <LiveOperations players={livePlayers} />
             <ActivityTimeline activities={activityTimeline} />
-                                <PlayerInsights data={playerInsights} />
-                                          <AudioInsights data={audioInsights} />
-
-
           </div>
 
           <aside className={dashboardSidebarColumn}>
@@ -218,12 +214,14 @@ export default function DashboardClient() {
               upcoming={scheduleSnapshot}
             />
             <ScheduleSnapshot items={scheduleSnapshot} />
-            
             <VenueInsights venues={venueInsights} />
           </aside>
         </div>
 
-
+        <div className={dashboardHalfRow}>
+          <PlayerInsights data={playerInsights} />
+          <AudioInsights data={audioInsights} />
+        </div>
       </div>
     </div>
   );
