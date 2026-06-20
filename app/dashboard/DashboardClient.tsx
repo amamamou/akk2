@@ -1,133 +1,47 @@
-/* eslint-disable prefer-const */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import React, { useEffect, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import DashboardHeader from "./components/DashboardHeader";
-import LivePlayerStatus, { type PlayerStatus } from "./components/LivePlayerStatus";
-import RecentActivityFeed, { type ActivityItem } from "./components/RecentActivityFeed";
-import UpcomingBroadcasts, { type Broadcast } from "./components/UpcomingBroadcasts";
-import QuickActions from "./components/QuickActions";
-import SystemAlerts from "./components/SystemAlerts";
 import { useAuth } from "@/app/context/AuthContext";
 import { isSuperAdminRole } from "@/lib/rbac";
-import { getApiClient } from "@/lib/api-client";
 import {
   fetchDashboardActivity,
   fetchMedia,
+  fetchPlaybackLogs,
   fetchPlayers,
   fetchSchedules,
   fetchSystemHealth,
   fetchWorkspaceClientsBundle,
 } from "@/lib/query-fetchers";
+import { buildBroadcastActivitySummary } from "@/lib/broadcast-activity";
+import {
+  buildActivityTimeline,
+  buildAudioInsights,
+  buildLivePlayerRows,
+  buildLiveSummary,
+  buildOperationalOverview,
+  buildPlayerInsights,
+  buildScheduleSnapshot,
+  buildSystemAlerts,
+  buildVenueInsights,
+} from "@/lib/dashboard-insights";
 import { queryKeys } from "@/lib/query-keys";
-import type { PlayerInfo, ScheduleEntry, ActivityLogEntry } from "@/types/api";
-import type { QuickStat } from "./components/QuickStatsGrid";
 
-const dayLabel = new Intl.DateTimeFormat(undefined, { weekday: "short" });
-const timeLabel = new Intl.DateTimeFormat(undefined, {
-  hour: "2-digit",
-  minute: "2-digit",
-  hour12: false,
-});
-
-function relativeTime(input: string) {
-  const date = new Date(input);
-  const diffMs = date.getTime() - Date.now();
-  const absMinutes = Math.round(Math.abs(diffMs) / 60000);
-  if (absMinutes < 60) return diffMs >= 0 ? `in ${absMinutes}m` : `${absMinutes}m ago`;
-  const absHours = Math.round(absMinutes / 60);
-  if (absHours < 24) return diffMs >= 0 ? `in ${absHours}h` : `${absHours}h ago`;
-  const absDays = Math.round(absHours / 24);
-  return diffMs >= 0 ? `in ${absDays}d` : `${absDays}d ago`;
-}
-
-function mapPlayerStatus(players: PlayerInfo[]): PlayerStatus[] {
-  return players.map((player, index) => {
-    const currentTrack = player.nowPlaying?.title || player.playlist?.[player.playlistIndex]?.title || "Idle";
-    const duration = player.nowPlaying?.duration || player.playlist?.[player.playlistIndex]?.duration || 180;
-    // Derive online/offline from lastSeen if available. Treat anything within
-    // the last 2 minutes as online; otherwise offline. This prevents the UI
-    // from showing random/hardcoded statuses.
-    const lastSeen = player.lastSeen ? new Date(player.lastSeen).getTime() : 0;
-    const isOnline = lastSeen && Date.now() - lastSeen <= 2 * 60 * 1000;
-    return {
-      name: player.roomName || player.playerName || `Player ${index + 1}`,
-      player: player.playerName || player.roomName || player.id,
-      status: isOnline ? "online" : "offline",
-      current: currentTrack,
-      progress: player.playingProgress || 0,
-      duration,
-    };
-  });
-}
-
-function mapUpcomingBroadcasts(schedules: ScheduleEntry[], players: PlayerInfo[]): Broadcast[] {
-  const playersById = new Map(players.map((player) => [player.id, player]));
-  return [...schedules]
-    .sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime())
-    .slice(0, 5)
-    .map((schedule) => {
-      const startsAt = new Date(schedule.startsAt);
-      const location = playersById.get(schedule.playerId)?.roomName || schedule.playerName || "Unknown location";
-      return {
-        time: `${dayLabel.format(startsAt)} ${timeLabel.format(startsAt)}`,
-        title: schedule.title,
-        location,
-        duration: `${Math.max(1, Math.round((new Date(schedule.endsAt).getTime() - startsAt.getTime()) / 60000))}m`,
-        status: schedule.recurrence,
-      };
-    });
-}
-
-function mapRecentActivity(schedules: ScheduleEntry[], players: PlayerInfo[], activityLogs?: ActivityLogEntry[]): ActivityItem[] {
-  // If we have activity logs from the API, use those first
-  if (activityLogs && activityLogs.length > 0) {
-    return activityLogs.slice(0, 5).map((log) => {
-      const relTime = relativeTime(log.createdAt);
-      let action = log.action;
-      let type = "update";
-
-      if (log.action.includes("created")) type = "start";
-      else if (log.action.includes("started")) type = "connect";
-      else if (log.action.includes("completed")) type = "complete";
-
-      // Ensure detail is a string
-      const detailsObj = log.details || {};
-      const detailString = typeof detailsObj === 'string'
-        ? detailsObj
-        : (typeof detailsObj === 'object' && (detailsObj as any).description)
-        ? (detailsObj as any).description
-        : `${log.targetType || "Item"} activity`;
-
-      return {
-        time: relTime,
-        action,
-        detail: detailString,
-        type,
-      };
-    });
-  }
-
-  // Fall back to schedules if no activity logs
-  const playersById = new Map(players.map((player) => [player.id, player]));
-  return [...schedules]
-    .sort((a, b) => new Date(b.startsAt).getTime() - new Date(a.startsAt).getTime())
-    .slice(0, 5)
-    .map((schedule) => {
-      const location = playersById.get(schedule.playerId)?.roomName || schedule.playerName || "Unknown location";
-      return {
-        time: relativeTime(schedule.startsAt),
-        action: "Broadcast scheduled",
-        detail: `${schedule.title} — ${location}`,
-        type: "update",
-      };
-    });
-}
+import DashboardHero from "./components/DashboardHero";
+import DashboardSkeleton from "./components/DashboardSkeleton";
+import OperationalMetricsStrip from "./components/OperationalMetricsStrip";
+import BroadcastActivity from "./components/BroadcastActivity";
+import OperationsOverview from "./components/OperationsOverview";
+import LiveOperations from "./components/LiveOperations";
+import VenueInsights from "./components/VenueInsights";
+import ActivityTimeline from "./components/ActivityTimeline";
+import ScheduleSnapshot from "./components/ScheduleSnapshot";
+import PlayerInsights from "./components/PlayerInsights";
+import AudioInsights from "./components/AudioInsights";
+import { dashboardContainerClass, dashboardCommandLayout, dashboardHalfRow, dashboardMainColumn, dashboardPageClass, dashboardSidebarColumn } from "./dashboard-styles";
 
 export default function DashboardClient() {
-  const apiClient = getApiClient();
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const isSuperAdmin = isSuperAdminRole(user?.role);
@@ -165,18 +79,26 @@ export default function DashboardClient() {
     queryFn: () => fetchDashboardActivity(),
   });
 
+  const playbackLogsQuery = useQuery({
+    queryKey: queryKeys.playbackLogs(undefined, 500),
+    queryFn: () => fetchPlaybackLogs(500),
+  });
+
   const players = playersQuery.data ?? [];
   const schedules = schedulesQuery.data ?? [];
+  const media = mediaQuery.data ?? [];
   const clients = clientsQuery.data ?? [];
   const systemHealth = healthQuery.data ?? null;
   const activityLogs = activityQuery.data ?? [];
+  const playbackLogs = playbackLogsQuery.data ?? [];
 
   const isLoading =
     playersQuery.isPending ||
     mediaQuery.isPending ||
     schedulesQuery.isPending ||
     healthQuery.isPending ||
-    activityQuery.isPending;
+    activityQuery.isPending ||
+    playbackLogsQuery.isPending;
 
   const error =
     playersQuery.error ||
@@ -210,146 +132,99 @@ export default function DashboardClient() {
     };
   }, [queryClient]);
 
-  const quickStats: QuickStat[] = useMemo(() => {
-    const activePlayers = players.filter((player) => {
-      if (!player.lastSeen) return false;
-      const last = new Date(player.lastSeen).getTime();
-      return Date.now() - last <= 2 * 60 * 1000; // active within last 2 minutes
-    }).length;
+  const clientsCount = isSuperAdmin ? clients.length : 1;
 
-    const healthRate = systemHealth?.heartbeatSuccessRate ?? 0;
-    const healthValue = systemHealth ? Math.round(healthRate) : 0;
-    const healthStatus = !systemHealth
-      ? "Unavailable"
-      : healthRate >= 80
-        ? "Healthy"
-        : healthRate >= 50
-          ? "Degraded"
-          : "Check status";
-
-    const secondStat: QuickStat = isSuperAdmin
-      ? {
-          label: "Clients",
-          value: String(clients.length),
-          icon: "Building",
-          trend: "✓ managed globally",
-        }
-      : {
-          label: "Weekly Schedule",
-          value: "Active",
-          valueClassName: "text-green-600",
-          icon: "Calendar",
-          trend: "",
-          subtext: "✓ Calendar is synced & published",
-        };
-
-    return [
-      { label: "Listeners", value: String(activePlayers), icon: "Speaker", trend: "currently online" },
-      secondStat,
-      { label: "Players", value: String(players.length), icon: "Cast", trend: "registered" },
-      { label: "System Health", value: String(healthValue) + "%", icon: "Activity", trend: healthStatus },
-    ];
-  }, [players, clients.length, isSuperAdmin, systemHealth]);
-
-  const livePlayers = useMemo(() => mapPlayerStatus(players), [players]);
-  const upcomingBroadcasts = useMemo(() => mapUpcomingBroadcasts(schedules, players), [schedules, players]);
-  const recentActivity = useMemo(() => mapRecentActivity(schedules, players, activityLogs), [schedules, players, activityLogs]);
-
-if (isLoading) {
-  return (
-    <div className="flex-1 flex flex-col overflow-hidden bg-white dark:bg-zinc-900">
-      <div className="sticky top-0 z-10 bg-white dark:bg-zinc-900">
-        <div className="px-8 py-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="w-56 h-8 bg-gray-200 dark:bg-zinc-800 rounded-md" aria-hidden="true" />
-              <div className="w-96 h-4 bg-gray-200 dark:bg-zinc-800 rounded-md mt-2" aria-hidden="true" />
-            </div>
-
-            <div className="flex items-center gap-3 shrink-0">
-              <div className="hidden sm:block">
-                <div className="w-72 h-12 bg-gray-200 dark:bg-zinc-800 rounded-2xl border border-gray-200 dark:border-zinc-700" aria-hidden="true" />
-              </div>
-              <div className="w-36 h-12 bg-gray-200 dark:bg-zinc-800 rounded-2xl border border-gray-200 dark:border-zinc-700" aria-hidden="true" />
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="flex-1 overflow-auto bg-white dark:bg-zinc-900">
-        <div className="px-6 py-6">
-
-          {/* Quick stats skeleton row */}
-          <div className="mb-6">
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 animate-pulse">
-              <div className="h-20 bg-gray-200 dark:bg-zinc-800 rounded-lg border border-gray-200 dark:border-zinc-700" aria-hidden="true" />
-              <div className="h-20 bg-gray-200 dark:bg-zinc-800 rounded-lg border border-gray-200 dark:border-zinc-700" aria-hidden="true" />
-              <div className="h-20 bg-gray-200 dark:bg-zinc-800 rounded-lg border border-gray-200 dark:border-zinc-700" aria-hidden="true" />
-              <div className="h-20 bg-gray-200 dark:bg-zinc-800 rounded-lg border border-gray-200 dark:border-zinc-700" aria-hidden="true" />
-            </div>
-          </div>
-
-          {/* Skeleton / wireframe grid */}
-          <div className="animate-pulse">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <div className="lg:col-span-2 space-y-6">
-                <div className="h-40 bg-gray-200 dark:bg-zinc-800 rounded-[12px] border border-gray-200 dark:border-zinc-700" aria-hidden="true" />
-                <div className="h-60 bg-gray-200 dark:bg-zinc-800 rounded-[12px] border border-gray-200 dark:border-zinc-700" aria-hidden="true" />
-              </div>
-
-              <div className="space-y-6">
-                <div className="h-24 bg-gray-200 dark:bg-zinc-800 rounded-[12px] border border-gray-200 dark:border-zinc-700" aria-hidden="true" />
-                <div className="h-40 bg-gray-200 dark:bg-zinc-800 rounded-[12px] border border-gray-200 dark:border-zinc-700" aria-hidden="true" />
-                <div className="h-20 bg-gray-200 dark:bg-zinc-800 rounded-[12px] border border-gray-200 dark:border-zinc-700" aria-hidden="true" />
-              </div>
-            </div>
-          </div>
-
-        </div>
-      </div>
-    </div>
+  const overview = useMemo(
+    () =>
+      buildOperationalOverview(schedules, players, clientsCount, systemHealth, playbackLogs),
+    [schedules, players, clientsCount, systemHealth, playbackLogs]
   );
-}
+
+  const broadcastActivity = useMemo(
+    () =>
+      buildBroadcastActivitySummary(
+        activityLogs,
+        schedules,
+        playbackLogs,
+        players,
+        systemHealth?.heartbeatSuccessRate
+      ),
+    [activityLogs, schedules, playbackLogs, players, systemHealth?.heartbeatSuccessRate]
+  );
+
+  const livePlayers = useMemo(() => buildLivePlayerRows(players), [players]);
+  const venueInsights = useMemo(
+    () => buildVenueInsights(players, playbackLogs),
+    [players, playbackLogs]
+  );
+  const activityTimeline = useMemo(
+    () => buildActivityTimeline(activityLogs, players, media, schedules),
+    [activityLogs, players, media, schedules]
+  );
+  const scheduleSnapshot = useMemo(
+    () => buildScheduleSnapshot(schedules, players),
+    [schedules, players]
+  );
+  const playerInsights = useMemo(
+    () => buildPlayerInsights(players, playbackLogs),
+    [players, playbackLogs]
+  );
+  const audioInsights = useMemo(
+    () => buildAudioInsights(media, schedules, playbackLogs),
+    [media, schedules, playbackLogs]
+  );
+  const systemAlerts = useMemo(
+    () => buildSystemAlerts(systemHealth, players, playbackLogs),
+    [systemHealth, players, playbackLogs]
+  );
+
+  const liveSummary = useMemo(
+    () => buildLiveSummary(players, systemHealth, playbackLogs),
+    [players, systemHealth, playbackLogs]
+  );
+
+  if (isLoading) {
+    return <DashboardSkeleton />;
+  }
 
   return (
-    <div className="flex-1 overflow-auto bg-white dark:bg-zinc-900">
-      {error && (
-        <div className="mx-8 mt-6 p-3 rounded-lg bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900/50 text-sm text-red-800 dark:text-red-300">
-          {error}
-        </div>
-      )}
+    <div className={dashboardPageClass}>
+      <div className={dashboardContainerClass}>
+        {error && (
+          <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-900/50 dark:bg-rose-950/30 dark:text-rose-300">
+            {error}
+          </div>
+        )}
 
-  <DashboardHeader stats={quickStats} showStats={true} />
+        <DashboardHero players={players} schedules={schedules} media={media} />
 
-      <div className="p-4 ">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 space-y-6">
-            <LivePlayerStatus players={livePlayers} />
-            <RecentActivityFeed activities={recentActivity} />
+        <OperationalMetricsStrip overview={overview} />
+
+        <div className={dashboardCommandLayout}>
+          <div className={dashboardMainColumn}>
+            <BroadcastActivity summary={broadcastActivity} />
+            <LiveOperations players={livePlayers} />
+            <ActivityTimeline activities={activityTimeline} />
+                                <PlayerInsights data={playerInsights} />
+                                          <AudioInsights data={audioInsights} />
+
+
           </div>
 
-          <div className="space-y-6">
-            <SystemAlerts
-              alerts={
-                systemHealth && !systemHealth.ok
-                  ? [
-                      {
-                        id: "health-1",
-                        severity: "warning",
-                        title: "System Health Degraded",
-                        message: `${systemHealth.offlinePlayers || 0} players offline`,
-                      },
-                    ]
-                  : []
-              }
-              isLoading={isLoading}
+          <aside className={dashboardSidebarColumn}>
+            <OperationsOverview
+              alerts={systemAlerts}
+              liveSummary={liveSummary}
+              upcoming={scheduleSnapshot}
             />
-            <UpcomingBroadcasts broadcasts={upcomingBroadcasts} />
-            <QuickActions />
-          </div>
+            <ScheduleSnapshot items={scheduleSnapshot} />
+            
+            <VenueInsights venues={venueInsights} />
+          </aside>
         </div>
+
+
       </div>
     </div>
   );
 }
-

@@ -3,7 +3,7 @@ import type { ApiClient } from "@/lib/api-client";
 import type { WorkspaceClientOption } from "@/lib/workspace-clients";
 import { isAllClientsSelection } from "@/lib/workspace-clients";
 import type { ScheduleEventCard } from "@/app/schedule/components/EventCard";
-import { shortDayFromDate } from "@/lib/schedule-calendar";
+import { formatLocalIsoDate, shortDayFromDate } from "@/lib/schedule-calendar";
 import {
   FRENCH_DEMO_PLAYER_REGISTRY,
   frenchDemoEnterpriseWorkspaceClients,
@@ -43,7 +43,7 @@ export function scheduleEntryToEventCard(entry: ScheduleEntry): ScheduleEventCar
     trackCount: entry.trackCount ?? undefined,
     roomId: entry.playerId,
     day: shortDayFromDate(startDate),
-    calendarDate: startDate.toISOString().slice(0, 10),
+    calendarDate: formatLocalIsoDate(startDate),
     time: startDate.toLocaleTimeString("en-US", {
       hour: "2-digit",
       minute: "2-digit",

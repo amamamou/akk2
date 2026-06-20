@@ -46,7 +46,7 @@ export default function QuickStatsGrid({ stats }: { stats: QuickStat[] }) {
 						className={
 							`relative overflow-hidden rounded-2xl px-6 py-6 flex flex-col transition-all h-[200px] ` +
 							(isFirst
-								? `bg-[linear-gradient(135deg,#111827_0%,#A473FF_100%)] text-white shadow-[0_8px_30px_rgba(0,0,0,0.04)]`
+								? `bg-[linear-gradient(135deg,#18181B_0%,#202538_38%,#A473FF_100%)] text-white shadow-[0_8px_30px_rgba(0,0,0,0.04)]`
 								: `bg-white dark:bg-zinc-900 border border-gray-100 dark:border-zinc-800 text-gray-900 dark:text-gray-100 shadow-[0_8px_30px_rgba(0,0,0,0.04)] dark:shadow-none`)
 						}
 					>

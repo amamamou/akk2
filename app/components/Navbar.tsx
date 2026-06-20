@@ -114,14 +114,7 @@ export default function Navbar() {
           </div>
 
           <div className="flex items-center justify-end gap-2 lg:gap-3">
-            <button
-              type="button"
-              onClick={toggleDarkMode}
-              aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
-              className="flex h-9 w-9 items-center justify-center rounded-full bg-[#F4F4F5] dark:bg-zinc-900 text-zinc-600 dark:text-zinc-300 transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-800"
-            >
-              {theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
-            </button>
+     
 
             <div className="hidden lg:flex items-center gap-2 rounded-full bg-[#F4F4F5] dark:bg-zinc-900 px-2 py-1">
               <button
