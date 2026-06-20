@@ -1,28 +1,81 @@
 "use client";
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Plus, Music, AlertCircle } from "lucide-react";
+import { AlertCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
 import PlaylistCard from "../components/PlaylistCard";
 import PlaylistModal from "../components/PlaylistModal";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import type { Playlist } from "../components/PlaylistModal";
-import AudioToolbar from "../components/AudioToolbar";
 import { getApiClient } from "@/lib/api-client";
 import { apiPlaylistToUi, isValidPlaylistId } from "@/lib/playlist-mapper";
+import { dashboardContainerClass, dashboardPageClass } from "@/app/dashboard/dashboard-styles";
+import { cn } from "@/utils/cn";
+import PlaylistsHero from "./components/PlaylistsHero";
+import PlaylistsToolbar, {
+  PlaylistsResultsSummary,
+  PlaylistsSearch,
+  type PlaylistFilterKey,
+  type PlaylistSortKey,
+} from "./components/PlaylistsToolbar";
+import { PlaylistGridSkeleton } from "./components/PlaylistCardSkeleton";
+import PlaylistsEmptyState from "./components/PlaylistsEmptyState";
+import PlaylistsPagination from "./components/PlaylistsPagination";
 
 const PLAYLISTS_STORAGE_KEY = "aa_playlists";
+
+function sortPlaylists(
+  items: Playlist[],
+  sort: PlaylistSortKey,
+  loadOrder: Map<string, number>
+): Playlist[] {
+  const sorted = [...items];
+
+  switch (sort) {
+    case "updated-desc":
+      sorted.sort(
+        (a, b) =>
+          new Date(b.lastModified).getTime() - new Date(a.lastModified).getTime()
+      );
+      break;
+    case "created-desc":
+      sorted.sort(
+        (a, b) => (loadOrder.get(a.id) ?? 0) - (loadOrder.get(b.id) ?? 0)
+      );
+      break;
+    case "name-asc":
+      sorted.sort((a, b) => a.title.localeCompare(b.title));
+      break;
+    case "name-desc":
+      sorted.sort((a, b) => b.title.localeCompare(a.title));
+      break;
+    case "tracks-desc":
+      sorted.sort((a, b) => b.trackCount - a.trackCount);
+      break;
+    case "tracks-asc":
+      sorted.sort((a, b) => a.trackCount - b.trackCount);
+      break;
+  }
+
+  return sorted;
+}
 
 export default function LibraryPlaylistsClient() {
   const apiClient = getApiClient();
   const router = useRouter();
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
+  const [loadOrder, setLoadOrder] = useState<Map<string, number>>(new Map());
   const [playlistModalOpen, setPlaylistModalOpen] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
-  const [selectedPlaylistForDelete, setSelectedPlaylistForDelete] = useState<Playlist | null>(null);
+  const [selectedPlaylistForDelete, setSelectedPlaylistForDelete] = useState<Playlist | null>(
+    null
+  );
   const [query, setQuery] = useState("");
+  const [sort, setSort] = useState<PlaylistSortKey>("updated-desc");
+  const [filter, setFilter] = useState<PlaylistFilterKey>("all");
 
   const persistCache = useCallback((items: Playlist[]) => {
     try {
@@ -36,14 +89,22 @@ export default function LibraryPlaylistsClient() {
     }
   }, []);
 
-  const loadPlaylists = useCallback(async () => {
-    setLoading(true);
+  const loadPlaylists = useCallback(async (options?: { refresh?: boolean }) => {
+    const isRefresh = options?.refresh === true;
+    if (isRefresh) {
+      setRefreshing(true);
+    } else {
+      setLoading(true);
+    }
     setError(null);
     try {
       const res = await apiClient.listPlaylists();
       const mapped = (res.playlists ?? [])
         .map((p) => apiPlaylistToUi(p))
         .filter((p): p is Playlist => p !== null);
+      const order = new Map<string, number>();
+      mapped.forEach((p, i) => order.set(p.id, i));
+      setLoadOrder(order);
       setPlaylists(mapped);
       persistCache(mapped);
     } catch (err) {
@@ -53,18 +114,28 @@ export default function LibraryPlaylistsClient() {
         if (raw) {
           const parsed = JSON.parse(raw) as Playlist[];
           if (Array.isArray(parsed)) {
-            setPlaylists(
-              parsed.filter((p) => isValidPlaylistId(p?.id))
-            );
+            const cached = parsed.filter((p) => isValidPlaylistId(p?.id));
+            const order = new Map<string, number>();
+            cached.forEach((p, i) => order.set(p.id, i));
+            setLoadOrder(order);
+            setPlaylists(cached);
           }
         }
       } catch {
         /* ignore */
       }
     } finally {
-      setLoading(false);
+      if (isRefresh) {
+        setRefreshing(false);
+      } else {
+        setLoading(false);
+      }
     }
   }, [apiClient, persistCache]);
+
+  const handleRefresh = useCallback(() => {
+    void loadPlaylists({ refresh: true });
+  }, [loadPlaylists]);
 
   useEffect(() => {
     void loadPlaylists();
@@ -72,19 +143,36 @@ export default function LibraryPlaylistsClient() {
 
   const filteredPlaylists = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return playlists;
-    return playlists.filter(
-      (p) =>
-        p.title.toLowerCase().includes(q) ||
-        (p.description ?? "").toLowerCase().includes(q)
-    );
-  }, [playlists, query]);
+    let items = playlists;
+
+    if (q) {
+      items = items.filter(
+        (p) =>
+          p.title.toLowerCase().includes(q) ||
+          (p.description ?? "").toLowerCase().includes(q)
+      );
+    }
+
+    if (filter === "has-tracks") {
+      items = items.filter((p) => p.trackCount > 0);
+    } else if (filter === "empty") {
+      items = items.filter((p) => p.trackCount === 0);
+    }
+
+    return sortPlaylists(items, sort, loadOrder);
+  }, [playlists, query, filter, sort, loadOrder]);
 
   const [page, setPage] = useState(1);
   const [perPage, setPerPage] = useState(5);
   const perPageOptions = [5, 10, 20, 50];
   const filteredCount = filteredPlaylists.length;
+  const totalCount = playlists.length;
   const totalPages = Math.max(1, Math.ceil(filteredCount / perPage));
+  const hasActiveFilters = filter !== "all" || query.trim().length > 0;
+
+  useEffect(() => {
+    setPage(1);
+  }, [query, sort, filter]);
 
   useEffect(() => {
     if (page > totalPages) setPage(totalPages);
@@ -104,142 +192,114 @@ export default function LibraryPlaylistsClient() {
     router.push(`/library/playlists/${id}`);
   };
 
+  const clearFilters = () => {
+    setQuery("");
+    setFilter("all");
+  };
+
+  const showEmptyNoPlaylists = !loading && totalCount === 0;
+  const showEmptyNoResults =
+    !loading && totalCount > 0 && filteredCount === 0;
+
   return (
-    <div className="flex-1 flex flex-col overflow-hidden bg-white dark:bg-zinc-900">
-      <div className="sticky top-0 z-10 bg-white dark:bg-zinc-900">
-        <div className="px-8 py-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">Playlists</h1>
-              <p className="mt-1 text-sm text-gray-500 dark:text-zinc-400">
-                Create and manage playback programs for your spaces
-              </p>
-            </div>
+    <div className={dashboardPageClass}>
+      <div className={dashboardContainerClass}>
+        <PlaylistsHero
+          onCreateClick={() => setPlaylistModalOpen(true)}
+          searchSlot={<PlaylistsSearch query={query} setQuery={setQuery} />}
+        />
 
-            <button
-              type="button"
-              onClick={() => setPlaylistModalOpen(true)}
-              className={
-                `group inline-flex items-center gap-3 h-12 px-5 bg-white dark:bg-zinc-900/40 text-gray-900 dark:text-gray-100 font-medium text-sm rounded-2xl border border-gray-100 dark:border-zinc-800 shadow-[0_8px_30px_rgba(0,0,0,0.04)] dark:shadow-none transition-all hover:shadow-lg hover:translate-y-0.5 cursor-pointer`
-              }
-            >
-              <span className="inline-flex items-center justify-center transition-colors">
-                <Plus size={16} strokeWidth={1.9} className="text-zinc-500 group-hover:text-[#A473FF] transition-colors" />
-              </span>
-
-              <span>New playlist</span>
-            </button>
+        {error && (
+          <div className="flex items-center gap-2 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-200">
+            <AlertCircle size={16} className="shrink-0" />
+            <span>{error}</span>
           </div>
-        </div>
-      </div>
+        )}
 
-      <div className="flex-1 overflow-auto bg-white dark:bg-zinc-900">
-        <div className="px-6 py-6">
+        {!showEmptyNoPlaylists && (
+          <PlaylistsToolbar
+            query={query}
+            setQuery={setQuery}
+            sort={sort}
+            setSort={setSort}
+            filter={filter}
+            setFilter={setFilter}
+            onClearFilters={clearFilters}
+            onRefresh={handleRefresh}
+            refreshing={refreshing}
+          />
+        )}
+
+        {!loading && !showEmptyNoPlaylists && (
+          <PlaylistsResultsSummary
+            page={page}
+            perPage={perPage}
+            filteredCount={filteredCount}
+            totalCount={totalCount}
+            displayedCount={paginatedPlaylists.length}
+            hasActiveFilters={hasActiveFilters}
+          />
+        )}
+
+        {loading ? (
+          <PlaylistGridSkeleton count={perPage} />
+        ) : showEmptyNoPlaylists ? (
+          <PlaylistsEmptyState
+            variant="no-playlists"
+            onCreateClick={() => setPlaylistModalOpen(true)}
+          />
+        ) : showEmptyNoResults ? (
+          <PlaylistsEmptyState
+            variant="no-results"
+            onCreateClick={() => setPlaylistModalOpen(true)}
+            onClearFilters={clearFilters}
+          />
+        ) : (
           <div
-            className="
-              bg-white dark:bg-zinc-900/40
-              rounded-[28px]
-              border
-              border-gray-100 dark:border-zinc-800
-              shadow-[0_8px_30px_rgba(0,0,0,0.04)] dark:shadow-none
-              flex
-              flex-col
-              min-h-[calc(100vh-220px)]
-              overflow-hidden
-            "
+            className={cn(
+              "grid grid-cols-2 gap-x-5 gap-y-8 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5",
+              refreshing && "pointer-events-none opacity-60 transition-opacity"
+            )}
           >
-            <div className="p-6 flex-1 overflow-auto">
-
-              {error && (
-                <div className="mb-4 flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-                  <AlertCircle size={16} className="shrink-0" />
-                  <span>{error}</span>
-                </div>
-              )}
-
-              {loading ? (
-                <div className="animate-pulse">
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-                    {Array.from({ length: perPage || 6 }).map((_, i) => (
-                      <div key={i} className="h-36 bg-gray-200 dark:bg-zinc-800 rounded-xl border border-gray-200 dark:border-zinc-800" aria-hidden="true" />
-                    ))}
-                  </div>
-                </div>
-              ) : paginatedPlaylists.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-16">
-                  <div className="text-center space-y-4 max-w-sm">
-                    <div className="inline-flex items-center justify-center w-14 h-14 rounded-lg bg-gray-100 dark:bg-zinc-800">
-                      <Music size={28} className="text-gray-400 dark:text-zinc-500" />
-                    </div>
-                    <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">No playlists yet</h2>
-                    <p className="text-sm text-gray-600 dark:text-zinc-400">
-                      Create your first playlist to organize tracks for scheduling and playback.
-                    </p>
-                    <button
-                      type="button"
-                      onClick={() => setPlaylistModalOpen(true)}
-                      className="inline-flex items-center gap-2 rounded-md bg-[#A473FF] px-5 py-2.5 text-sm font-medium text-white hover:bg-[#7A42FF]"
-                    >
-                      <Plus size={16} />
-                      Create playlist
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-                  {paginatedPlaylists.map((playlist) => (
-                    <PlaylistCard
-                      key={playlist.id}
-                      playlist={playlist}
-                      onClick={() => navigateToPlaylist(playlist)}
-                      onEdit={async (id, newTitle) => {
-                        if (!newTitle?.trim()) return;
-                        try {
-                          await apiClient.updatePlaylist(id, { title: newTitle.trim() });
-                          await loadPlaylists();
-                        } catch {
-                          setPlaylists((prev) =>
-                            prev.map((pl) =>
-                              pl.id === id ? { ...pl, title: newTitle.trim() } : pl
-                            )
-                          );
-                        }
-                      }}
-                      onDelete={(id) => {
-                        const p = playlists.find((pl) => pl.id === id) || null;
-                        setSelectedPlaylistForDelete(p);
-                        setDeleteOpen(true);
-                      }}
-                    />
-                  ))}
-                </div>
-              )}
-
-            </div>
-
-            <div className="border-t border-gray-100">
-              {loading ? (
-                <div className="p-4">
-                  <div className="h-12 bg-gray-200 rounded-2xl border border-gray-200 w-full animate-pulse" aria-hidden="true" />
-                </div>
-              ) : (
-                <AudioToolbar
-                  query={query}
-                  setQuery={setQuery}
-                  filteredCount={filteredCount}
-                  totalCount={playlists.length}
-                  page={page}
-                  setPage={setPage}
-                  perPage={perPage}
-                  setPerPage={setPerPage}
-                  perPageOptions={perPageOptions}
-                  totalPages={totalPages}
-                  placeholder="Search by title, track."
-                />
-              )}
-            </div>
+            {paginatedPlaylists.map((playlist) => (
+              <PlaylistCard
+                key={playlist.id}
+                playlist={playlist}
+                onClick={() => navigateToPlaylist(playlist)}
+                onEdit={async (id, newTitle) => {
+                  if (!newTitle?.trim()) return;
+                  try {
+                    await apiClient.updatePlaylist(id, { title: newTitle.trim() });
+                    await loadPlaylists({ refresh: true });
+                  } catch {
+                    setPlaylists((prev) =>
+                      prev.map((pl) =>
+                        pl.id === id ? { ...pl, title: newTitle.trim() } : pl
+                      )
+                    );
+                  }
+                }}
+                onDelete={(id) => {
+                  const p = playlists.find((pl) => pl.id === id) || null;
+                  setSelectedPlaylistForDelete(p);
+                  setDeleteOpen(true);
+                }}
+              />
+            ))}
           </div>
-        </div>
+        )}
+
+        {!showEmptyNoPlaylists && (
+          <PlaylistsPagination
+            page={page}
+            setPage={setPage}
+            perPage={perPage}
+            setPerPage={setPerPage}
+            perPageOptions={perPageOptions}
+            totalPages={totalPages}
+            disabled={loading || refreshing}
+          />
+        )}
       </div>
 
       <PlaylistModal
@@ -255,7 +315,9 @@ export default function LibraryPlaylistsClient() {
             });
             const created = apiPlaylistToUi(res.playlist);
             if (!created || !isValidPlaylistId(created.id)) {
-              setError("Playlist was created but the server did not return an id. Refresh the list.");
+              setError(
+                "Playlist was created but the server did not return an id. Refresh the list."
+              );
               await loadPlaylists();
               return;
             }
@@ -264,12 +326,15 @@ export default function LibraryPlaylistsClient() {
               persistCache(next);
               return next;
             });
+            setLoadOrder((prev) => {
+              const next = new Map(prev);
+              next.set(created.id, -1);
+              return next;
+            });
             setPlaylistModalOpen(false);
             router.push(`/library/playlists/${created.id}`);
           } catch (err) {
-            setError(
-              err instanceof Error ? err.message : "Failed to create playlist"
-            );
+            setError(err instanceof Error ? err.message : "Failed to create playlist");
           }
         }}
       />
