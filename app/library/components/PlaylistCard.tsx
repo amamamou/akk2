@@ -5,7 +5,7 @@ import { Clock3, Disc3, Edit2, MoreHorizontal, Music, Trash2 } from "lucide-reac
 import { cn } from "@/utils/cn";
 import type { Playlist } from "./PlaylistModal";
 import { isValidPlaylistId } from "@/lib/playlist-mapper";
-import { dashboardAccentDot, dashboardIconChip } from "@/app/dashboard/dashboard-styles";
+import { dashboardAccentDot } from "@/app/dashboard/dashboard-styles";
 
 const coverGradients = {
   indigo: "from-indigo-500 via-indigo-600 to-indigo-900",
@@ -23,6 +23,16 @@ function resolveCoverGradient(color?: string | null): string {
     return coverGradients[color as CoverGradientKey];
   }
   return coverGradients.indigo;
+}
+
+function hasCustomCover(cover?: string | null): boolean {
+  if (!cover?.trim()) return false;
+  return (
+    cover.startsWith("http://") ||
+    cover.startsWith("https://") ||
+    cover.startsWith("data:") ||
+    cover.startsWith("/")
+  );
 }
 
 function formatRelativeDate(iso: string): string | null {
@@ -89,9 +99,7 @@ export default function PlaylistCard({
   }
 
   const gradientClass = resolveCoverGradient(playlist.coverColor);
-  const remoteCover =
-    typeof playlist.cover === "string" &&
-    (playlist.cover.startsWith("http://") || playlist.cover.startsWith("https://"));
+  const customCover = hasCustomCover(playlist.cover) && !coverError;
   const relativeUpdate = formatRelativeDate(playlist.lastModified);
 
   const openPlaylist = () => {
@@ -113,14 +121,15 @@ export default function PlaylistCard({
           if (e.key === "Enter") openPlaylist();
         }}
         className={cn(
-          "relative aspect-square w-full overflow-hidden rounded-2xl bg-gradient-to-br shadow-[0_8px_30px_rgba(0,0,0,0.04)] transition-all duration-200",
+          "relative aspect-square w-full overflow-hidden rounded-2xl shadow-[0_8px_30px_rgba(0,0,0,0.04)] transition-all duration-200",
           "ring-1 ring-gray-100 group-hover:ring-[#A473FF]/25 group-hover:shadow-[0_12px_40px_rgba(164,115,255,0.12)]",
           "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#A473FF]/40",
           "dark:ring-zinc-700/60 dark:group-hover:ring-[#A473FF]/30",
-          gradientClass
+          !customCover && "bg-gradient-to-br",
+          !customCover && gradientClass
         )}
       >
-        {remoteCover && !coverError ? (
+        {customCover ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={playlist.cover}
@@ -129,14 +138,14 @@ export default function PlaylistCard({
             className="h-full w-full object-cover"
           />
         ) : (
-          <div className="flex h-full w-full items-center justify-center bg-black/10">
-            <div className={cn(dashboardIconChip, "h-12 w-12 rounded-xl bg-white/10 ring-white/20")}>
-              <Music size={22} className="text-white/90" strokeWidth={1.8} />
-            </div>
+          <div className="flex h-full w-full items-center justify-center">
+            <Music size={28} className="text-white/85" strokeWidth={1.75} />
           </div>
         )}
 
-        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/35 via-transparent to-transparent opacity-80" />
+        {!customCover && (
+          <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/35 via-transparent to-transparent opacity-80" />
+        )}
 
         <div className="absolute bottom-3 left-3 right-3 flex items-end justify-between gap-2">
           <span className="inline-flex items-center gap-1 rounded-md bg-black/30 px-2 py-1 text-[10px] font-medium tabular-nums text-white/90 backdrop-blur-sm">
