@@ -784,9 +784,14 @@ export class ApiClient {
     return response.data;
   }
 
+  private playlistPath(playlistId: string, suffix = ""): string {
+    const id = encodeURIComponent(playlistId.trim());
+    return `/playlists/${id}${suffix}`;
+  }
+
   async getPlaylist(playlistId: string): Promise<PlaylistDetailResponse> {
     const response = await this.instance.get<PlaylistDetailResponse>(
-      `/playlists/${playlistId}`
+      this.playlistPath(playlistId)
     );
     return response.data;
   }
@@ -804,19 +809,20 @@ export class ApiClient {
     playlistId: string,
     data: PlaylistUpdateInput
   ): Promise<PlaylistDetailResponse> {
+    const body: Record<string, string | null | undefined> = {};
+    if (data.title !== undefined) body.title = data.title;
+    if (data.description !== undefined) body.description = data.description;
+    if (data.coverColor !== undefined) body.cover_color = data.coverColor;
+
     const response = await this.instance.put<PlaylistDetailResponse>(
-      `/playlists/${playlistId}`,
-      {
-        title: data.title,
-        description: data.description,
-        cover_color: data.coverColor,
-      }
+      this.playlistPath(playlistId),
+      body
     );
     return response.data;
   }
 
   async deletePlaylist(playlistId: string): Promise<{ ok: boolean; message?: string }> {
-    const response = await this.instance.delete(`/playlists/${playlistId}`);
+    const response = await this.instance.delete(this.playlistPath(playlistId));
     return response.data;
   }
 
@@ -825,7 +831,7 @@ export class ApiClient {
     data: PlaylistItemAddInput
   ): Promise<PlaylistDetailResponse> {
     const response = await this.instance.post<PlaylistDetailResponse>(
-      `/playlists/${playlistId}/items`,
+      this.playlistPath(playlistId, "/items"),
       { mediaId: data.mediaId, position: data.position }
     );
     return response.data;
@@ -835,8 +841,9 @@ export class ApiClient {
     playlistId: string,
     itemId: string
   ): Promise<PlaylistDetailResponse> {
+    const item = encodeURIComponent(itemId.trim());
     const response = await this.instance.delete<PlaylistDetailResponse>(
-      `/playlists/${playlistId}/items/${itemId}`
+      this.playlistPath(playlistId, `/items/${item}`)
     );
     return response.data;
   }

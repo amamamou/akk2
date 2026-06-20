@@ -1,0 +1,301 @@
+﻿
+=== PlaylistUpdate ===
+{
+  "properties": {
+    "title": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Title"
+    },
+    "description": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Description"
+    },
+    "cover_color": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Cover Color"
+    }
+  },
+  "type": "object",
+  "title": "PlaylistUpdate"
+}
+
+=== PlaylistItemAdd ===
+{
+  "properties": {
+    "mediaId": {
+      "type": "string",
+      "title": "Mediaid"
+    },
+    "position": {
+      "anyOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Position"
+    }
+  },
+  "type": "object",
+  "required": [
+    "mediaId"
+  ],
+  "title": "PlaylistItemAdd"
+}
+
+=== PlaylistTrackInfo ===
+{
+  "properties": {
+    "id": {
+      "type": "string",
+      "title": "Id"
+    },
+    "mediaId": {
+      "type": "string",
+      "title": "Mediaid"
+    },
+    "title": {
+      "type": "string",
+      "title": "Title"
+    },
+    "duration": {
+      "type": "integer",
+      "title": "Duration"
+    },
+    "position": {
+      "type": "integer",
+      "title": "Position"
+    }
+  },
+  "type": "object",
+  "required": [
+    "id",
+    "mediaId",
+    "title",
+    "duration",
+    "position"
+  ],
+  "title": "PlaylistTrackInfo"
+}
+
+=== PlaylistInfo ===
+{
+  "properties": {
+    "id": {
+      "type": "string",
+      "title": "Id"
+    },
+    "title": {
+      "type": "string",
+      "title": "Title"
+    },
+    "description": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Description"
+    },
+    "trackCount": {
+      "type": "integer",
+      "title": "Trackcount"
+    },
+    "totalDurationSeconds": {
+      "type": "integer",
+      "title": "Totaldurationseconds"
+    },
+    "totalDuration": {
+      "type": "string",
+      "title": "Totalduration"
+    },
+    "coverColor": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Covercolor",
+      "default": "indigo"
+    },
+    "lastModified": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Lastmodified"
+    },
+    "tracks": {
+      "items": {
+        "$ref": "#/components/schemas/PlaylistTrackInfo"
+      },
+      "type": "array",
+      "title": "Tracks",
+      "default": []
+    }
+  },
+  "type": "object",
+  "required": [
+    "id",
+    "title",
+    "trackCount",
+    "totalDurationSeconds",
+    "totalDuration"
+  ],
+  "title": "PlaylistInfo"
+}
+
+=== PlaylistDetailResponse ===
+{
+  "properties": {
+    "ok": {
+      "type": "boolean",
+      "title": "Ok"
+    },
+    "playlist": {
+      "$ref": "#/components/schemas/PlaylistInfo"
+    }
+  },
+  "type": "object",
+  "required": [
+    "ok",
+    "playlist"
+  ],
+  "title": "PlaylistDetailResponse"
+}
+
+=== PUT playlist ===
+{
+  "tags": [
+    "playlists"
+  ],
+  "summary": "Update Playlist",
+  "operationId": "update_playlist_v1_playlists__playlist_id__put",
+  "parameters": [
+    {
+      "name": "playlist_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+        "type": "string",
+        "title": "Playlist Id"
+      }
+    }
+  ],
+  "requestBody": {
+    "required": true,
+    "content": {
+      "application/json": {
+        "schema": {
+          "$ref": "#/components/schemas/PlaylistUpdate"
+        }
+      }
+    }
+  },
+  "responses": {
+    "200": {
+      "description": "Successful Response",
+      "content": {
+        "application/json": {
+          "schema": {
+            "$ref": "#/components/schemas/PlaylistDetailResponse"
+          }
+        }
+      }
+    },
+    "422": {
+      "description": "Validation Error",
+      "content": {
+        "application/json": {
+          "schema": {
+            "$ref": "#/components/schemas/HTTPValidationError"
+          }
+        }
+      }
+    }
+  }
+}
+
+=== DELETE item ===
+{
+  "tags": [
+    "playlists"
+  ],
+  "summary": "Remove Playlist Item",
+  "operationId": "remove_playlist_item_v1_playlists__playlist_id__items__item_id__delete",
+  "parameters": [
+    {
+      "name": "playlist_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+        "type": "string",
+        "title": "Playlist Id"
+      }
+    },
+    {
+      "name": "item_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+        "type": "string",
+        "title": "Item Id"
+      }
+    }
+  ],
+  "responses": {
+    "200": {
+      "description": "Successful Response",
+      "content": {
+        "application/json": {
+          "schema": {
+            "$ref": "#/components/schemas/PlaylistDetailResponse"
+          }
+        }
+      }
+    },
+    "422": {
+      "description": "Validation Error",
+      "content": {
+        "application/json": {
+          "schema": {
+            "$ref": "#/components/schemas/HTTPValidationError"
+          }
+        }
+      }
+    }
+  }
+}

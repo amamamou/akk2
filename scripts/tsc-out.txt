@@ -1,0 +1,6 @@
+﻿app/dashboard/components/DashboardSkeleton.tsx(173,7): error TS2322: Type 'boolean' is not assignable to type 'string'.
+app/dashboard/components/DashboardSkeleton.tsx(232,41): error TS2322: Type 'boolean' is not assignable to type 'string'.
+app/dashboard/components/DashboardSkeleton.tsx(304,7): error TS2322: Type 'boolean' is not assignable to type 'string'.
+app/dashboard/components/DashboardSkeleton.tsx(335,40): error TS2322: Type 'boolean' is not assignable to type 'string'.
+app/dashboard/components/DashboardSkeleton.tsx(358,41): error TS2322: Type 'boolean' is not assignable to type 'string'.
+app/dashboard/components/DashboardSkeleton.tsx(393,40): error TS2322: Type 'boolean' is not assignable to type 'string'.

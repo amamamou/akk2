@@ -12,6 +12,7 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  --animate-equalizer-bar: equalizer-bar 0.65s ease-in-out infinite;
 }
 
 .dark {
@@ -32,6 +33,18 @@ body {
   }
   50% {
     transform: scaleY(1.02);
+  }
+}
+
+@keyframes equalizer-bar {
+  0%, 100% {
+    transform: scaleY(0.2);
+  }
+  35% {
+    transform: scaleY(0.85);
+  }
+  65% {
+    transform: scaleY(0.45);
   }
 }
 

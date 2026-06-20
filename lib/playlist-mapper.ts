@@ -1,4 +1,4 @@
-import type { PlaylistApiInfo } from "@/types/api";
+import type { PlaylistApiInfo, PlaylistTrackInfo } from "@/types/api";
 import type { Playlist } from "@/app/library/components/PlaylistModal";
 
 /** Unified playlist id from API / cache payloads (always lowercase `id` first). */
@@ -53,6 +53,31 @@ function resolveTotalDuration(row: Record<string, unknown>): string {
     sumTrackSeconds(row.tracks);
 
   return seconds > 0 ? formatDurationFromSeconds(seconds) : "0m";
+}
+
+/** Normalize playlist item rows from API (supports camelCase and snake_case). */
+export function normalizePlaylistTrack(raw: unknown): PlaylistTrackInfo | null {
+  if (!raw || typeof raw !== "object") return null;
+  const row = raw as Record<string, unknown>;
+  const id = String(row.id ?? row.item_id ?? row.itemId ?? "").trim();
+  const mediaId = String(row.mediaId ?? row.media_id ?? "").trim();
+  if (!id || !mediaId) return null;
+  const duration = Number(row.duration ?? 0);
+  const position = Number(row.position ?? 0);
+  return {
+    id,
+    mediaId,
+    title: String(row.title ?? "Untitled"),
+    duration: Number.isFinite(duration) && duration >= 0 ? duration : 0,
+    position: Number.isFinite(position) && position >= 0 ? position : 0,
+  };
+}
+
+export function normalizePlaylistTracks(raw: unknown): PlaylistTrackInfo[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map(normalizePlaylistTrack)
+    .filter((t): t is PlaylistTrackInfo => t !== null);
 }
 
 export function apiPlaylistToUi(

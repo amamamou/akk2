@@ -1,16 +1,53 @@
 "use client";
 
-import React, { useCallback, useEffect, useState, useRef } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter, useParams } from "next/navigation";
-import { Music, Plus, Edit, Trash, Check, Loader2, X } from "lucide-react";
-import { cn } from "@/utils/cn";
+import { AlertCircle, Check } from "lucide-react";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import type { Playlist } from "../../components/PlaylistModal";
 import { getApiClient } from "@/lib/api-client";
+import { formatApiError } from "@/lib/format-api-error";
 import { queryKeys } from "@/lib/query-keys";
-import { apiPlaylistToUi, isValidPlaylistId } from "@/lib/playlist-mapper";
+import {
+  apiPlaylistToUi,
+  isValidPlaylistId,
+  normalizePlaylistTracks,
+} from "@/lib/playlist-mapper";
 import type { PlaylistTrackInfo } from "@/types/api";
+import {
+  dashboardContainerClass,
+  dashboardPageClass,
+} from "@/app/dashboard/dashboard-styles";
+import { cn } from "@/utils/cn";
+import PlaylistDetailSkeleton from "./components/PlaylistDetailSkeleton";
+import PlaylistDetailWorkspace from "./components/PlaylistDetailWorkspace";
+import EditPlaylistModal, { type CoverKey } from "./components/EditPlaylistModal";
+import AddTrackModal from "./components/AddTrackModal";
+import PreviewPlayer from "./components/PreviewPlayer";
+import type {
+  PreviewPlayerState,
+  TrackPreviewState,
+} from "./components/playlist-detail-types";
+
+function resolveCoverKey(color?: string | null): CoverKey {
+  const valid: CoverKey[] = ["slate", "indigo", "blue", "purple", "emerald"];
+  if (color && valid.includes(color as CoverKey)) return color as CoverKey;
+  return "indigo";
+}
+
+function syncPlaylistState(
+  res: { playlist: Parameters<typeof apiPlaylistToUi>[0] },
+  setters: {
+    setPlaylist: (p: Playlist | null) => void;
+    setTracks: (t: PlaylistTrackInfo[]) => void;
+  }
+) {
+  const ui = apiPlaylistToUi(res.playlist);
+  setters.setPlaylist(ui);
+  setters.setTracks(normalizePlaylistTracks(res.playlist.tracks));
+  return ui;
+}
 
 export default function PlaylistDetailClient({
   playlistId: playlistIdProp,
@@ -32,28 +69,88 @@ export default function PlaylistDetailClient({
     : isValidPlaylistId(routeId)
       ? routeId
       : "";
+
   const [playlist, setPlaylist] = useState<Playlist | null>(null);
   const [tracks, setTracks] = useState<PlaylistTrackInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [editSaved, setEditSaved] = useState(false);
   const [mediaPickerOpen, setMediaPickerOpen] = useState(false);
-  const [mediaOptions, setMediaOptions] = useState<{ id: string; title: string }[]>([]);
-  const [isEditing, setIsEditing] = useState(false);
+  const [mediaPickerLoading, setMediaPickerLoading] = useState(false);
+  const [initialMediaIdsOnOpen, setInitialMediaIdsOnOpen] = useState<Set<string>>(() => new Set());
+  const [mediaOptions, setMediaOptions] = useState<
+    { id: string; title: string; duration?: string }[]
+  >([]);
+  const [mediaUrlById, setMediaUrlById] = useState<Record<string, string>>({});
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
+  const [coverColor, setCoverColor] = useState<CoverKey>("indigo");
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
+  const [successToast, setSuccessToast] = useState<string | null>(null);
+  const [addingMediaId, setAddingMediaId] = useState<string | null>(null);
+  const [removingItemId, setRemovingItemId] = useState<string | null>(null);
+  const [trackQuery, setTrackQuery] = useState("");
   const titleRef = useRef<HTMLInputElement | null>(null);
+
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const tickRafRef = useRef<number | null>(null);
+  const activeTrackIdRef = useRef<string | null>(null);
+  const [activeTrackId, setActiveTrackId] = useState<string | null>(null);
+  const [playbackRevision, setPlaybackRevision] = useState(0);
+
+  const setActiveTrack = useCallback((trackId: string | null) => {
+    activeTrackIdRef.current = trackId;
+    setActiveTrackId(trackId);
+  }, []);
+
+  const syncPlaybackState = useCallback(() => {
+    setPlaybackRevision((n) => n + 1);
+  }, []);
+
+  /** Authoritative playback flag — always read from the audio element. */
+  const isAudioPlaying = useCallback(() => {
+    const audio = audioRef.current;
+    return (
+      activeTrackIdRef.current != null &&
+      audio != null &&
+      !audio.paused &&
+      !audio.ended
+    );
+  }, []);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const [streamError, setStreamError] = useState<string | null>(null);
+  const [errorTrackId, setErrorTrackId] = useState<string | null>(null);
+  const [volume, setVolume] = useState(0.85);
 
   const DUPLICATE_TRACK_MESSAGE =
     "This audio track is already present inside this playlist.";
+
+  const activePlaylistId = playlist?.id ?? playlistId;
 
   useEffect(() => {
     if (!toast) return;
     const timer = window.setTimeout(() => setToast(null), 4000);
     return () => window.clearTimeout(timer);
   }, [toast]);
+
+  useEffect(() => {
+    if (!successToast) return;
+    const timer = window.setTimeout(() => setSuccessToast(null), 3500);
+    return () => window.clearTimeout(timer);
+  }, [successToast]);
+
+  useEffect(() => {
+    if (!streamError) return;
+    const timer = window.setTimeout(() => {
+      setStreamError(null);
+      setErrorTrackId(null);
+    }, 5000);
+    return () => window.clearTimeout(timer);
+  }, [streamError]);
 
   const playlistQuery = useQuery({
     queryKey: queryKeys.playlist(playlistId ?? ""),
@@ -67,368 +164,524 @@ export default function PlaylistDetailClient({
   });
 
   const invalidatePlaylistQueries = useCallback(async () => {
-    if (!isValidPlaylistId(playlistId)) return;
-    await queryClient.invalidateQueries({ queryKey: queryKeys.playlist(playlistId) });
+    if (!isValidPlaylistId(activePlaylistId)) return;
+    await queryClient.invalidateQueries({ queryKey: queryKeys.playlist(activePlaylistId) });
     await queryClient.invalidateQueries({ queryKey: queryKeys.playlists() });
-  }, [playlistId, queryClient]);
+  }, [activePlaylistId, queryClient]);
+
+  type UpdatePayload = {
+    playlistId: string;
+    title: string;
+    description: string;
+    coverColor: CoverKey;
+  };
 
   const updatePlaylistMutation = useMutation({
-    mutationFn: (data: { title: string; description: string }) =>
-      apiClient.updatePlaylist(playlistId, data),
+    mutationFn: (payload: UpdatePayload) =>
+      apiClient.updatePlaylist(payload.playlistId, {
+        title: payload.title,
+        description: payload.description,
+        coverColor: payload.coverColor,
+      }),
     onSuccess: () => void invalidatePlaylistQueries(),
   });
 
   const addPlaylistItemMutation = useMutation({
-    mutationFn: (mediaId: string) =>
-      apiClient.addPlaylistItem(playlistId, { mediaId }),
+    mutationFn: (payload: { playlistId: string; mediaId: string }) =>
+      apiClient.addPlaylistItem(payload.playlistId, { mediaId: payload.mediaId }),
     onSuccess: () => void invalidatePlaylistQueries(),
   });
 
   const removePlaylistItemMutation = useMutation({
-    mutationFn: (itemId: string) =>
-      apiClient.removePlaylistItem(playlistId, itemId),
+    mutationFn: (payload: { playlistId: string; itemId: string }) =>
+      apiClient.removePlaylistItem(payload.playlistId, payload.itemId),
     onSuccess: () => void invalidatePlaylistQueries(),
   });
 
   useEffect(() => {
     if (!playlistQuery.data) {
       if (playlistQuery.error) {
-        setError(
-          playlistQuery.error instanceof Error
-            ? playlistQuery.error.message
-            : "Failed to load playlist"
-        );
+        setError(formatApiError(playlistQuery.error, "Failed to load playlist"));
         setPlaylist(null);
       }
       setLoading(playlistQuery.isPending);
       return;
     }
-    const ui = apiPlaylistToUi(playlistQuery.data.playlist);
+    const ui = syncPlaylistState(playlistQuery.data, { setPlaylist, setTracks });
     if (!ui) {
       setError("Playlist response is missing an id.");
       setPlaylist(null);
       setLoading(false);
       return;
     }
-    setPlaylist(ui);
-    setTracks(playlistQuery.data.playlist.tracks ?? []);
     setName(ui.title);
     setDescription(ui.description ?? "");
+    setCoverColor(resolveCoverKey(ui.coverColor));
     setLoading(false);
     setError(null);
   }, [playlistQuery.data, playlistQuery.error, playlistQuery.isPending]);
 
   useEffect(() => {
-    if (!isEditing) return;
+    if (!editOpen) return;
+    setEditSaved(false);
     const t = setTimeout(() => {
       titleRef.current?.focus();
       titleRef.current?.select?.();
     }, 50);
     return () => clearTimeout(t);
-  }, [isEditing]);
+  }, [editOpen]);
+
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    const scheduleTimeUpdate = () => {
+      if (tickRafRef.current != null) return;
+      tickRafRef.current = window.requestAnimationFrame(() => {
+        tickRafRef.current = null;
+        setCurrentTime(audio.currentTime);
+        syncPlaybackState();
+      });
+    };
+
+    const syncDuration = () => {
+      setDuration(Number.isFinite(audio.duration) ? audio.duration : 0);
+    };
+
+    const onEnded = () => {
+      setActiveTrack(null);
+      setCurrentTime(0);
+      audio.currentTime = 0;
+      syncPlaybackState();
+    };
+    const onError = () => {
+      setStreamError("Unable to load or play this audio stream");
+      setErrorTrackId(activeTrackIdRef.current);
+      syncPlaybackState();
+    };
+
+    audio.addEventListener("timeupdate", scheduleTimeUpdate);
+    audio.addEventListener("loadedmetadata", syncDuration);
+    audio.addEventListener("durationchange", syncDuration);
+    audio.addEventListener("play", syncPlaybackState);
+    audio.addEventListener("playing", syncPlaybackState);
+    audio.addEventListener("pause", syncPlaybackState);
+    audio.addEventListener("ended", onEnded);
+    audio.addEventListener("error", onError);
+
+    return () => {
+      audio.removeEventListener("timeupdate", scheduleTimeUpdate);
+      audio.removeEventListener("loadedmetadata", syncDuration);
+      audio.removeEventListener("durationchange", syncDuration);
+      audio.removeEventListener("play", syncPlaybackState);
+      audio.removeEventListener("playing", syncPlaybackState);
+      audio.removeEventListener("pause", syncPlaybackState);
+      audio.removeEventListener("ended", onEnded);
+      audio.removeEventListener("error", onError);
+      if (tickRafRef.current != null) {
+        window.cancelAnimationFrame(tickRafRef.current);
+      }
+    };
+  }, [setActiveTrack, syncPlaybackState]);
+
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (audio) audio.volume = volume;
+  }, [volume]);
+
+  const stopPreview = useCallback(() => {
+    const audio = audioRef.current;
+    if (audio) {
+      audio.pause();
+      audio.currentTime = 0;
+    }
+    setActiveTrack(null);
+    setCurrentTime(0);
+    setDuration(0);
+    setStreamError(null);
+    setErrorTrackId(null);
+    syncPlaybackState();
+  }, [setActiveTrack, syncPlaybackState]);
+
+  const hydrateMediaCatalog = useCallback(
+    async (res: Awaited<ReturnType<typeof apiClient.listMedia>>) => {
+      const urls: Record<string, string> = {};
+      const options = (res.media ?? []).map((m) => {
+        if (m.url) urls[m.id] = m.url;
+        return {
+          id: m.id,
+          title: m.title || "Untitled",
+          duration: m.duration,
+        };
+      });
+      setMediaUrlById((prev) => ({ ...prev, ...urls }));
+      setMediaOptions(options);
+      return options;
+    },
+    []
+  );
+
+  const ensureMediaUrls = useCallback(async () => {
+    if (Object.keys(mediaUrlById).length > 0) return mediaUrlById;
+    const res = await apiClient.listMedia();
+    const urls: Record<string, string> = {};
+    for (const m of res.media ?? []) {
+      if (m.url) urls[m.id] = m.url;
+    }
+    setMediaUrlById((prev) => ({ ...prev, ...urls }));
+    return urls;
+  }, [apiClient, mediaUrlById]);
 
   const openMediaPicker = async () => {
+    audioRef.current?.pause();
+    syncPlaybackState();
+    setInitialMediaIdsOnOpen(new Set(tracks.map((t) => t.mediaId)));
+    setMediaPickerOpen(true);
+    setMediaPickerLoading(true);
     try {
       const res = await apiClient.listMedia();
-      setMediaOptions(
-        (res.media ?? []).map((m) => ({ id: m.id, title: m.title || "Untitled" }))
-      );
-      setMediaPickerOpen(true);
-    } catch {
-      setError("Could not load media library");
+      await hydrateMediaCatalog(res);
+    } catch (err) {
+      setError(formatApiError(err, "Could not load media library"));
+      setMediaPickerOpen(false);
+    } finally {
+      setMediaPickerLoading(false);
     }
   };
 
   async function saveChanges() {
-    if (!playlist) return;
+    if (!playlist || !isValidPlaylistId(activePlaylistId)) return;
     const trimmed = name.trim();
     const descTrim = description.trim();
     setSaving(true);
+    setEditSaved(false);
     try {
       const res = await updatePlaylistMutation.mutateAsync({
+        playlistId: activePlaylistId,
         title: trimmed || playlist.title,
         description: descTrim,
+        coverColor,
       });
-      const ui = apiPlaylistToUi(res.playlist);
-      setPlaylist(ui);
-      setTracks(res.playlist.tracks ?? []);
-      setIsEditing(false);
+      syncPlaylistState(res, { setPlaylist, setTracks });
+      setEditSaved(true);
+      setSuccessToast("Playlist updated");
+      setTimeout(() => setEditOpen(false), 600);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to save");
+      setError(formatApiError(err, "Failed to save playlist"));
     } finally {
       setSaving(false);
     }
   }
 
   async function removeTrack(itemId: string) {
+    if (!isValidPlaylistId(activePlaylistId)) {
+      setError("Cannot remove track — playlist ID is missing.");
+      return;
+    }
+    if (!itemId?.trim()) {
+      setError("Cannot remove track — invalid item ID from server.");
+      return;
+    }
+
+    if (activeTrackId === itemId) {
+      stopPreview();
+    }
+    setRemovingItemId(itemId);
     try {
-      const res = await removePlaylistItemMutation.mutateAsync(itemId);
-      const ui = apiPlaylistToUi(res.playlist);
-      setPlaylist(ui);
-      setTracks(res.playlist.tracks ?? []);
+      const res = await removePlaylistItemMutation.mutateAsync({
+        playlistId: activePlaylistId,
+        itemId,
+      });
+      syncPlaylistState(res, { setPlaylist, setTracks });
+      setSuccessToast("Track removed");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to remove track");
+      setError(formatApiError(err, "Failed to remove track"));
+    } finally {
+      setRemovingItemId(null);
     }
   }
 
   async function addTrack(mediaId: string) {
-    if (tracks.some((t) => t.mediaId === mediaId)) {
-      setToast(DUPLICATE_TRACK_MESSAGE);
-      return;
-    }
+    if (!isValidPlaylistId(activePlaylistId)) return;
+    if (tracks.some((t) => t.mediaId === mediaId)) return;
+
+    setAddingMediaId(mediaId);
     try {
-      const res = await addPlaylistItemMutation.mutateAsync(mediaId);
-      const ui = apiPlaylistToUi(res.playlist);
-      setPlaylist(ui);
-      setTracks(res.playlist.tracks ?? []);
-      setMediaPickerOpen(false);
+      const res = await addPlaylistItemMutation.mutateAsync({
+        playlistId: activePlaylistId,
+        mediaId,
+      });
+      syncPlaylistState(res, { setPlaylist, setTracks });
     } catch (err: unknown) {
-      const ax = err as { response?: { status?: number; data?: { error?: string } } };
+      const ax = err as { response?: { status?: number } };
       if (ax.response?.status === 409) {
         setToast(DUPLICATE_TRACK_MESSAGE);
         return;
       }
-      setError(
-        ax.response?.data?.error ??
-          (err instanceof Error ? err.message : "Failed to add track")
-      );
+      setError(formatApiError(err, "Failed to add track"));
+    } finally {
+      setAddingMediaId(null);
     }
   }
 
+  const resolveTrackUrl = useCallback(
+    async (track: PlaylistTrackInfo): Promise<string | null> => {
+      let urls = mediaUrlById;
+      if (!urls[track.mediaId]) {
+        try {
+          urls = await ensureMediaUrls();
+        } catch (err) {
+          setStreamError(formatApiError(err, "Could not load audio library"));
+          setErrorTrackId(track.id);
+          setActiveTrack(track.id);
+          syncPlaybackState();
+          return null;
+        }
+      }
+      const url = urls[track.mediaId]?.trim();
+      if (!url) {
+        setStreamError("No audio URL available for this track");
+        setErrorTrackId(track.id);
+        setActiveTrack(track.id);
+        syncPlaybackState();
+        return null;
+      }
+      return url;
+    },
+    [ensureMediaUrls, mediaUrlById, setActiveTrack, syncPlaybackState]
+  );
+
+  const handlePreviewLaunch = useCallback(
+    async (track: PlaylistTrackInfo) => {
+      if (activeTrackIdRef.current === track.id) return;
+
+      const url = await resolveTrackUrl(track);
+      if (!url) return;
+
+      const audio = audioRef.current;
+      if (!audio) return;
+
+      setStreamError(null);
+      setErrorTrackId(null);
+
+      audio.src = url;
+      setActiveTrack(track.id);
+      setCurrentTime(0);
+      setDuration(0);
+
+      try {
+        await audio.play();
+        syncPlaybackState();
+      } catch {
+        setStreamError("Playback blocked or stream unavailable");
+        setErrorTrackId(track.id);
+        setActiveTrack(track.id);
+        syncPlaybackState();
+      }
+    },
+    [resolveTrackUrl, setActiveTrack, syncPlaybackState]
+  );
+
+  const handlePreviewPlayPause = useCallback(() => {
+    const audio = audioRef.current;
+    if (!audio || activeTrackIdRef.current == null) return;
+    if (isAudioPlaying()) {
+      audio.pause();
+    } else {
+      void audio.play().catch(() => {
+        setStreamError("Playback blocked or stream unavailable");
+      });
+    }
+    syncPlaybackState();
+  }, [isAudioPlaying, syncPlaybackState]);
+
+  const handlePreviewSeek = useCallback(
+    (time: number) => {
+      const audio = audioRef.current;
+      if (!audio || activeTrackIdRef.current == null) return;
+      audio.currentTime = Math.max(0, Math.min(time, duration || audio.duration || 0));
+      setCurrentTime(audio.currentTime);
+      syncPlaybackState();
+    },
+    [duration, syncPlaybackState]
+  );
+
+  const handleVolumeChange = useCallback((next: number) => {
+    setVolume(next);
+  }, []);
+
+  const getPreviewForTrack = useCallback(
+    (trackId: string): TrackPreviewState | undefined => {
+      const isPreviewing = activeTrackId === trackId || errorTrackId === trackId;
+      if (!isPreviewing) return undefined;
+
+      return {
+        isPreviewing: true,
+        isPlaying: activeTrackId === trackId && isAudioPlaying(),
+        streamError: errorTrackId === trackId ? streamError : null,
+      };
+    },
+    [activeTrackId, errorTrackId, isAudioPlaying, playbackRevision, streamError]
+  );
+
+  const previewPlayerState = useMemo((): PreviewPlayerState | null => {
+    if (!activeTrackId) return null;
+    const track = tracks.find((t) => t.id === activeTrackId);
+    if (!track) return null;
+
+    const dur = duration > 0 ? duration : 0;
+    const progressPercent =
+      dur > 0 ? Math.min(100, (currentTime / dur) * 100) : 0;
+
+    return {
+      trackTitle: track.title,
+      isPlaying: isAudioPlaying(),
+      currentTime,
+      duration: dur,
+      progressPercent,
+      streamError: errorTrackId === activeTrackId ? streamError : null,
+    };
+  }, [
+    activeTrackId,
+    currentTime,
+    duration,
+    errorTrackId,
+    isAudioPlaying,
+    playbackRevision,
+    streamError,
+    tracks,
+  ]);
+
+  const existingMediaIds = useMemo(
+    () => new Set(tracks.map((t) => t.mediaId)),
+    [tracks]
+  );
+
+  const sessionAddedCount = useMemo(() => {
+    if (!mediaPickerOpen) return 0;
+    return tracks.filter((t) => !initialMediaIdsOnOpen.has(t.mediaId)).length;
+  }, [tracks, initialMediaIdsOnOpen, mediaPickerOpen]);
+
+  const hasChanges =
+    playlist &&
+    (name.trim() !== (playlist.title ?? "") ||
+      description.trim() !== (playlist.description ?? "") ||
+      coverColor !== resolveCoverKey(playlist.coverColor));
+
+  const openEdit = () => {
+    if (!playlist) return;
+    setName(playlist.title ?? "");
+    setDescription(playlist.description ?? "");
+    setCoverColor(resolveCoverKey(playlist.coverColor));
+    setEditOpen(true);
+  };
+
   if (loading) {
     return (
-      <div className="flex min-h-[40vh] items-center justify-center text-sm text-gray-500">
-        <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-        Loading playlist…
+      <div className={dashboardPageClass}>
+        <div className={cn(dashboardContainerClass, "py-8")}>
+          <PlaylistDetailSkeleton />
+        </div>
       </div>
     );
   }
 
   if (!playlist) {
     return (
-      <div className="px-8 py-12 text-sm text-gray-600">
-        {error ?? "Playlist not found."}
+      <div className={dashboardPageClass}>
+        <div className={cn(dashboardContainerClass, "py-12")}>
+          <div className="flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-200">
+            <AlertCircle size={18} className="mt-0.5 shrink-0" />
+            <p>{error ?? "Playlist not found."}</p>
+          </div>
+        </div>
       </div>
     );
   }
 
-  const displayTitle = playlist.title ?? "Untitled playlist";
-  const hasChanges =
-    name.trim() !== (playlist.title ?? "") ||
-    description.trim() !== (playlist.description ?? "");
-
-  const gradientMap: Record<string, string> = {
-    indigo: "from-indigo-500 to-indigo-700",
-    blue: "from-blue-500 to-blue-700",
-    purple: "from-purple-500 to-purple-700",
-    emerald: "from-emerald-500 to-emerald-700",
-    slate: "from-slate-400 to-slate-600",
-  };
-  const coverGradient = gradientMap[playlist.coverColor || "indigo"];
-
-  function formatDuration(seconds: number) {
-    const m = Math.floor(seconds / 60);
-    const s = seconds % 60;
-    return `${m}:${String(s).padStart(2, "0")}`;
-  }
-
   return (
-    <div className="min-h-screen overflow-auto">
+    <div className={dashboardPageClass}>
       {toast && (
-        <div className="fixed right-6 bottom-6 z-50 max-w-sm rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-900 shadow-md">
+        <div
+          role="status"
+          className={cn(
+            "fixed right-6 z-50 max-w-sm rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-900 shadow-lg dark:border-amber-900/40 dark:bg-amber-950/80 dark:text-amber-100",
+            previewPlayerState ? "bottom-28" : "bottom-6"
+          )}
+        >
           {toast}
         </div>
       )}
-      {error && (
-        <div className="mx-8 mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
-          {error}
+
+      {successToast && (
+        <div
+          role="status"
+          className={cn(
+            "fixed right-6 z-50 flex max-w-sm items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800 shadow-lg dark:border-emerald-900/40 dark:bg-emerald-950/80 dark:text-emerald-100",
+            previewPlayerState ? "bottom-28" : "bottom-6"
+          )}
+        >
+          <Check size={16} strokeWidth={2.5} />
+          {successToast}
         </div>
       )}
 
-      <section className="w-full">
-        <div className="w-full px-8 py-6 flex items-center">
-          <div className="max-w-8xl mx-auto w-full">
-            <div className="mb-4 flex items-center justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => void openMediaPicker()}
-                className="inline-flex items-center gap-2 rounded-md bg-[#F3F4F6] text-gray-900 px-4 py-2 text-sm font-medium hover:bg-[#E7E7E7]"
-              >
-                <Plus size={16} />
-                <span>Add track</span>
-              </button>
-            </div>
-
-            <div className="flex flex-col md:flex-row items-start gap-6">
-              <div
-                className={`flex-shrink-0 w-28 h-28 md:w-36 md:h-36 rounded-md overflow-hidden bg-gradient-to-br ${coverGradient} shadow-sm flex items-center justify-center`}
-              >
-                <Music size={56} className="text-white/90" />
-              </div>
-
-              <div className="flex-1">
-                {isEditing ? (
-                  <div className="mt-2 p-4 bg-white dark:bg-zinc-900/40 rounded-lg border border-gray-100 dark:border-zinc-800 shadow-sm">
-                    <label className="text-xs text-gray-500 dark:text-zinc-400">Title</label>
-                    <input
-                      ref={titleRef}
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      className="w-full mt-1 text-2xl font-semibold text-gray-900 dark:text-gray-100 border-0 focus:outline-none bg-transparent"
-                    />
-                    <label className="mt-3 block text-xs text-gray-500 dark:text-zinc-400">Description</label>
-                    <textarea
-                      value={description}
-                      onChange={(e) => setDescription(e.target.value)}
-                      className="w-full mt-1 text-sm text-gray-600 dark:text-zinc-300 border-0 focus:outline-none bg-transparent"
-                      rows={3}
-                    />
-                    <div className="mt-4 flex justify-end gap-3">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setIsEditing(false);
-                          setName(playlist.title ?? "");
-                          setDescription(playlist.description ?? "");
-                        }}
-                        className="px-3 py-1 text-sm text-gray-700 border rounded-md"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => void saveChanges()}
-                        disabled={!hasChanges || saving}
-                        className={cn(
-                          "px-3 py-1 text-sm rounded-md flex items-center gap-1",
-                          hasChanges
-                            ? "bg-[#A473FF] text-white"
-                            : "bg-gray-200 text-gray-500 cursor-not-allowed"
-                        )}
-                      >
-                        <Check size={16} />
-                        Save
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <>
-                    <div className="flex items-center gap-3">
-                      <h1 className="text-2xl md:text-3xl font-semibold text-gray-900 dark:text-gray-100 truncate">
-                        {displayTitle}
-                      </h1>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setIsEditing(true);
-                          setName(playlist.title ?? "");
-                          setDescription(playlist.description ?? "");
-                        }}
-                        className="p-1 rounded-md text-gray-600 dark:text-zinc-400 hover:bg-gray-100 dark:hover:bg-zinc-800"
-                      >
-                        <Edit size={16} />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setDeleteOpen(true)}
-                        className="p-1 rounded-md text-rose-600 hover:bg-rose-50"
-                      >
-                        <Trash size={16} />
-                      </button>
-                    </div>
-                    {playlist.description ? (
-                      <p className="mt-1 text-sm text-gray-500 dark:text-zinc-400">{playlist.description}</p>
-                    ) : null}
-                  </>
-                )}
-
-                <div className="mt-4 flex items-center gap-6 text-sm text-gray-600 dark:text-zinc-400">
-                  <div>
-                    <span className="text-xs text-gray-500 dark:text-zinc-500">Duration </span>
-                    <span className="font-semibold text-gray-900 dark:text-gray-100">{playlist.totalDuration}</span>
-                  </div>
-                  <div>
-                    <span className="text-xs text-gray-500 dark:text-zinc-500">Tracks </span>
-                    <span className="font-semibold text-gray-900 dark:text-gray-100">{playlist.trackCount}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
+      <div className={cn(dashboardContainerClass, "space-y-6", previewPlayerState && "pb-28")}>
+        {error && (
+          <div className="flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-200">
+            <AlertCircle size={16} className="mt-0.5 shrink-0" />
+            <span>{error}</span>
           </div>
-        </div>
-      </section>
+        )}
 
-      <main className="mt-6 pb-24">
-        <div className="max-w-8xl mx-auto px-6">
-          <div className="bg-white dark:bg-zinc-900/40 rounded-xl shadow-sm dark:shadow-none overflow-hidden border border-gray-100 dark:border-zinc-800">
-            <div className="px-6 py-4 border-b border-gray-100 dark:border-zinc-800 flex justify-between">
-              <div className="text-sm font-semibold text-gray-700 dark:text-zinc-200">Tracks</div>
-              <div className="text-sm text-gray-500 dark:text-zinc-400">{tracks.length} items</div>
-            </div>
-            {tracks.length === 0 ? (
-              <div className="px-6 py-12 text-center text-sm text-gray-500">
-                No tracks yet. Use Add track to pull audio from your library.
-              </div>
-            ) : (
-              tracks.map((t) => (
-                <div
-                  key={t.id}
-                  className="grid grid-cols-[48px_1fr_96px_40px] gap-4 items-center px-6 py-4 hover:bg-gray-50 dark:hover:bg-zinc-800/60 border-t border-gray-50 dark:border-zinc-800"
-                >
-                  <Music size={20} className="text-gray-400 dark:text-zinc-500 mx-auto" />
-                  <div>
-                    <div className="text-sm font-medium text-gray-900 dark:text-gray-100">{t.title}</div>
-                    <div className="text-xs text-gray-500 dark:text-zinc-400">{formatDuration(t.duration)}</div>
-                  </div>
-                  <div className="text-sm text-gray-500 dark:text-zinc-400 text-right">
-                    #{t.position + 1}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => void removeTrack(t.id)}
-                    className="text-rose-600 hover:text-rose-800 text-xs"
-                    title="Remove"
-                  >
-                    <Trash size={14} />
-                  </button>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-      </main>
+        <PlaylistDetailWorkspace
+          playlist={playlist}
+          tracks={tracks}
+          trackQuery={trackQuery}
+          onTrackQueryChange={setTrackQuery}
+          removingId={removingItemId}
+          getPreview={getPreviewForTrack}
+          onPreviewPlay={(t) => void handlePreviewLaunch(t)}
+          onRemove={(id) => void removeTrack(id)}
+          onAddTracks={() => void openMediaPicker()}
+          onEdit={openEdit}
+          onDelete={() => setDeleteOpen(true)}
+        />
+      </div>
 
-      {mediaPickerOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-md rounded-lg bg-white dark:bg-zinc-900 border border-gray-100 dark:border-zinc-800 shadow-lg">
-            <div className="flex items-center justify-between border-b border-gray-100 dark:border-zinc-800 px-4 py-3">
-              <h3 className="font-semibold text-gray-900 dark:text-gray-100">Add track from library</h3>
-              <button type="button" onClick={() => setMediaPickerOpen(false)}>
-                <X size={18} />
-              </button>
-            </div>
-            <ul className="max-h-80 overflow-auto py-2">
-              {mediaOptions.length === 0 ? (
-                <li className="px-4 py-6 text-sm text-gray-500 text-center">
-                  No media in library. Upload audio first.
-                </li>
-              ) : (
-                mediaOptions.map((m) => (
-                  <li key={m.id}>
-                    <button
-                      type="button"
-                      onClick={() => void addTrack(m.id)}
-                      className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-zinc-200 hover:bg-gray-50 dark:hover:bg-zinc-800"
-                    >
-                      {m.title}
-                    </button>
-                  </li>
-                ))
-              )}
-            </ul>
-          </div>
-        </div>
-      )}
+      <EditPlaylistModal
+        open={editOpen}
+        name={name}
+        description={description}
+        coverColor={coverColor}
+        saving={saving}
+        saved={editSaved}
+        hasChanges={!!hasChanges}
+        titleRef={titleRef}
+        onNameChange={setName}
+        onDescriptionChange={setDescription}
+        onCoverColorChange={setCoverColor}
+        onClose={() => {
+          setEditOpen(false);
+          setName(playlist.title ?? "");
+          setDescription(playlist.description ?? "");
+          setCoverColor(resolveCoverKey(playlist.coverColor));
+        }}
+        onSave={() => void saveChanges()}
+      />
+
+      <AddTrackModal
+        open={mediaPickerOpen}
+        onClose={() => setMediaPickerOpen(false)}
+        options={mediaOptions}
+        mediaUrls={mediaUrlById}
+        loading={mediaPickerLoading}
+        existingMediaIds={existingMediaIds}
+        initialMediaIds={initialMediaIdsOnOpen}
+        onAdd={(id) => void addTrack(id)}
+        addingId={addingMediaId}
+        sessionAddedCount={sessionAddedCount}
+      />
 
       <ConfirmDialog
         open={deleteOpen}
@@ -438,15 +691,28 @@ export default function PlaylistDetailClient({
         cancelLabel="Cancel"
         onCancel={() => setDeleteOpen(false)}
         onConfirm={async () => {
+          if (!isValidPlaylistId(activePlaylistId)) return;
           try {
-            await apiClient.deletePlaylist(playlist.id);
+            await apiClient.deletePlaylist(activePlaylistId);
             router.push("/library/playlists");
           } catch (err) {
-            setError(err instanceof Error ? err.message : "Failed to delete");
+            setError(formatApiError(err, "Failed to delete playlist"));
           }
           setDeleteOpen(false);
         }}
       />
+
+      {previewPlayerState && (
+        <PreviewPlayer
+          state={previewPlayerState}
+          volume={volume}
+          onPlayPause={handlePreviewPlayPause}
+          onSeek={handlePreviewSeek}
+          onVolumeChange={handleVolumeChange}
+        />
+      )}
+
+      <audio ref={audioRef} preload="metadata" className="sr-only" aria-hidden />
     </div>
   );
 }
