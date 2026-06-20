@@ -2,7 +2,9 @@
 
 import React, { useState, useEffect } from "react";
 import { useAuth } from "@/app/context/AuthContext";
-import SettingsHeader, { type SettingsTab } from "./components/SettingsHeader";
+import SettingsPageHeader from "./components/SettingsPageHeader";
+import SettingsPageSkeleton from "./components/SettingsPageSkeleton";
+import SettingsTabBar, { type SettingsTab } from "./components/SettingsTabBar";
 import MyDetailsTab from "./components/MyDetailsTab";
 import BillingTab from "./components/BillingTab";
 import PlanTab from "./components/PlanTab";
@@ -11,6 +13,8 @@ import {
   dispatchUserProfileUpdated,
   persistUserProfileToStorage,
 } from "@/lib/user-profile-events";
+import { dashboardCardClass, dashboardContainerClass, dashboardPageClass } from "@/app/dashboard/dashboard-styles";
+import { cn } from "@/utils/cn";
 
 const USER_STORAGE_KEY = "akou.user";
 
@@ -41,8 +45,9 @@ const defaultProfile: UserProfile = {
 };
 
 export default function SettingsClient() {
-  const { user: authUser } = useAuth();
+  const { user: authUser, isLoading: authLoading } = useAuth();
   const [initialProfile, setInitialProfile] = useState<UserProfile>(defaultProfile);
+  const [profileReady, setProfileReady] = useState(false);
 
   const [firstName, setFirstName] = useState(defaultProfile.firstName);
   const [lastName, setLastName] = useState(defaultProfile.lastName);
@@ -52,6 +57,7 @@ export default function SettingsClient() {
   const [timezone, setTimezone] = useState(defaultProfile.timezone);
   const [avatar, setAvatar] = useState<string | null>(defaultProfile.avatar ?? null);
   const [dirty, setDirty] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [activeTab, setActiveTab] = useState<string>("my-details");
 
   const [countries, setCountries] = useState<
@@ -63,7 +69,10 @@ export default function SettingsClient() {
   ]);
 
   useEffect(() => {
+    if (authLoading) return;
+
     let cancelled = false;
+    setProfileReady(false);
 
     const applyProfile = (profileToUse: UserProfile) => {
       if (cancelled) return;
@@ -76,6 +85,10 @@ export default function SettingsClient() {
       setTimezone(profileToUse.timezone);
       setAvatar(profileToUse.avatar ?? null);
       setDirty(false);
+    };
+
+    const finishLoading = () => {
+      if (!cancelled) setProfileReady(true);
     };
 
     const loadFromStorage = (): UserProfile | null => {
@@ -133,6 +146,8 @@ export default function SettingsClient() {
             avatar: loadFromStorage()?.avatar ?? null,
           };
           applyProfile(fallback);
+        } finally {
+          finishLoading();
         }
       })();
       return () => {
@@ -166,7 +181,8 @@ export default function SettingsClient() {
     }
 
     applyProfile(profileToUse);
-  }, [authUser]);
+    finishLoading();
+  }, [authUser, authLoading]);
 
   useEffect(() => {
     let mounted = true;
@@ -214,101 +230,104 @@ export default function SettingsClient() {
     };
   }, []);
 
+  if (authLoading || !profileReady) {
+    return <SettingsPageSkeleton />;
+  }
+
   return (
-    <div className="flex-1 overflow-auto bg-white dark:bg-zinc-900">
-      <div className="">
-        <SettingsHeader
-          tabs={TABS}
-          activeTab={activeTab}
-          onTabChange={(key) => setActiveTab(key)}
-          dirty={dirty}
-          onCancel={() => {
-            setFirstName(initialProfile.firstName);
-            setLastName(initialProfile.lastName);
-            setEmail(initialProfile.email);
-            setRole(initialProfile.role);
-            setCountry(initialProfile.country);
-            setTimezone(initialProfile.timezone);
-            setAvatar(initialProfile.avatar ?? null);
-            setDirty(false);
-          }}
-          onSave={() => {
-            void (async () => {
-              const profile: UserProfile = {
-                firstName,
-                lastName,
-                email,
-                role,
-                country,
-                timezone,
-                avatar,
-              };
+    <div className={dashboardPageClass}>
+      <div className={dashboardContainerClass}>
+        <SettingsPageHeader />
 
-              const isAvatarUrl =
-                typeof profile.avatar === "string" &&
-                (profile.avatar.startsWith("http") || profile.avatar.startsWith("/"));
+        <div className={cn(dashboardCardClass, "flex min-h-[calc(100vh-14rem)] flex-col overflow-hidden")}>
+          <SettingsTabBar tabs={TABS} activeTab={activeTab} onTabChange={setActiveTab} />
+          <div className="flex-1 p-6 sm:p-8">
+            {activeTab === "my-details" ? (
+              <MyDetailsTab
+                initial={initialProfile}
+                firstName={firstName}
+                lastName={lastName}
+                email={email}
+                role={role}
+                country={country}
+                timezone={timezone}
+                countries={countries}
+                avatar={avatar}
+                dirty={dirty}
+                isSaving={isSaving}
+                onCancel={() => {
+                  setFirstName(initialProfile.firstName);
+                  setLastName(initialProfile.lastName);
+                  setEmail(initialProfile.email);
+                  setRole(initialProfile.role);
+                  setCountry(initialProfile.country);
+                  setTimezone(initialProfile.timezone);
+                  setAvatar(initialProfile.avatar ?? null);
+                  setDirty(false);
+                }}
+                onSave={() => {
+                  void (async () => {
+                    setIsSaving(true);
+                    const profile: UserProfile = {
+                      firstName,
+                      lastName,
+                      email,
+                      role,
+                      country,
+                      timezone,
+                      avatar,
+                    };
 
-              try {
-                await getApiClient().updateUserProfile({
-                  firstName: profile.firstName,
-                  lastName: profile.lastName,
-                  country: profile.country,
-                  timezone: profile.timezone,
-                  profilePhotoUrl: isAvatarUrl ? profile.avatar : profile.avatar ?? null,
-                });
-              } catch (err) {
-                console.error("Failed to save profile to server", err);
-              }
+                    const isAvatarUrl =
+                      typeof profile.avatar === "string" &&
+                      (profile.avatar.startsWith("http") || profile.avatar.startsWith("/"));
 
-              persistUserProfileToStorage({
-                firstName: profile.firstName,
-                lastName: profile.lastName,
-                email: profile.email,
-                avatar: isAvatarUrl ? profile.avatar : null,
-              });
+                    try {
+                      await getApiClient().updateUserProfile({
+                        firstName: profile.firstName,
+                        lastName: profile.lastName,
+                        country: profile.country,
+                        timezone: profile.timezone,
+                        profilePhotoUrl: isAvatarUrl ? profile.avatar : profile.avatar ?? null,
+                      });
+                    } catch (err) {
+                      console.error("Failed to save profile to server", err);
+                    } finally {
+                      setIsSaving(false);
+                    }
 
-              dispatchUserProfileUpdated({
-                firstName: profile.firstName,
-                lastName: profile.lastName,
-                role: profile.role,
-                avatar: isAvatarUrl ? profile.avatar : null,
-              });
+                    persistUserProfileToStorage({
+                      firstName: profile.firstName,
+                      lastName: profile.lastName,
+                      email: profile.email,
+                      avatar: isAvatarUrl ? profile.avatar : null,
+                    });
 
-              setInitialProfile(profile);
-              setDirty(false);
-            })();
-          }}
-        />
+                    dispatchUserProfileUpdated({
+                      firstName: profile.firstName,
+                      lastName: profile.lastName,
+                      role: profile.role,
+                      avatar: isAvatarUrl ? profile.avatar : null,
+                    });
 
-        <div className="px-6 py-6">
-          <div className="bg-white dark:bg-zinc-900 rounded-[28px] border border-gray-100 dark:border-zinc-800 shadow-[0_8px_30px_rgba(0,0,0,0.04)] dark:shadow-none flex flex-col min-h-[calc(100vh-220px)] overflow-hidden">
-            <div className="p-8 flex-1 overflow-auto">
-              {activeTab === "my-details" ? (
-                <MyDetailsTab
-                  initial={initialProfile}
-                  firstName={firstName}
-                  lastName={lastName}
-                  email={email}
-                  role={role}
-                  country={country}
-                  timezone={timezone}
-                  countries={countries}
-                  avatar={avatar}
-                  setFirstName={setFirstName}
-                  setLastName={setLastName}
-                  setEmail={setEmail}
-                  setRole={setRole}
-                  setCountry={setCountry}
-                  setTimezone={setTimezone}
-                  setAvatar={setAvatar}
-                  setDirty={setDirty}
-                />
-              ) : activeTab === "plan" ? (
-                <PlanTab />
-              ) : (
-                <BillingTab />
-              )}
-            </div>
+                    setInitialProfile(profile);
+                    setDirty(false);
+                  })();
+                }}
+                setFirstName={setFirstName}
+                setLastName={setLastName}
+                setEmail={setEmail}
+                setRole={setRole}
+                setCountry={setCountry}
+                setTimezone={setTimezone}
+                setAvatar={setAvatar}
+                setDirty={setDirty}
+              />
+            ) : activeTab === "plan" ? (
+              <PlanTab onOpenBilling={() => setActiveTab("billing")} />
+            ) : (
+              <BillingTab />
+            )}
           </div>
         </div>
       </div>

@@ -2,17 +2,23 @@
 
 import React, { useCallback, useEffect, useState } from "react";
 import {
-  CreditCard,
-  CalendarCheck,
-  ShieldCheck,
-  Users,
-  Cloud,
-  TrendingUp,
+  ArrowRight,
+  HardDrive,
   Loader2,
+  Monitor,
+  Repeat,
   Save,
+  TrendingUp,
+  Users,
 } from "lucide-react";
 import { getApiClient } from "@/lib/api-client";
 import type { ClientInfo, TenantSettingsData } from "@/types/api";
+import {
+  dashboardAccentShadow,
+  dashboardPanelSubtitle,
+  dashboardPanelTitle,
+  dashboardSectionLabel,
+} from "@/app/dashboard/dashboard-styles";
 import { cn } from "@/utils/cn";
 import { useAuth } from "@/app/context/AuthContext";
 import { isSuperAdminRole } from "@/lib/rbac";
@@ -31,8 +37,14 @@ const TIER_LABELS: Record<string, string> = {
   ENTERPRISE: "Enterprise",
 };
 
+const TIER_DESCRIPTIONS: Record<SubscriptionTier, string> = {
+  STARTER: "Up to 5 players · 2 GB storage",
+  PROFESSIONAL: "Up to 20 players · 20 GB storage",
+  ENTERPRISE: "Custom player and storage limits",
+};
+
 const TABLE_INPUT_CLASS =
-  "w-full min-w-[5rem] rounded-md border border-gray-200 bg-white px-2 py-1.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#A473FF]/30 focus:border-[#A473FF] dark:bg-zinc-900/50 dark:border-zinc-700 dark:text-zinc-100";
+  "h-9 w-full min-w-[5rem] rounded-xl border border-gray-200 bg-white px-2.5 text-sm text-gray-900 focus:border-[#A473FF]/40 focus:outline-none focus:ring-2 focus:ring-[#A473FF]/15 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100";
 
 type MasterClientRow = {
   clientId: string;
@@ -50,30 +62,80 @@ type RowDraft = {
   maxStorageGb: string;
 };
 
-function UsageBar({ used, max, label }: { used: number; max: number; label: string }) {
+function TierBadge({ tier }: { tier: string }) {
+  const label = TIER_LABELS[tier] ?? tier;
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full bg-zinc-100 px-2.5 py-0.5 text-xs font-medium text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
+      <Repeat size={11} strokeWidth={2} />
+      {label}
+    </span>
+  );
+}
+
+function UsageMeter({
+  label,
+  used,
+  max,
+  unit,
+}: {
+  label: string;
+  used: number;
+  max: number;
+  unit?: string;
+}) {
   const pct = max > 0 ? Math.min(100, Math.round((used / max) * 100)) : 0;
   const atLimit = max > 0 && used >= max;
+  const remaining = max > 0 ? Math.max(0, max - used) : null;
 
   return (
-    <div>
-      <div className="flex items-center justify-between text-sm">
-        <span className="font-medium text-gray-900 dark:text-gray-100">{label}</span>
-        <span className="text-gray-600 dark:text-zinc-400">
-          {used} / {max > 0 ? max : "—"}
-        </span>
+    <div className="space-y-2.5">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <p className="text-sm font-medium text-gray-900 dark:text-zinc-100">{label}</p>
+          <p className="mt-0.5 text-xs text-gray-500 dark:text-zinc-400">
+            {remaining !== null
+              ? atLimit
+                ? "Limit reached — contact support to increase"
+                : `${remaining}${unit ? ` ${unit}` : ""} remaining`
+              : "No limit configured"}
+          </p>
+        </div>
+        <p className="shrink-0 text-right text-sm tabular-nums text-gray-900 dark:text-zinc-100">
+          <span className="font-semibold">{used}</span>
+          <span className="text-gray-400 dark:text-zinc-500">
+            {" "}
+            / {max > 0 ? max : "—"}
+            {unit ? ` ${unit}` : ""}
+          </span>
+        </p>
       </div>
-      <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-gray-100 dark:bg-zinc-800">
+      <div className="h-2 w-full overflow-hidden rounded-full bg-gray-100 dark:bg-zinc-800">
         <div
           className={cn(
-            "h-full rounded-full transition-all",
-            atLimit ? "bg-amber-500" : "bg-[#A473FF]"
+            "h-full rounded-full transition-all duration-300",
+            atLimit ? "bg-amber-500" : pct >= 80 ? "bg-amber-400" : "bg-[#A473FF]"
           )}
           style={{ width: `${pct}%` }}
         />
       </div>
-      {atLimit && (
-        <p className="mt-1 text-xs text-amber-700 dark:text-amber-400">At or over plan limit</p>
-      )}
+      <p className="text-xs tabular-nums text-gray-400 dark:text-zinc-500">{pct}% used</p>
+    </div>
+  );
+}
+
+function PlanSkeleton() {
+  return (
+    <div className="animate-pulse space-y-8">
+      <div className="space-y-3">
+        <div className="h-3 w-24 rounded bg-gray-200 dark:bg-zinc-800" />
+        <div className="h-8 w-48 rounded bg-gray-200 dark:bg-zinc-800" />
+        <div className="h-4 w-72 rounded bg-gray-200 dark:bg-zinc-800" />
+      </div>
+      <div className="space-y-6 border-t border-gray-100 pt-8 dark:border-zinc-800">
+        <div className="h-4 w-32 rounded bg-gray-200 dark:bg-zinc-800" />
+        <div className="h-2 w-full rounded-full bg-gray-100 dark:bg-zinc-800" />
+        <div className="h-2 w-full rounded-full bg-gray-100 dark:bg-zinc-800" />
+      </div>
     </div>
   );
 }
@@ -97,103 +159,258 @@ function normalizeClient(client: Record<string, unknown>): ClientInfo {
   };
 }
 
-function TenantPlanView({ settings }: { settings: TenantSettingsData }) {
-  const tier = (settings.subscriptionTier || settings.planName || "STARTER").toUpperCase();
+function TenantPlanView({
+  settings,
+  onOpenBilling,
+}: {
+  settings: TenantSettingsData;
+  onOpenBilling?: () => void;
+}) {
+  const tier = (settings.subscriptionTier || settings.planName || "STARTER").toUpperCase() as SubscriptionTier;
+  const planLabel = settings.planName || TIER_LABELS[tier] || tier;
+  const tierSummary = TIER_DESCRIPTIONS[tier] ?? "Workspace subscription";
 
   return (
-    <div className="max-w-8xl space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Your plan</h2>
-          <p className="mt-1 text-sm text-gray-600 dark:text-zinc-400">
-            {settings.planName ? settings.planName : tier}
+    <div className="space-y-10">
+      <section className="space-y-5">
+        <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0 space-y-2">
+            <p className={dashboardSectionLabel}>Subscription</p>
+            <div className="flex flex-wrap items-center gap-2.5">
+              <h2 className={dashboardPanelTitle}>{planLabel}</h2>
+              <TierBadge tier={tier} />
+            </div>
+            <p className={cn(dashboardPanelSubtitle, "max-w-xl")}>
+              {tierSummary}. Billed monthly and renewed automatically.
+            </p>
+          </div>
+
+          <div className="flex shrink-0 flex-wrap items-center gap-2">
+            {onOpenBilling ? (
+              <button
+                type="button"
+                onClick={onOpenBilling}
+                className="inline-flex h-10 items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800"
+              >
+                Billing & invoices
+                <ArrowRight size={14} className="opacity-60" />
+              </button>
+            ) : null}
+            <button
+              type="button"
+              className={cn(
+                "inline-flex h-10 items-center gap-2 rounded-xl px-4 text-sm font-medium text-white transition-opacity hover:opacity-90",
+                dashboardAccentShadow
+              )}
+              style={{
+                background: "linear-gradient(135deg, #18181B 0%, #202538 38%, #A473FF 100%)",
+              }}
+            >
+              <TrendingUp size={15} />
+              Request upgrade
+            </button>
+          </div>
+        </div>
+
+        <dl className="grid grid-cols-1 gap-4 sm:grid-cols-3 sm:gap-6">
+          <div className="border-t border-gray-100 pt-4 dark:border-zinc-800 sm:border-t-0 sm:pt-0">
+            <dt className={dashboardSectionLabel}>Billing cycle</dt>
+            <dd className="mt-1.5 text-sm font-medium text-gray-900 dark:text-zinc-100">Monthly</dd>
+          </div>
+          <div className="border-t border-gray-100 pt-4 dark:border-zinc-800 sm:border-t-0 sm:pt-0">
+            <dt className={dashboardSectionLabel}>Player seats</dt>
+            <dd className="mt-1.5 text-sm font-medium tabular-nums text-gray-900 dark:text-zinc-100">
+              {settings.maxPlayers} included
+            </dd>
+          </div>
+          <div className="border-t border-gray-100 pt-4 dark:border-zinc-800 sm:border-t-0 sm:pt-0">
+            <dt className={dashboardSectionLabel}>Storage</dt>
+            <dd className="mt-1.5 text-sm font-medium tabular-nums text-gray-900 dark:text-zinc-100">
+              {settings.maxStorageGb} GB included
+            </dd>
+          </div>
+        </dl>
+      </section>
+
+      <section className="border-t border-gray-100 pt-8 dark:border-zinc-800">
+        <div className="mb-6 max-w-2xl">
+          <h3 className={dashboardPanelTitle}>Usage</h3>
+          <p className={cn(dashboardPanelSubtitle, "mt-1")}>
+            How much of your subscription you&apos;ve used in this workspace.
           </p>
         </div>
-
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            className="inline-flex items-center gap-2 px-4 py-2 bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700 rounded-md text-sm text-gray-700 dark:text-zinc-200 hover:bg-gray-50 dark:hover:bg-zinc-800"
-          >
-            <CreditCard className="h-4 w-4 text-amber-500" /> Manage billing
-          </button>
-          <button
-            type="button"
-            className="group inline-flex items-center gap-2 px-4 py-2 bg-[#A473FF] text-white rounded-md text-sm hover:bg-[#7A42FF]"
-          >
-            <TrendingUp className="h-4 w-4 transform transition-transform duration-200 group-hover:-translate-y-1" />
-            Upgrade
-          </button>
+        <div className="max-w-2xl space-y-8">
+          <UsageMeter
+            label="Registered players"
+            used={settings.usedPlayers}
+            max={settings.maxPlayers}
+          />
+          <UsageMeter
+            label="Media storage"
+            used={settings.usedStorageGb}
+            max={settings.maxStorageGb}
+            unit="GB"
+          />
         </div>
-      </div>
+      </section>
 
-      <div className="space-y-4">
-        <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">What&apos;s included</h3>
-        <ul className="space-y-3">
-          <li className="flex items-start gap-3">
-            <div className="flex items-center justify-center h-8 w-8 rounded-md bg-amber-50 dark:bg-amber-950/40 text-amber-600">
-              <Users className="h-4 w-4" />
-            </div>
-            <div>
-              <div className="font-medium text-gray-900 dark:text-gray-100">Player seats</div>
-              <div className="text-sm text-gray-500 dark:text-zinc-400">
-                {settings.maxPlayers ?? "—"} seats included
-              </div>
-            </div>
+      <section className="border-t border-gray-100 pt-8 dark:border-zinc-800">
+        <h3 className={dashboardPanelTitle}>Included with your plan</h3>
+        <ul className="mt-4 space-y-3 text-sm text-gray-600 dark:text-zinc-400">
+          <li className="flex items-start gap-2.5">
+            <Users size={15} className="mt-0.5 shrink-0 text-gray-400" strokeWidth={1.75} />
+            <span>
+              <span className="font-medium text-gray-900 dark:text-zinc-100">Player seats</span>
+              {" — "}
+              register up to {settings.maxPlayers} devices in your workspace
+            </span>
           </li>
-
-          <li className="flex items-start gap-3">
-            <div className="flex items-center justify-center h-8 w-8 rounded-md bg-purple-50 dark:bg-purple-950/40 text-purple-600">
-              <Cloud className="h-4 w-4" />
-            </div>
-            <div>
-              <div className="font-medium text-gray-900 dark:text-gray-100">Storage</div>
-              <div className="text-sm text-gray-500 dark:text-zinc-400">
-                {settings.maxStorageGb ?? "—"} GB storage
-              </div>
-            </div>
+          <li className="flex items-start gap-2.5">
+            <HardDrive size={15} className="mt-0.5 shrink-0 text-gray-400" strokeWidth={1.75} />
+            <span>
+              <span className="font-medium text-gray-900 dark:text-zinc-100">Media storage</span>
+              {" — "}
+              {settings.maxStorageGb} GB for audio and playlist assets
+            </span>
           </li>
-
-          <li className="flex items-start gap-3">
-            <div className="flex items-center justify-center h-8 w-8 rounded-md bg-green-50 dark:bg-green-950/40 text-green-600">
-              <ShieldCheck className="h-4 w-4" />
-            </div>
-            <div>
-              <div className="font-medium text-gray-900 dark:text-gray-100">Security & support</div>
-              <div className="text-sm text-gray-500 dark:text-zinc-400">
-                Enterprise-grade security and priority support
-              </div>
-            </div>
+          <li className="flex items-start gap-2.5">
+            <Repeat size={15} className="mt-0.5 shrink-0 text-gray-400" strokeWidth={1.75} />
+            <span>
+              <span className="font-medium text-gray-900 dark:text-zinc-100">Automatic renewal</span>
+              {" — "}
+              subscription continues each month unless changed
+            </span>
           </li>
         </ul>
-      </div>
-
-      <div className="space-y-4">
-        <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Billing & limits</h3>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <CalendarCheck className="h-5 w-5 text-amber-500" />
-            <div>
-              <div className="font-medium text-gray-900 dark:text-gray-100">Billing cycle</div>
-              <div className="text-sm text-gray-500 dark:text-zinc-400">Monthly</div>
-            </div>
-          </div>
-          <div className="text-sm text-gray-700 dark:text-zinc-300 font-medium">Contact sales</div>
-        </div>
-
-        <UsageBar label="Registered players" used={settings.usedPlayers} max={settings.maxPlayers} />
-        <UsageBar label="Storage (GB)" used={settings.usedStorageGb} max={settings.maxStorageGb} />
-      </div>
-
-      <p className="text-xs text-gray-500 dark:text-zinc-500">
-        Usage is calculated from players and media stored in your tenant. Contact
-        support to upgrade your tier or raise limits.
-      </p>
+      </section>
     </div>
   );
 }
 
-function MasterClientsSubscriptionTable({
+function isDraftDirty(row: MasterClientRow, draft: RowDraft | undefined): boolean {
+  if (!draft) return false;
+  return (
+    draft.subscriptionTier !== row.subscriptionTier ||
+    Number(draft.maxPlayers) !== row.maxPlayers ||
+    Number(draft.maxStorageGb) !== row.maxStorageGb
+  );
+}
+
+function MasterClientCard({
+  row,
+  draft,
+  saving,
+  onDraftChange,
+  onSave,
+}: {
+  row: MasterClientRow;
+  draft: RowDraft | undefined;
+  saving: boolean;
+  onDraftChange: (patch: Partial<RowDraft>) => void;
+  onSave: () => void;
+}) {
+  const tier = draft?.subscriptionTier ?? row.subscriptionTier;
+  const isEnterprise = tier === "ENTERPRISE";
+  const dirty = isDraftDirty(row, draft);
+
+  return (
+    <article className="border-t border-gray-100 py-6 first:border-t-0 first:pt-0 dark:border-zinc-800">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
+          <p className="font-medium text-gray-900 dark:text-zinc-100">{row.workspaceName}</p>
+          <p className="mt-1 flex items-center gap-1.5 text-xs text-gray-500 dark:text-zinc-400">
+            <Monitor size={12} />
+            {row.registeredDevices} active device{row.registeredDevices === 1 ? "" : "s"}
+          </p>
+        </div>
+        <TierBadge tier={tier} />
+      </div>
+
+      <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div>
+          <label className={cn(dashboardSectionLabel, "mb-1.5 block")}>Plan</label>
+          <select
+            value={tier}
+            onChange={(e) =>
+              onDraftChange({ subscriptionTier: e.target.value as SubscriptionTier })
+            }
+            className={TABLE_INPUT_CLASS}
+          >
+            {SUBSCRIPTION_TIERS.map((t) => (
+              <option key={t} value={t}>
+                {TIER_LABELS[t] ?? t}
+              </option>
+            ))}
+          </select>
+          <p className="mt-1.5 text-xs text-gray-400 dark:text-zinc-500">
+            {TIER_DESCRIPTIONS[tier]}
+          </p>
+        </div>
+
+        <div>
+          <label className={cn(dashboardSectionLabel, "mb-1.5 block")}>Max players</label>
+          <input
+            type="number"
+            min={1}
+            value={draft?.maxPlayers ?? String(row.maxPlayers)}
+            disabled={!isEnterprise}
+            onChange={(e) => onDraftChange({ maxPlayers: e.target.value })}
+            className={cn(TABLE_INPUT_CLASS, !isEnterprise && "cursor-not-allowed opacity-50")}
+          />
+          {!isEnterprise ? (
+            <p className="mt-1.5 text-xs text-gray-400 dark:text-zinc-500">Fixed for this tier</p>
+          ) : null}
+        </div>
+
+        <div>
+          <label className={cn(dashboardSectionLabel, "mb-1.5 block")}>Storage (GB)</label>
+          <input
+            type="number"
+            min={1}
+            value={draft?.maxStorageGb ?? String(row.maxStorageGb)}
+            disabled={!isEnterprise}
+            onChange={(e) => onDraftChange({ maxStorageGb: e.target.value })}
+            className={cn(TABLE_INPUT_CLASS, !isEnterprise && "cursor-not-allowed opacity-50")}
+          />
+          {!isEnterprise ? (
+            <p className="mt-1.5 text-xs text-gray-400 dark:text-zinc-500">Fixed for this tier</p>
+          ) : null}
+        </div>
+
+        <div className="flex items-end">
+          <button
+            type="button"
+            disabled={saving || !dirty}
+            onClick={onSave}
+            className={cn(
+              "inline-flex h-9 w-full items-center justify-center gap-1.5 rounded-xl px-3 text-xs font-medium transition-opacity sm:w-auto",
+              dirty
+                ? cn("text-white hover:opacity-90", dashboardAccentShadow)
+                : "cursor-not-allowed bg-gray-100 text-gray-400 dark:bg-zinc-800 dark:text-zinc-500"
+            )}
+            style={
+              dirty
+                ? {
+                    background:
+                      "linear-gradient(135deg, #18181B 0%, #202538 38%, #A473FF 100%)",
+                  }
+                : undefined
+            }
+          >
+            {saving ? (
+              <Loader2 size={14} className="animate-spin" />
+            ) : (
+              <Save size={14} />
+            )}
+            Save changes
+          </button>
+        </div>
+      </div>
+    </article>
+  );
+}
+
+function MasterClientsSubscriptionView({
   rows,
   drafts,
   savingId,
@@ -209,146 +426,39 @@ function MasterClientsSubscriptionTable({
   onSave: (clientId: string) => void;
 }) {
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <div>
-        <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
-          Master client subscriptions
-        </h2>
-        <p className="mt-1 text-sm text-gray-600 dark:text-zinc-400">
-          Platform-wide billing tiers, device allocations, and storage quotas.
+        <p className={dashboardSectionLabel}>Administration</p>
+        <h2 className={cn(dashboardPanelTitle, "mt-1")}>Client subscriptions</h2>
+        <p className={cn(dashboardPanelSubtitle, "mt-1 max-w-2xl")}>
+          {rows.length} workspace{rows.length === 1 ? "" : "s"}. Adjust plan tier and limits per
+          client — Starter and Growth use preset caps; Enterprise allows custom values.
         </p>
       </div>
 
-      {saveError && (
-        <div className="rounded-lg border border-red-200 dark:border-red-900/50 bg-red-50 dark:bg-red-950/30 px-4 py-3 text-sm text-red-800 dark:text-red-300">
+      {saveError ? (
+        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-300">
           {saveError}
         </div>
-      )}
+      ) : null}
 
-      <div className="rounded-lg border border-gray-100 dark:border-zinc-800 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50 dark:bg-zinc-900/60 border-b border-gray-100 dark:border-zinc-800">
-              <tr>
-                <th className="text-left px-4 py-3 font-medium text-gray-700 dark:text-zinc-300 text-xs uppercase tracking-wide">
-                  Workspace
-                </th>
-                <th className="text-left px-4 py-3 font-medium text-gray-700 dark:text-zinc-300 text-xs uppercase tracking-wide">
-                  Billing tier
-                </th>
-                <th className="text-left px-4 py-3 font-medium text-gray-700 dark:text-zinc-300 text-xs uppercase tracking-wide">
-                  Registered devices
-                </th>
-                <th className="text-left px-4 py-3 font-medium text-gray-700 dark:text-zinc-300 text-xs uppercase tracking-wide">
-                  Player limit
-                </th>
-                <th className="text-left px-4 py-3 font-medium text-gray-700 dark:text-zinc-300 text-xs uppercase tracking-wide">
-                  Storage (GB)
-                </th>
-                <th className="text-left px-4 py-3 font-medium text-gray-700 dark:text-zinc-300 text-xs uppercase tracking-wide">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row) => {
-                const draft = drafts[row.clientId];
-                const tier = draft?.subscriptionTier ?? row.subscriptionTier;
-                const isEnterprise = tier === "ENTERPRISE";
-
-                return (
-                  <tr
-                    key={row.clientId}
-                    className="border-b border-gray-50 dark:border-zinc-800/80 hover:bg-gray-50/80 dark:hover:bg-zinc-900/40 transition-colors"
-                  >
-                    <td className="px-4 py-3 font-medium text-gray-900 dark:text-gray-100">
-                      {row.workspaceName}
-                    </td>
-                    <td className="px-4 py-3">
-                      <select
-                        value={tier}
-                        onChange={(e) =>
-                          onDraftChange(row.clientId, {
-                            subscriptionTier: e.target.value as SubscriptionTier,
-                          })
-                        }
-                        className={TABLE_INPUT_CLASS}
-                      >
-                        {SUBSCRIPTION_TIERS.map((t) => (
-                          <option key={t} value={t}>
-                            {TIER_LABELS[t] ?? t}
-                          </option>
-                        ))}
-                      </select>
-                      <p className="mt-1 text-xs text-gray-500 dark:text-zinc-500">
-                        {row.workspaceName}: {TIER_LABELS[tier] ?? tier}
-                      </p>
-                    </td>
-                    <td className="px-4 py-3 text-gray-700 dark:text-zinc-300">
-                      {row.registeredDevices}
-                    </td>
-                    <td className="px-4 py-3">
-                      <input
-                        type="number"
-                        min={1}
-                        value={draft?.maxPlayers ?? String(row.maxPlayers)}
-                        disabled={!isEnterprise}
-                        onChange={(e) =>
-                          onDraftChange(row.clientId, { maxPlayers: e.target.value })
-                        }
-                        className={cn(
-                          TABLE_INPUT_CLASS,
-                          !isEnterprise && "opacity-60 cursor-not-allowed"
-                        )}
-                      />
-                    </td>
-                    <td className="px-4 py-3">
-                      <input
-                        type="number"
-                        min={1}
-                        value={draft?.maxStorageGb ?? String(row.maxStorageGb)}
-                        disabled={!isEnterprise}
-                        onChange={(e) =>
-                          onDraftChange(row.clientId, { maxStorageGb: e.target.value })
-                        }
-                        className={cn(
-                          TABLE_INPUT_CLASS,
-                          !isEnterprise && "opacity-60 cursor-not-allowed"
-                        )}
-                      />
-                    </td>
-                    <td className="px-4 py-3">
-                      <button
-                        type="button"
-                        disabled={savingId === row.clientId}
-                        onClick={() => onSave(row.clientId)}
-                        className="inline-flex items-center gap-1.5 rounded-md bg-[#A473FF] px-3 py-1.5 text-xs font-medium text-white hover:bg-[#7A42FF] disabled:opacity-60"
-                      >
-                        {savingId === row.clientId ? (
-                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                        ) : (
-                          <Save className="h-3.5 w-3.5" />
-                        )}
-                        Save
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+      <div>
+        {rows.map((row) => (
+          <MasterClientCard
+            key={row.clientId}
+            row={row}
+            draft={drafts[row.clientId]}
+            saving={savingId === row.clientId}
+            onDraftChange={(patch) => onDraftChange(row.clientId, patch)}
+            onSave={() => onSave(row.clientId)}
+          />
+        ))}
       </div>
-
-      <p className="text-xs text-gray-500 dark:text-zinc-500">
-        Starter and Growth tiers use fixed allocation caps. Enterprise workspaces
-        support custom player and storage overrides.
-      </p>
     </div>
   );
 }
 
-export default function PlanTab() {
+export default function PlanTab({ onOpenBilling }: { onOpenBilling?: () => void }) {
   const apiClient = getApiClient();
   const { user } = useAuth();
   const isSuperAdmin = isSuperAdminRole(user?.role);
@@ -521,24 +631,12 @@ export default function PlanTab() {
   };
 
   if (isLoading) {
-    return (
-      <div className="space-y-6">
-        <div className="animate-pulse">
-          <div className="h-6 w-1/3 bg-gray-200 dark:bg-zinc-800 rounded mb-2" />
-          <div className="h-4 w-1/4 bg-gray-200 dark:bg-zinc-800 rounded" />
-        </div>
-        <div className="space-y-3 animate-pulse">
-          <div className="h-3 bg-gray-200 dark:bg-zinc-800 rounded w-full" />
-          <div className="h-3 bg-gray-200 dark:bg-zinc-800 rounded w-full" />
-          <div className="h-3 bg-gray-200 dark:bg-zinc-800 rounded w-2/3" />
-        </div>
-      </div>
-    );
+    return <PlanSkeleton />;
   }
 
   if (error) {
     return (
-      <div className="rounded-lg border border-red-200 dark:border-red-900/50 bg-red-50 dark:bg-red-950/30 px-4 py-3 text-sm text-red-800 dark:text-red-300">
+      <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-300">
         {error}
       </div>
     );
@@ -547,14 +645,20 @@ export default function PlanTab() {
   if (isSuperAdmin) {
     if (masterRows.length === 0) {
       return (
-        <p className="text-sm text-gray-500 dark:text-zinc-400">
-          No active client workspaces found.
-        </p>
+        <div className="py-10 text-center">
+          <HardDrive size={28} className="mx-auto text-gray-300 dark:text-zinc-600" strokeWidth={1.5} />
+          <p className="mt-3 text-sm font-medium text-gray-900 dark:text-gray-100">
+            No client workspaces found
+          </p>
+          <p className="mt-1 text-xs text-gray-500 dark:text-zinc-400">
+            Active clients will appear here for subscription management.
+          </p>
+        </div>
       );
     }
 
     return (
-      <MasterClientsSubscriptionTable
+      <MasterClientsSubscriptionView
         rows={masterRows}
         drafts={drafts}
         savingId={savingId}
@@ -571,5 +675,5 @@ export default function PlanTab() {
     );
   }
 
-  return <TenantPlanView settings={settings} />;
+  return <TenantPlanView settings={settings} onOpenBilling={onOpenBilling} />;
 }
