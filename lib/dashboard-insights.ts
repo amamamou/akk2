@@ -44,9 +44,21 @@ export function resolvePlayerHealth(
 export interface OperationalOverview {
   broadcasts: number;
   activePlayers: number;
-  clients: number;
+  /** Super-admin portfolio size; null for workspace managers. */
+  clients: number | null;
+  /** Distinct venue / room names in the manager workspace. */
+  locations: number;
   successRate: number;
   offlineCount: number;
+}
+
+function countUniqueLocations(players: PlayerInfo[]): number {
+  const names = new Set<string>();
+  for (const player of players) {
+    const name = player.roomName?.trim() || player.playerName?.trim();
+    if (name) names.add(name);
+  }
+  return names.size;
 }
 
 export interface LivePlayerRow {
@@ -175,7 +187,7 @@ export function buildLiveSummary(
 export function buildOperationalOverview(
   schedules: ScheduleEntry[],
   players: PlayerInfo[],
-  clientsCount: number,
+  clientsCount: number | null,
   systemHealth: SystemHealthMetrics | null,
   playbackLogs: PlaybackLogEntry[]
 ): OperationalOverview {
@@ -187,6 +199,7 @@ export function buildOperationalOverview(
     broadcasts: todayBroadcasts,
     activePlayers: live.online,
     clients: clientsCount,
+    locations: countUniqueLocations(players),
     successRate: live.healthRate,
     offlineCount: live.offline,
   };

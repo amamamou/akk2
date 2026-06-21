@@ -163,7 +163,7 @@ export default function BroadcastActivity({ summary }: BroadcastActivityProps) {
         </div>
       </div>
 
-      <div className="mt-4">
+      <div className="mt-4 pt-3">
         <div className="flex items-start gap-2.5">
           <div className="flex flex-col gap-[3px] pt-px text-[10px] font-medium text-gray-400">
             {DAY_LABELS.map((label, i) => (
@@ -172,7 +172,7 @@ export default function BroadcastActivity({ summary }: BroadcastActivityProps) {
               </span>
             ))}
           </div>
-          <div className="flex flex-1 gap-[3px] overflow-x-auto pb-0.5">
+          <div className="flex flex-1 gap-[3px] overflow-x-auto px-0.5 pt-1 pb-0.5">
             {weeks.map((week, weekIdx) => (
               <div key={weekIdx} className="flex flex-col gap-[3px]">
                 {week.map((cell) => (

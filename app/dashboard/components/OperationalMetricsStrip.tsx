@@ -10,13 +10,18 @@ import {
   dashboardMetricValue,
 } from "../dashboard-styles";
 
+type MetricKey =
+  | "broadcasts"
+  | "activePlayers"
+  | "clients"
+  | "locations"
+  | "successRate"
+  | "offlineCount";
+
 interface MetricDef {
-  key: keyof Pick<
-    OperationalOverview,
-    "broadcasts" | "activePlayers" | "clients" | "successRate" | "offlineCount"
-  >;
+  key: MetricKey;
   label: string;
-  format: (v: number) => string;
+  format: (v: number | null) => string;
   highlight?: boolean;
 }
 
@@ -26,15 +31,21 @@ function formatPercent(v: number) {
 
 export default function OperationalMetricsStrip({
   overview,
+  isSuperAdmin,
 }: {
   overview: OperationalOverview;
+  isSuperAdmin: boolean;
 }) {
+  const workspaceMetric: MetricDef = isSuperAdmin
+    ? { key: "clients", label: "Clients", format: (v) => String(v ?? 0) }
+    : { key: "locations", label: "Locations", format: (v) => String(v ?? 0) };
+
   const metrics: MetricDef[] = [
-    { key: "broadcasts", label: "Broadcasts today", format: (v) => String(v), highlight: true },
-    { key: "activePlayers", label: "Active players", format: (v) => String(v) },
-    { key: "clients", label: "Clients", format: (v) => String(v) },
-    { key: "successRate", label: "Success rate", format: formatPercent },
-    { key: "offlineCount", label: "Offline players", format: (v) => String(v) },
+    { key: "broadcasts", label: "Broadcasts today", format: (v) => String(v ?? 0), highlight: true },
+    { key: "activePlayers", label: "Active players", format: (v) => String(v ?? 0) },
+    workspaceMetric,
+    { key: "successRate", label: "Success rate", format: (v) => formatPercent(v ?? 0) },
+    { key: "offlineCount", label: "Offline players", format: (v) => String(v ?? 0) },
   ];
 
   return (

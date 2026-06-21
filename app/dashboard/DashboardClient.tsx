@@ -132,12 +132,16 @@ export default function DashboardClient() {
     };
   }, [queryClient]);
 
-  const clientsCount = isSuperAdmin ? clients.length : 1;
-
   const overview = useMemo(
     () =>
-      buildOperationalOverview(schedules, players, clientsCount, systemHealth, playbackLogs),
-    [schedules, players, clientsCount, systemHealth, playbackLogs]
+      buildOperationalOverview(
+        schedules,
+        players,
+        isSuperAdmin ? clients.length : null,
+        systemHealth,
+        playbackLogs
+      ),
+    [schedules, players, isSuperAdmin, clients.length, systemHealth, playbackLogs]
   );
 
   const broadcastActivity = useMemo(
@@ -198,7 +202,7 @@ export default function DashboardClient() {
 
         <DashboardHero players={players} schedules={schedules} media={media} />
 
-        <OperationalMetricsStrip overview={overview} />
+        <OperationalMetricsStrip overview={overview} isSuperAdmin={isSuperAdmin} />
 
         <div className={dashboardCommandLayout}>
           <div className={dashboardMainColumn}>

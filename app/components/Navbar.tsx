@@ -164,12 +164,18 @@ export default function Navbar() {
                   />
                   <div className="fixed right-4 top-16 z-[100] mt-1 w-56 overflow-hidden rounded-xl bg-white shadow-lg shadow-black/[0.06] dark:bg-[#18181B] dark:shadow-black/20 lg:right-5 lg:top-[76px]">
                     <div className="bg-zinc-50/80 p-4 dark:bg-[#09090C]/50">
-                      <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                      <p
+                        className="truncate text-sm font-medium text-zinc-900 dark:text-zinc-100"
+                        title={(user as { name?: string } | undefined)?.name}
+                      >
                         {(user as { name?: string } | undefined)?.name ||
                           (user as { email?: string } | undefined)?.email ||
                           "User"}
                       </p>
-                      <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
+                      <p
+                        className="mt-1 truncate text-xs text-zinc-500 dark:text-zinc-400"
+                        title={(user as { email?: string } | undefined)?.email}
+                      >
                         {(user as { email?: string } | undefined)?.email}
                       </p>
                     </div>
@@ -302,8 +308,9 @@ function UserProfile({
   return (
     <button
       onClick={onToggle}
+      title={`${name}${email ? ` · ${email}` : ""}`}
       className={cn(
-        "flex items-center gap-2 rounded-full px-2 py-1 transition-colors lg:gap-3 lg:px-3",
+        "flex min-w-0 max-w-full items-center gap-2 overflow-hidden rounded-full px-2 py-1 transition-colors lg:gap-3 lg:px-3",
         shellTrackClass,
         "hover:bg-zinc-100 dark:hover:bg-[#09090C]/80"
       )}
@@ -314,26 +321,28 @@ function UserProfile({
           src={avatarUrl}
           alt=""
           onError={() => setAvatarError(true)}
-          className="h-8 w-8 rounded-full object-cover"
+          className="h-8 w-8 shrink-0 rounded-full object-cover"
         />
       ) : (
         <div
-          className="flex h-8 w-8 items-center justify-center rounded-full bg-zinc-200 text-[11px] font-semibold tracking-wide text-zinc-600 dark:bg-[#09090C] dark:text-zinc-200"
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-zinc-200 text-[11px] font-semibold tracking-wide text-zinc-600 dark:bg-[#09090C] dark:text-zinc-200"
           aria-hidden
         >
           {initials || "U"}
         </div>
       )}
 
-        <div className="hidden text-left leading-tight lg:block">
-          <div className="text-[13px] font-medium tracking-tight text-zinc-900 dark:text-zinc-100">{name}</div>
-          <div className="text-[11px] text-zinc-400 dark:text-zinc-500">{email}</div>
+        <div className="hidden min-w-0 max-w-[11.5rem] shrink text-left leading-tight lg:block">
+          <div className="truncate text-[13px] font-medium tracking-tight text-zinc-900 dark:text-zinc-100">
+            {name}
+          </div>
+          <div className="truncate text-[11px] text-zinc-400 dark:text-zinc-500">{email}</div>
         </div>
 
       <ChevronDown
         size={14}
         strokeWidth={1.9}
-        className={`hidden lg:block text-zinc-500 dark:text-zinc-400 transition-transform ${
+        className={`hidden shrink-0 lg:block text-zinc-500 dark:text-zinc-400 transition-transform ${
           isOpen ? "rotate-180" : ""
         }`}
       />
