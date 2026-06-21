@@ -29,3 +29,11 @@ export function PlaylistGridSkeleton({ count }: { count: number }) {
     </div>
   );
 }
+
+export function PlaylistsResultsSummarySkeleton() {
+  return (
+    <div className="flex justify-end" aria-hidden>
+      <Bone className="h-4 w-48" />
+    </div>
+  );
+}

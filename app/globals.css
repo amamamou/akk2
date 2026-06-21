@@ -16,8 +16,10 @@
 }
 
 .dark {
-  --background: #18181b;
+  --background: #09090c;
   --foreground: #ededed;
+  --shell-chrome: #18181b;
+  --shell-track: #09090c;
 }
 
 body {

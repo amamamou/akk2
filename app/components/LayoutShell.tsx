@@ -19,13 +19,13 @@ export default function LayoutShell({
   }
 
   return (
-    <div className="grid h-screen grid-rows-[72px_1fr] dark:bg-zinc-900">
+    <div className="grid h-screen grid-rows-[64px_1fr] dark:bg-[#18181B] lg:grid-rows-[76px_1fr]">
       <Navbar />
 
-  <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1 overflow-hidden">
         <SidebarWrapper />
 
-        <main className="flex-1 overflow-auto bg-white dark:bg-zinc-900">
+        <main className="flex-1 overflow-auto bg-white dark:bg-[#09090C]">
           {children}
         </main>
       </div>

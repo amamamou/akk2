@@ -283,8 +283,9 @@ export default function EditPlaylistModal({
             <button
               type="button"
               onClick={onClose}
-              className="inline-flex h-10 items-center rounded-xl border border-gray-200 bg-white px-4 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800"
+              className="inline-flex h-10 items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800"
             >
+              <X size={15} strokeWidth={2} className="shrink-0 opacity-70" />
               Cancel
             </button>
             <button
@@ -306,8 +307,12 @@ export default function EditPlaylistModal({
                   : undefined
               }
             >
-              {saving ? <Loader2 size={15} className="animate-spin" /> : null}
-              Save changes
+              {saving ? (
+                <Loader2 size={15} className="animate-spin" />
+              ) : (
+                <Check size={15} strokeWidth={2.5} />
+              )}
+              {saving ? "Saving…" : "Save changes"}
             </button>
           </div>
         </footer>

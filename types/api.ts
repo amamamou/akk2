@@ -74,6 +74,12 @@ export interface MediaInfo {
   singer?: string;
   tenantId?: string;
   tenant_id?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  created_at?: string;
+  updated_at?: string;
+  addedAt?: string;
+  modifiedAt?: string;
 }
 
 export interface MediaListResponse {

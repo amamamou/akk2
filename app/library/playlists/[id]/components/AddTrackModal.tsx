@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AudioLines, Check, Loader2, Pause, Play, Search, X } from "lucide-react";
+import { AudioLines, Check, Loader2, Pause, Play, Plus, Search, X } from "lucide-react";
 import {
   dashboardAccentShadow,
   dashboardCardClass,
@@ -340,8 +340,9 @@ export default function AddTrackModal({
                         type="button"
                         onClick={() => onAdd(item.id)}
                         disabled={Boolean(addingId)}
-                        className="inline-flex h-8 shrink-0 items-center justify-center rounded-lg px-3 text-xs font-medium text-[#8B5CF6] transition-colors hover:bg-[#A473FF]/10 disabled:opacity-50"
+                        className="inline-flex h-8 shrink-0 items-center justify-center gap-1 rounded-lg px-3 text-xs font-medium text-[#8B5CF6] transition-colors hover:bg-[#A473FF]/10 disabled:opacity-50"
                       >
+                        <Plus size={14} strokeWidth={2} className="shrink-0" />
                         Add
                       </button>
                     )}

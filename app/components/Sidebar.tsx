@@ -10,15 +10,24 @@ import {
   LogOut,
   LayoutDashboard,
   CalendarDays,
-  Speaker,
+  Radio,
   ListMusic,
   Music,
   BarChart3,
   Settings,
   Users,
 } from "lucide-react";
-import { ConfirmDialog } from "./ConfirmDialog";
+import SignOutModal from "./SignOutModal";
 import { isSuperAdminRole } from "@/lib/rbac";
+import { cn } from "@/utils/cn";
+
+const shellTrackClass = "bg-zinc-100/80 dark:bg-[#09090C]/90";
+
+const shellActiveClass =
+  "bg-zinc-900 text-white shadow-sm shadow-zinc-900/15 dark:bg-zinc-100 dark:text-zinc-900 dark:shadow-none";
+
+const shellInactiveClass =
+  "text-zinc-500 hover:bg-white/70 hover:text-zinc-800 dark:text-zinc-400 dark:hover:bg-[#18181B]/60 dark:hover:text-zinc-100";
 
 export default function Sidebar() {
   const { logout, user } = useAuth();
@@ -59,8 +68,8 @@ export default function Sidebar() {
 
   return (
     <>
-      <aside className="fixed bottom-0 left-0 right-0 lg:static w-full h-20 lg:h-full lg:w-[76px] bg-white dark:bg-zinc-900 flex lg:flex-col items-center justify-between lg:justify-start lg:py-4 px-4 lg:px-0 border-t lg:border-t-0 border-zinc-200 dark:border-zinc-800">
-        <div className="hidden lg:flex bg-[#F4F4F5] dark:bg-zinc-900 rounded-full px-2 py-2 flex-col items-center gap-2">
+      <aside className="fixed bottom-0 left-0 right-0 z-40 flex h-20 w-full items-center justify-between bg-white/95 px-4 backdrop-blur-md dark:bg-[#18181B]/95 lg:static lg:h-full lg:w-[76px] lg:flex-col lg:justify-start lg:px-0 lg:py-4">
+        <div className={cn("hidden flex-col items-center gap-2 rounded-full px-2 py-2 lg:flex", shellTrackClass)}>
           <ThemeSidebarButton
             icon={<SunDim size={16} strokeWidth={1.9} />}
             active={theme === "light"}
@@ -75,7 +84,7 @@ export default function Sidebar() {
           />
         </div>
 
-        <div className="flex lg:flex-col lg:mt-6 bg-[#F4F4F5] dark:bg-zinc-900 rounded-full lg:px-2.5 lg:py-3 px-2 py-2 items-center gap-2">
+        <div className={cn("flex items-center gap-2 rounded-full px-2 py-2 lg:mt-6 lg:flex-col lg:px-2.5 lg:py-3", shellTrackClass)}>
           <SidebarButton
             href="/dashboard"
             icon={<LayoutDashboard size={15} strokeWidth={1.9} />}
@@ -95,7 +104,7 @@ export default function Sidebar() {
 
           <SidebarButton
             href="/players"
-            icon={<Speaker size={15} strokeWidth={1.9} />}
+            icon={<Radio size={15} strokeWidth={1.9} />}
           />
 
           <SidebarButton
@@ -119,7 +128,7 @@ export default function Sidebar() {
           />
         </div>
 
-        <div className="bg-[#F4F4F5] dark:bg-zinc-900 rounded-full px-2 py-2 flex lg:flex-col items-center gap-2 lg:mt-auto">
+        <div className={cn("flex items-center gap-2 rounded-full px-2 py-2 lg:mt-auto lg:flex-col", shellTrackClass)}>
           <SidebarButton
             icon={
               <LogOut
@@ -133,15 +142,12 @@ export default function Sidebar() {
         </div>
       </aside>
 
-      <ConfirmDialog
-        isOpen={showLogoutDialog}
-        title="Sign out?"
-        description="You'll be logged out of your account."
-        confirmText="Sign Out"
-        cancelText="Cancel"
+      <SignOutModal
+        open={showLogoutDialog}
+        onClose={() => setShowLogoutDialog(false)}
         onConfirm={handleLogoutConfirm}
-        onCancel={() => setShowLogoutDialog(false)}
-        isDangerous={false}
+        userName={user?.name}
+        userEmail={user?.email}
       />
     </>
   );
@@ -164,17 +170,10 @@ function ThemeSidebarButton({
       onClick={onClick}
       aria-label={label}
       aria-pressed={active}
-      className={`
-        flex items-center justify-center
-        h-8 w-8 rounded-full
-        transition-all duration-200
-        relative
-        ${
-          active
-            ? "bg-[#111827] text-white dark:bg-zinc-100 dark:text-zinc-900"
-            : "text-zinc-500 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800 hover:text-zinc-800 dark:hover:text-zinc-200"
-        }
-      `}
+      className={cn(
+        "relative flex h-8 w-8 items-center justify-center rounded-full transition-all duration-200",
+        active ? shellActiveClass : shellInactiveClass
+      )}
     >
       {active && (
         <div className="absolute inset-0 rounded-full overflow-hidden">
@@ -228,18 +227,10 @@ function SidebarButton({
       type="button"
       onClick={handleClick}
       aria-current={isActive ? "page" : undefined}
-      className={`
-        flex items-center justify-center
-        h-8 w-8 rounded-full
-        transition-all duration-200
-        relative
-        group
-        ${
-          isActive
-            ? "bg-[#111827] text-white dark:bg-zinc-100 dark:text-zinc-900"
-            : "text-zinc-500 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800 hover:text-zinc-800 dark:hover:text-zinc-200"
-        }
-      `}
+      className={cn(
+        "group relative flex h-8 w-8 items-center justify-center rounded-full transition-all duration-200",
+        isActive ? shellActiveClass : shellInactiveClass
+      )}
     >
       {isActive && (
         <div className="absolute inset-0 rounded-full overflow-hidden">

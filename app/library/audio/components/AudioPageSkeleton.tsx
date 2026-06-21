@@ -1,6 +1,9 @@
 import React from "react";
 import { cn } from "@/utils/cn";
-import { dashboardCardClass } from "@/app/dashboard/dashboard-styles";
+import {
+  dashboardCardClass,
+  dashboardHeroSectionClass,
+} from "@/app/dashboard/dashboard-styles";
 
 function Bone({ className }: { className?: string }) {
   return (
@@ -51,11 +54,11 @@ export function AudioListSkeleton({ count = 10 }: { count?: number }) {
 
 function AudioHeroSkeleton() {
   return (
-    <section className="pb-1">
+    <section className={dashboardHeroSectionClass}>
       <div className="flex flex-col gap-8 lg:flex-row lg:items-end lg:justify-between">
         <div className="min-w-0 space-y-2">
           <Bone className="h-3 w-36" />
-          <Bone className="h-9 w-32 sm:h-10" />
+          <Bone className="h-9 w-28 sm:h-10" />
           <Bone className="h-4 w-full max-w-xl" />
         </div>
         <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center lg:min-w-[420px] lg:w-auto">
@@ -72,10 +75,11 @@ function AudioToolbarSkeleton() {
     <div className="space-y-3">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex flex-wrap items-center gap-2">
-          <Bone className="h-3 w-14" />
-          <Bone className="h-10 w-full min-w-[160px] flex-1 rounded-xl sm:w-[180px] sm:flex-none" />
-          <Bone className="ml-1 h-3 w-12" />
-          <Bone className="h-10 w-full min-w-[160px] flex-1 rounded-xl sm:w-[180px] sm:flex-none" />
+          <Bone className="h-3 w-8" />
+          <Bone className="h-7 w-[72px] rounded-lg" />
+          <Bone className="h-7 w-[60px] rounded-lg" />
+          <Bone className="h-7 w-[72px] rounded-lg" />
+          <Bone className="h-7 w-[60px] rounded-lg" />
         </div>
         <div className="flex items-center gap-2">
           <Bone className="h-10 w-full min-w-[160px] flex-1 rounded-xl sm:w-[180px] sm:flex-none" />
@@ -88,8 +92,7 @@ function AudioToolbarSkeleton() {
 
 function AudioResultsSummarySkeleton() {
   return (
-    <div className="flex items-center gap-2">
-      <Bone className="h-4 w-4 rounded" />
+    <div className="flex justify-end">
       <Bone className="h-4 w-48" />
     </div>
   );

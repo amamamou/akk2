@@ -11,13 +11,12 @@ import {
 } from "@/app/dashboard/dashboard-styles";
 import { cn } from "@/utils/cn";
 
-export default function AudioHero({
-  onUploadClick,
-  searchSlot,
-}: {
+interface AudioHeroProps {
   onUploadClick: () => void;
   searchSlot: React.ReactNode;
-}) {
+}
+
+export default function AudioHero({ onUploadClick, searchSlot }: AudioHeroProps) {
   return (
     <section className={dashboardHeroSectionClass}>
       <div className="flex flex-col gap-8 lg:flex-row lg:items-end lg:justify-between">
@@ -27,7 +26,7 @@ export default function AudioHero({
             Audio
           </h1>
           <p className={cn(dashboardPanelSubtitle, "max-w-xl text-sm")}>
-            Find, preview, and manage audio files used across playlists and broadcasts.
+            Manage audios for playlists, scheduling, and broadcast across your spaces.
           </p>
         </div>
 

@@ -1,15 +1,29 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
-import { Building2, X, MapPin, Wifi, Cpu } from "lucide-react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import { Loader2, Plus, Radio, Wifi, X } from "lucide-react";
 import { useAuth } from "@/app/context/AuthContext";
 import { getApiClient } from "@/lib/api-client";
 import { toActiveWorkspaceClients, type WorkspaceClientOption } from "@/lib/workspace-clients";
+import {
+  dashboardAccentShadow,
+  dashboardCardClass,
+  dashboardIconChip,
+  dashboardPanelSubtitle,
+  dashboardPanelTitle,
+  dashboardSectionLabel,
+} from "@/app/dashboard/dashboard-styles";
+import { cn } from "@/utils/cn";
+
+const INPUT_CLASS =
+  "mt-2 w-full rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 focus:border-[#A473FF]/40 focus:outline-none focus:ring-2 focus:ring-[#A473FF]/15 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:placeholder:text-zinc-500";
 
 interface AddPlayerModalProps {
   isOpen: boolean;
   onClose: () => void;
   defaultClientId?: string;
+  /** When set, player is always created in this workspace (selector hidden). */
+  lockedClientId?: string;
   onSubmit: (data: {
     name: string;
     locationName?: string;
@@ -20,21 +34,41 @@ interface AddPlayerModalProps {
   }) => Promise<void>;
 }
 
+function resetForm(setters: {
+  setName: (v: string) => void;
+  setLocationName: (v: string) => void;
+  setIpAddress: (v: string) => void;
+  setDeviceId: (v: string) => void;
+  setSubmitError: (v: string | null) => void;
+  setSelectedClientId: (v: string) => void;
+  defaultClientId: string;
+}) {
+  setters.setName("");
+  setters.setLocationName("");
+  setters.setIpAddress("");
+  setters.setDeviceId("");
+  setters.setSubmitError(null);
+  setters.setSelectedClientId(setters.defaultClientId);
+}
+
 export default function AddPlayerModal({
   isOpen,
   onClose,
   onSubmit,
   defaultClientId = "",
+  lockedClientId,
 }: AddPlayerModalProps) {
   const { user } = useAuth();
   const isSuperAdmin = String(user?.role || "").toUpperCase() === "SUPER_ADMIN";
   const requireClientSelection = isSuperAdmin;
+  const clientSelectionLocked = Boolean(lockedClientId);
 
   const [workspaceClients, setWorkspaceClients] = useState<WorkspaceClientOption[]>([]);
   const [clientsLoading, setClientsLoading] = useState(false);
   const [clientsError, setClientsError] = useState<string | null>(null);
   const [selectedClientId, setSelectedClientId] = useState(defaultClientId);
   const [isLoading, setIsLoading] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [locationName, setLocationName] = useState("");
   const [ipAddress, setIpAddress] = useState("");
@@ -54,8 +88,9 @@ export default function AddPlayerModal({
         if (cancelled) return;
         const eligible = toActiveWorkspaceClients(res?.clients ?? []);
         setWorkspaceClients(eligible);
-        if (defaultClientId && eligible.some((c) => c.id === defaultClientId)) {
-          setSelectedClientId(defaultClientId);
+        const preferredClientId = lockedClientId || defaultClientId;
+        if (preferredClientId && eligible.some((c) => c.id === preferredClientId)) {
+          setSelectedClientId(preferredClientId);
         } else if (eligible.length > 0) {
           setSelectedClientId(eligible[0].id);
         }
@@ -72,31 +107,66 @@ export default function AddPlayerModal({
     return () => {
       cancelled = true;
     };
-  }, [isOpen, isSuperAdmin, defaultClientId]);
+  }, [isOpen, isSuperAdmin, defaultClientId, lockedClientId]);
+
+  const effectiveClientId = lockedClientId || defaultClientId;
 
   useEffect(() => {
     if (!isOpen) return;
-    if (defaultClientId) {
-      setSelectedClientId(defaultClientId);
-    }
-  }, [isOpen, defaultClientId]);
+    resetForm({
+      setName,
+      setLocationName,
+      setIpAddress,
+      setDeviceId,
+      setSubmitError,
+      setSelectedClientId,
+      defaultClientId: effectiveClientId,
+    });
+    const t = window.setTimeout(() => nameInputRef.current?.focus(), 50);
+    return () => window.clearTimeout(t);
+  }, [isOpen, effectiveClientId]);
+
+  const handleClose = useCallback(() => {
+    if (isLoading) return;
+    resetForm({
+      setName,
+      setLocationName,
+      setIpAddress,
+      setDeviceId,
+      setSubmitError,
+      setSelectedClientId,
+      defaultClientId: effectiveClientId,
+    });
+    onClose();
+  }, [isLoading, effectiveClientId, onClose]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") handleClose();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [isOpen, handleClose]);
 
   const selectedClient = workspaceClients.find((c) => c.id === selectedClientId);
+  const canSubmit =
+    name.trim().length > 0 &&
+    (!requireClientSelection ||
+      (!clientsLoading && Boolean(selectedClientId) && workspaceClients.length > 0));
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
+  const handleSubmit = async () => {
     if (requireClientSelection && !selectedClient) {
-      alert("Please select a client workspace");
+      setSubmitError("Select a client workspace before adding a player.");
       return;
     }
-
     if (!name.trim()) {
-      alert("Player name is required");
+      setSubmitError("Player name is required.");
       return;
     }
 
     setIsLoading(true);
+    setSubmitError(null);
     try {
       await onSubmit({
         name: name.trim(),
@@ -106,18 +176,22 @@ export default function AddPlayerModal({
         clientId: selectedClient?.id,
         tenantId: selectedClient?.tenantId,
       });
-
-      setName("");
-      setLocationName("");
-      setIpAddress("");
-      setDeviceId("");
+      resetForm({
+        setName,
+        setLocationName,
+        setIpAddress,
+        setDeviceId,
+        setSubmitError,
+        setSelectedClientId,
+        defaultClientId: effectiveClientId,
+      });
       onClose();
-    } catch (error) {
-      console.error("Failed to add player:", error);
-      const msg =
-        (error as { message?: string })?.message ||
-        "Failed to add player. Please try again.";
-      alert(msg);
+    } catch (err: unknown) {
+      const ax = err as { response?: { data?: { error?: string } }; message?: string };
+      setSubmitError(
+        ax?.response?.data?.error ||
+          (err instanceof Error ? err.message : "Failed to add player. Please try again.")
+      );
     } finally {
       setIsLoading(false);
     }
@@ -126,37 +200,63 @@ export default function AddPlayerModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center">
-      <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
-        <div className="flex items-center justify-between p-6 border-b border-gray-200">
-          <h2 className="text-lg font-semibold text-gray-900">Add New Player</h2>
+    <div
+      className="fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="add-player-title"
+    >
+      <button
+        type="button"
+        aria-label="Close dialog"
+        className="absolute inset-0 bg-black/40 backdrop-blur-[2px]"
+        onClick={handleClose}
+      />
+
+      <div
+        className={cn(
+          dashboardCardClass,
+          "relative z-10 flex max-h-[92vh] w-full max-w-lg flex-col overflow-hidden sm:max-h-none",
+          dashboardAccentShadow
+        )}
+      >
+        <header className="flex items-start justify-between gap-4 border-b border-gray-100 px-6 py-5 dark:border-zinc-700/60">
+          <div className="min-w-0">
+            <div className="mb-2 flex items-center gap-2">
+              <div className={cn(dashboardIconChip, "h-8 w-8 rounded-lg")}>
+                <Radio size={15} className="text-[#8B5CF6]" strokeWidth={2} />
+              </div>
+              <span className={dashboardSectionLabel}>Device fleet</span>
+            </div>
+            <h2 id="add-player-title" className={cn(dashboardPanelTitle, "text-lg")}>
+              Add player
+            </h2>
+            <p className={cn(dashboardPanelSubtitle, "mt-1 max-w-sm")}>
+              Name the device, set its location, and optionally add network details.
+            </p>
+          </div>
           <button
             type="button"
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600"
+            onClick={handleClose}
             disabled={isLoading}
+            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 disabled:opacity-50 dark:hover:bg-zinc-800"
           >
-            <X size={20} />
+            <X size={18} />
           </button>
-        </div>
+        </header>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          {requireClientSelection && (
-            <div>
-              <label
-                htmlFor="add-player-client"
-                className="text-sm font-medium text-gray-700 block mb-2 flex items-center gap-2"
-              >
-                <Building2 size={16} className="text-gray-500" />
-                Client Workspace *
+        <div className="flex-1 overflow-y-auto px-6 py-5">
+          {requireClientSelection && !clientSelectionLocked ? (
+            <div className="mb-5">
+              <label htmlFor="add-player-client" className={dashboardSectionLabel}>
+                Client workspace
               </label>
               <select
                 id="add-player-client"
                 value={selectedClientId}
                 onChange={(e) => setSelectedClientId(e.target.value)}
-                className="w-full px-3 py-2 border border-violet-200 bg-violet-50 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#A473FF]/30"
+                className={cn(INPUT_CLASS, "appearance-none")}
                 disabled={isLoading || clientsLoading || workspaceClients.length === 0}
-                required
               >
                 <option value="" disabled>
                   {clientsLoading ? "Loading clients…" : "Choose a client…"}
@@ -167,103 +267,155 @@ export default function AddPlayerModal({
                   </option>
                 ))}
               </select>
-              {clientsError && (
-                <p className="text-xs text-red-600 mt-1">{clientsError}</p>
-              )}
-              {!clientsLoading && workspaceClients.length === 0 && !clientsError && (
-                <p className="text-xs text-amber-700 mt-1">
-                  No active clients with a linked tenant are available.
+              {clientsError ? (
+                <p className="mt-1.5 text-xs font-medium text-rose-600 dark:text-rose-400">
+                  {clientsError}
                 </p>
-              )}
+              ) : null}
+              {!clientsLoading && workspaceClients.length === 0 && !clientsError ? (
+                <p className="mt-1.5 text-xs text-amber-600 dark:text-amber-400">
+                  No active client workspaces are available.
+                </p>
+              ) : null}
             </div>
-          )}
+          ) : null}
 
-          <div>
-            <label className="text-sm font-medium text-gray-700 block mb-2">
-              Player Name *
-            </label>
-            <input
-              ref={nameInputRef}
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. Lobby Speaker"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#A473FF]/30"
-              disabled={isLoading}
-              required
-            />
+          <div className="space-y-4">
+            <div>
+              <label htmlFor="add-player-name" className={dashboardSectionLabel}>
+                Name
+              </label>
+              <input
+                ref={nameInputRef}
+                id="add-player-name"
+                autoFocus
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && canSubmit && !isLoading) void handleSubmit();
+                }}
+                placeholder="e.g. Lobby speaker"
+                className={INPUT_CLASS}
+                disabled={isLoading}
+              />
+            </div>
+
+            <div>
+              <label htmlFor="add-player-location" className={dashboardSectionLabel}>
+                Location
+                <span className="ml-1 normal-case tracking-normal text-gray-400">
+                  (optional)
+                </span>
+              </label>
+              <input
+                id="add-player-location"
+                type="text"
+                value={locationName}
+                onChange={(e) => setLocationName(e.target.value)}
+                placeholder="e.g. Reception area"
+                className={INPUT_CLASS}
+                disabled={isLoading}
+              />
+            </div>
           </div>
 
-          <div>
-            <label className="text-sm font-medium text-gray-700 block mb-2 flex items-center gap-2">
-              <MapPin size={16} className="text-gray-500" />
-              Location Name
-            </label>
-            <input
-              type="text"
-              value={locationName}
-              onChange={(e) => setLocationName(e.target.value)}
-              placeholder="e.g. Reception Area"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#A473FF]/30"
-              disabled={isLoading}
-            />
+          <div className="mt-6">
+            <div className="mb-3 flex items-center gap-2">
+              <Wifi size={14} className="text-gray-400" />
+              <span className={dashboardSectionLabel}>Device details</span>
+              <span className="text-[10px] font-medium normal-case tracking-normal text-gray-400">
+                (optional)
+              </span>
+            </div>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div>
+                <label htmlFor="add-player-ip" className={dashboardSectionLabel}>
+                  IP address
+                </label>
+                <input
+                  id="add-player-ip"
+                  type="text"
+                  value={ipAddress}
+                  onChange={(e) => setIpAddress(e.target.value)}
+                  placeholder="192.168.1.100"
+                  className={INPUT_CLASS}
+                  disabled={isLoading}
+                />
+              </div>
+
+              <div>
+                <label htmlFor="add-player-device" className={dashboardSectionLabel}>
+                  Device ID
+                </label>
+                <input
+                  id="add-player-device"
+                  type="text"
+                  value={deviceId}
+                  onChange={(e) => setDeviceId(e.target.value)}
+                  placeholder="DEVICE-12345"
+                  className={INPUT_CLASS}
+                  disabled={isLoading}
+                />
+              </div>
+            </div>
           </div>
 
-          <div>
-            <label className="text-sm font-medium text-gray-700 block mb-2 flex items-center gap-2">
-              <Wifi size={16} className="text-gray-500" />
-              IP Address
-            </label>
-            <input
-              type="text"
-              value={ipAddress}
-              onChange={(e) => setIpAddress(e.target.value)}
-              placeholder="e.g. 192.168.1.100"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#A473FF]/30"
-              disabled={isLoading}
-            />
-          </div>
+          {submitError ? (
+            <p className="mt-4 text-xs font-medium text-rose-600 dark:text-rose-400">
+              {submitError}
+            </p>
+          ) : null}
+        </div>
 
-          <div>
-            <label className="text-sm font-medium text-gray-700 block mb-2 flex items-center gap-2">
-              <Cpu size={16} className="text-gray-500" />
-              Device ID
-            </label>
-            <input
-              type="text"
-              value={deviceId}
-              onChange={(e) => setDeviceId(e.target.value)}
-              placeholder="e.g. DEVICE-12345"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#A473FF]/30"
-              disabled={isLoading}
-            />
-          </div>
-
-          <div className="flex gap-2 pt-4 border-t border-gray-200">
+        <footer className="flex items-center justify-between gap-3 border-t border-gray-100 px-6 py-4 dark:border-zinc-700/60">
+          <p className="hidden items-center gap-1.5 text-xs text-gray-400 sm:flex">
+            <Radio size={12} />
+            Device appears in fleet after registration
+          </p>
+          <div className="flex w-full items-center justify-end gap-2 sm:w-auto">
             <button
               type="button"
-              onClick={onClose}
-              className="flex-1 px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+              onClick={handleClose}
               disabled={isLoading}
+              className="inline-flex h-10 items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800"
             >
+              <X size={15} strokeWidth={2} className="shrink-0 opacity-70" />
               Cancel
             </button>
             <button
-              type="submit"
-              className="flex-1 px-4 py-2 bg-[#A473FF] text-white rounded-md text-sm font-medium hover:brightness-90 disabled:opacity-50"
-              disabled={
-                isLoading ||
-                !name.trim() ||
-                (requireClientSelection &&
-                  (clientsLoading ||
-                    !selectedClientId ||
-                    workspaceClients.length === 0))
+              type="button"
+              onClick={() => void handleSubmit()}
+              disabled={!canSubmit || isLoading}
+              className={cn(
+                "inline-flex h-10 items-center gap-2 rounded-xl px-5 text-sm font-medium transition-opacity",
+                canSubmit && !isLoading
+                  ? "text-white hover:opacity-90"
+                  : "cursor-not-allowed bg-gray-200 text-gray-400 dark:bg-zinc-800 dark:text-zinc-500"
+              )}
+              style={
+                canSubmit && !isLoading
+                  ? {
+                      background:
+                        "linear-gradient(135deg, #18181B 0%, #202538 38%, #A473FF 100%)",
+                    }
+                  : undefined
               }
             >
-              {isLoading ? "Adding..." : "Add Player"}
+              {isLoading ? (
+                <>
+                  <Loader2 size={16} strokeWidth={2} className="shrink-0 animate-spin" />
+                  Adding…
+                </>
+              ) : (
+                <>
+                  <Plus size={16} strokeWidth={2} className="shrink-0" />
+                  Add 
+                </>
+              )}
             </button>
           </div>
-        </form>
+        </footer>
       </div>
     </div>
   );

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AlertCircle, ShieldAlert } from "lucide-react";
 import { useAuth } from "@/app/context/AuthContext";
@@ -24,6 +24,7 @@ import ClientsToolbar, {
 import ClientCard from "./components/ClientCard";
 import ClientsEmptyState from "./components/ClientsEmptyState";
 import ClientsPageSkeleton from "./components/ClientsPageSkeleton";
+import PlaylistsPagination from "@/app/library/playlists/components/PlaylistsPagination";
 import {
   dashboardCardClass,
   dashboardContainerClass,
@@ -74,6 +75,9 @@ export default function ClientsClient() {
   const [statusFilter, setStatusFilter] = useState<ClientStatusFilter>("all");
   const [planFilter, setPlanFilter] = useState<ClientPlanFilter>("all");
   const [sort, setSort] = useState<ClientSortKey>("name-asc");
+  const [page, setPage] = useState(1);
+  const [perPage, setPerPage] = useState(10);
+  const perPageOptions = [5, 10, 20, 50];
   const [createOpen, setCreateOpen] = useState(false);
   const [createLoading, setCreateLoading] = useState(false);
   const [toastOpen, setToastOpen] = useState(false);
@@ -186,6 +190,23 @@ export default function ClientsClient() {
     return sortClients(result, sort, billingByClientIdResolved);
   }, [clients, query, statusFilter, planFilter, sort, billingByClientIdResolved]);
 
+  const filteredCount = filteredClients.length;
+  const totalCount = clients.length;
+  const totalPages = Math.max(1, Math.ceil(filteredCount / perPage));
+
+  useEffect(() => {
+    setPage(1);
+  }, [query, statusFilter, planFilter, sort]);
+
+  useEffect(() => {
+    if (page > totalPages) setPage(totalPages);
+  }, [page, totalPages]);
+
+  const paginatedClients = useMemo(() => {
+    const start = (page - 1) * perPage;
+    return filteredClients.slice(start, start + perPage);
+  }, [filteredClients, page, perPage]);
+
   const clearFilters = () => {
     setQuery("");
     setStatusFilter("all");
@@ -270,7 +291,6 @@ export default function ClientsClient() {
     );
   }
 
-  const totalCount = clients.length;
   const showToolbar = totalCount > 0;
   const emptyVariant =
     totalCount === 0 ? ("no-clients" as const) : ("no-results" as const);
@@ -281,15 +301,6 @@ export default function ClientsClient() {
         <ClientsHero
           onCreateClick={() => setCreateOpen(true)}
           searchSlot={<ClientsSearch query={query} setQuery={setQuery} />}
-          summarySlot={
-            totalCount > 0 ? (
-              <ClientsResultsSummary
-                filteredCount={filteredClients.length}
-                totalCount={totalCount}
-                hasActiveFilters={hasActiveFilters}
-              />
-            ) : null
-          }
         />
 
         {loadError ? (
@@ -315,6 +326,17 @@ export default function ClientsClient() {
           />
         ) : null}
 
+        {showToolbar && filteredCount > 0 ? (
+          <ClientsResultsSummary
+            page={page}
+            perPage={perPage}
+            filteredCount={filteredCount}
+            totalCount={totalCount}
+            displayedCount={paginatedClients.length}
+            hasActiveFilters={hasActiveFilters}
+          />
+        ) : null}
+
         {filteredClients.length === 0 ? (
           <ClientsEmptyState
             variant={emptyVariant}
@@ -328,7 +350,7 @@ export default function ClientsClient() {
               refreshing && "pointer-events-none opacity-60"
             )}
           >
-            {filteredClients.map((client) => {
+            {paginatedClients.map((client) => {
               const billing = billingByClientIdResolved[client.id];
               return (
                 <ClientCard
@@ -355,6 +377,20 @@ export default function ClientsClient() {
             })}
           </div>
         )}
+
+        {filteredCount > 0 ? (
+          <PlaylistsPagination
+            page={page}
+            setPage={setPage}
+            perPage={perPage}
+            setPerPage={setPerPage}
+            perPageOptions={perPageOptions}
+            totalPages={totalPages}
+            disabled={refreshing}
+            showTopBorder={false}
+            ariaLabel="Client pagination"
+          />
+        ) : null}
       </div>
 
       <CreateClientModal

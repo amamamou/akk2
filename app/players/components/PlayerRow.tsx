@@ -1,110 +1,61 @@
 "use client";
+
 import React, { useEffect, useRef, useState } from "react";
-import { cn } from '@/utils/cn';
-import { useAuth } from '@/app/context/AuthContext';
-import { createPortal } from "react-dom";
-import { Cast, MoreHorizontal, Pencil, Trash } from "lucide-react";
-import PlayerActions from "./PlayerActions";
-import ConfirmDialog from "@/components/ui/ConfirmDialog";
+import { Loader2, Pencil, Radio, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { useAuth } from "@/app/context/AuthContext";
+import { cn } from "@/utils/cn";
+import { STATUS_CONFIG } from "../lib/player-status";
+import type { PlayerViewModel } from "../types";
+import PlayerActions from "./PlayerActions";
 
-type Track = { id: string; title: string; duration?: number };
-type Upcoming = { id: string; title: string; time?: string };
+const rowActionClass =
+  "inline-flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 transition-colors opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-visible:opacity-100";
 
-type Player = {
-  id: string;
-  roomId: string;
-  roomName: string;
-  playerName: string;
-  status: "online" | "offline" | "idle";
-  nowPlaying?: Track | null;
-  nextEvent?: Upcoming | null;
-  playingProgress?: number;
-  isPlaying?: boolean;
-  playlist?: Track[];
-};
-
-export default function PlayerRow({ player, onPlayPause, onSkip, onRename, onDelete, onRequestEdit, editing }: { player: Player; onPlayPause: (id: string) => void; onSkip: (id: string) => void; onRename: (id: string, name: string) => void; onDelete?: (id: string) => void; onRequestEdit?: (id: string) => void; editing?: boolean }) {
+export default function PlayerRow({
+  player,
+  onPlayPause,
+  onSkip,
+  onRename,
+  onRequestDelete,
+  onRequestEdit,
+  editing,
+  deleting = false,
+}: {
+  player: PlayerViewModel;
+  showClient?: boolean;
+  onPlayPause: (id: string) => void;
+  onSkip: (id: string) => void;
+  onRename: (id: string, name: string) => void;
+  onRequestDelete?: () => void;
+  onRequestEdit?: (id: string) => void;
+  editing?: boolean;
+  deleting?: boolean;
+}) {
   const router = useRouter();
-  const [isEditing, setIsEditing] = useState<boolean>(!!editing);
-  // edit the room name (user request) instead of the player name
+  const { user } = useAuth();
+  const isSuperAdmin = user?.role === "SUPER_ADMIN";
+  const status = STATUS_CONFIG[player.status];
+  const [isEditing, setIsEditing] = useState(!!editing);
   const [name, setName] = useState(player.roomName);
   const inputRef = useRef<HTMLInputElement | null>(null);
-  const [menuOpen, setMenuOpen] = useState(false);
-  const { user } = useAuth();
-  const [confirmOpen, setConfirmOpen] = useState(false);
-  const menuRefDesktop = useRef<HTMLDivElement | null>(null);
-  const menuRefMobile = useRef<HTMLDivElement | null>(null);
-  const menuTriggerDesktopRef = useRef<HTMLButtonElement | null>(null);
-  const menuTriggerMobileRef = useRef<HTMLButtonElement | null>(null);
-  const [menuTarget, setMenuTarget] = useState<"desktop" | "mobile" | null>(null);
-  const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(null);
+
+  const locationLabel = player.locationName || player.roomName || player.playerName;
+  const playbackLabel = player.nowPlaying?.title ?? "Nothing playing";
+  const playlistLabel =
+    player.playlist.length > 0
+      ? `${player.playlist.length} track${player.playlist.length === 1 ? "" : "s"}`
+      : "No playlist";
 
   useEffect(() => {
-    if (editing) {
-      const t = setTimeout(() => {
-        setIsEditing(true);
-        inputRef.current?.focus();
-        inputRef.current?.select?.();
-      }, 50);
-      return () => clearTimeout(t);
-    }
+    if (!editing) return;
+    const t = window.setTimeout(() => {
+      setIsEditing(true);
+      inputRef.current?.focus();
+      inputRef.current?.select?.();
+    }, 50);
+    return () => window.clearTimeout(t);
   }, [editing]);
-
-  // close menu on outside pointer interactions or Escape
-  useEffect(() => {
-    function onDocPointer(e: PointerEvent) {
-      if (!menuOpen) return;
-
-      // Walk up from the event target to check if it's inside one of our elements.
-  let node: Node | null = e.target as Node | null;
-      while (node) {
-        if (menuRefDesktop.current && node === menuRefDesktop.current) return;
-        if (menuTriggerDesktopRef.current && node === menuTriggerDesktopRef.current) return;
-        if (menuRefMobile.current && node === menuRefMobile.current) return;
-        if (menuTriggerMobileRef.current && node === menuTriggerMobileRef.current) return;
-        node = node.parentNode;
-      }
-
-      setMenuOpen(false);
-    }
-
-    function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") setMenuOpen(false);
-    }
-
-    // use pointerdown in capture so we can inspect the composed path before React synthetic events
-    document.addEventListener("pointerdown", onDocPointer, true);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("pointerdown", onDocPointer, true);
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [menuOpen]);
-
-  // compute and update portal menu position
-  useEffect(() => {
-  if (!menuOpen || !menuTarget) return;
-  const trigger = menuTarget === "desktop" ? menuTriggerDesktopRef.current : menuTriggerMobileRef.current;
-  if (!trigger) return;
-
-    const menuWidth = 192; // w-48 -> 12rem -> 192px
-    function updatePos() {
-      if (!trigger) return;
-      const rect = trigger.getBoundingClientRect();
-      const left = Math.min(Math.max(rect.right - menuWidth, 8), window.innerWidth - menuWidth - 8) + window.scrollX;
-      const top = rect.bottom + 8 + window.scrollY;
-      setMenuPos({ top, left });
-    }
-
-    updatePos();
-    window.addEventListener("resize", updatePos);
-    window.addEventListener("scroll", updatePos, { passive: true });
-    return () => {
-      window.removeEventListener("resize", updatePos);
-      window.removeEventListener("scroll", updatePos);
-    };
-  }, [menuOpen, menuTarget]);
 
   function save() {
     if (name.trim() === "") return;
@@ -112,203 +63,92 @@ export default function PlayerRow({ player, onPlayPause, onSkip, onRename, onDel
     setIsEditing(false);
   }
 
+  const metaParts = [status.label, locationLabel].filter(Boolean);
+
   return (
-    <div
-      role="button"
-      tabIndex={0}
-      aria-pressed={false}
-      onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-        }
-      }}
+    <article
       className={cn(
-        "group",
-        "grid grid-cols-[56px_1fr_auto]",
-        "gap-5 items-center",
-
-        "px-5 py-4",
-
-        "rounded-2xl",
-
-        "bg-[#FAFAFB] dark:bg-zinc-900/60",
-
-        "border border-transparent dark:border-zinc-800",
-
-        "transition-all duration-200",
-
-        "hover:bg-white dark:hover:bg-zinc-900/80",
-        "hover:border-gray-100 dark:hover:border-zinc-700",
-        "hover:shadow-[0_8px_24px_rgba(0,0,0,0.04)]",
-
-        "focus-visible:outline-none",
-        "focus-visible:ring-2",
-        "focus-visible:ring-[#A473FF]/20",
+        "group relative grid grid-cols-[auto_1fr_auto] items-center gap-3 px-4 py-3",
+        "border-b border-gray-100 last:border-b-0 dark:border-zinc-800/80 sm:grid-cols-[36px_1fr_minmax(0,9rem)_minmax(0,7rem)_auto] sm:gap-4 sm:px-5",
+        "transition-colors hover:bg-[#A473FF]/[0.04] dark:hover:bg-[#A473FF]/[0.06]"
       )}
-      onClick={() => { /* keep row click available for parent if needed */ }}
     >
-      {/* ICON with status overlay */}
-      <div className="flex items-center justify-center w-14 h-14">
-        <div className="relative rounded-xl p-2.5 bg-[#A473FF]">
-          <Cast size={16} className="text-white" />
-
-          <span
-            className={`absolute bottom-1 right-1 h-3 w-3 rounded-full border-2 border-white ${player.status === 'online' ? 'bg-emerald-500' : 'bg-zinc-300'}`}
-            aria-hidden
-          />
-        </div>
+      <div
+        className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-gray-400 dark:text-zinc-500"
+        aria-hidden
+      >
+        <Radio size={14} strokeWidth={2} />
       </div>
 
-      {/* MAIN */}
       <div className="min-w-0">
-        <div className="text-[15px] font-semibold text-zinc-900 dark:text-zinc-100 truncate">
-          {isEditing ? (
-            <input
-              ref={inputRef}
-              value={name}
-              placeholder="Enter location name"
-              onChange={(e) => setName(e.target.value)}
-              onBlur={save}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") save();
-                if (e.key === "Escape") {
-                  setName(player.roomName);
-                  setIsEditing(false);
-                }
-              }}
-              className={`w-full rounded-md border px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-gray-300 transition-colors md:mr-36 md:max-w-[40ch] max-w-[28ch] ${
-                name.trim() === "" ? "border-dashed border-gray-300 bg-gray-50" : "border-gray-300 bg-white"
-              }`}
-            />
-          ) : (
-            <span
-              onClick={(e) => { e.stopPropagation(); setIsEditing(true); setTimeout(() => { inputRef.current?.focus(); inputRef.current?.select?.(); }, 50); }}
-              className="cursor-pointer truncate"
-              title={player.roomName}
-            >
-              {player.roomName}
-            </span>
-          )}
-
-        </div>
-
-        <div className="mt-1 flex items-center gap-2 text-xs text-zinc-500">
-          <span>{player.playerName}</span>
-          <span className="h-1 w-1 rounded-full bg-zinc-300" />
-          <span>{player.status === 'online' ? 'Connected' : 'Offline'}</span>
-        </div>
-
-        {player.nowPlaying && (
-          <div className="mt-2 flex items-center gap-2">
-            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-            <span className="text-[11px] text-zinc-400 truncate">Now playing {player.nowPlaying.title}</span>
-          </div>
-        )}
-      </div>
-
-      {/* STATUS + NOW PLAYING */}
-      <div className="md:col-auto col-span-2 flex items-center md:justify-end justify-start gap-3 w-full">
-        <div className={cn(
-          "hidden md:flex items-center gap-2 transition-all duration-200 transform z-30",
-          menuOpen ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-2',
-          'group-hover:opacity-100 group-hover:translate-x-0'
-        )}>
-          <PlayerActions
-            isPlaying={!!player.isPlaying}
-            onPlayPause={(e) => { e?.stopPropagation(); onPlayPause(player.id); }}
-            onSkip={(e) => { e?.stopPropagation(); onSkip(player.id); }}
-            onOpenSchedule={(e) => { e?.stopPropagation(); router.push(`/schedule?roomId=${encodeURIComponent(player.id)}`); }}
+        {isEditing ? (
+          <input
+            ref={inputRef}
+            value={name}
+            placeholder="Player name"
+            onChange={(e) => setName(e.target.value)}
+            onBlur={save}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") save();
+              if (e.key === "Escape") {
+                setName(player.roomName);
+                setIsEditing(false);
+              }
+            }}
+            className="w-full max-w-sm rounded-lg border border-gray-200 bg-white px-2.5 py-1 text-sm text-gray-900 focus:border-[#A473FF]/40 focus:outline-none focus:ring-2 focus:ring-[#A473FF]/15 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
           />
-
-
-          <div className="relative">
-            <button
-              ref={menuTriggerDesktopRef}
-              onClick={(e) => { e.stopPropagation(); setMenuTarget('desktop'); setMenuOpen((s) => !s); }}
-              title="More options"
-              className="p-1.5 rounded hover:bg-gray-100 text-gray-500 hover:text-gray-700 transition-colors focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-gray-200"
-            >
-              <MoreHorizontal size={16} />
-            </button>
-            {menuOpen && menuTarget === 'desktop' && menuPos && createPortal(
-              <div ref={menuRefDesktop} onPointerDown={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()} style={{ position: 'absolute', top: menuPos.top, left: menuPos.left, width: 192 }} className="bg-white border border-gray-200 rounded-xl shadow-xl z-50 overflow-hidden backdrop-blur-sm">
-                <button
-                  aria-label="Rename"
-                  onClick={() => { setMenuOpen(false); setMenuTarget(null); onRequestEdit?.(player.id); }}
-                  className="w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 cursor-pointer transition-colors"
-                >
-                  <Pencil size={16} className="text-gray-500" />
-                  <span>Rename</span>
-                </button>
-                <div className="h-px bg-gray-100" />
-                {user?.role === 'SUPER_ADMIN' && (
-                  <button
-                    aria-label="Delete"
-                    onClick={() => { setMenuOpen(false); setMenuTarget(null); setConfirmOpen(true); }}
-                    className="group w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 cursor-pointer transition-colors"
-                  >
-                    <Trash size={16} className="text-gray-500" />
-                    <span>Delete</span>
-                  </button>
-                )}
-              </div>,
-              document.body
-            )}
-          </div>
-          {/* delete moved to kebab menu */}
-        </div>
-
-  {/* mobile kebab */}
-  <div className="md:hidden ml-auto relative z-30">
-          <button
-            ref={menuTriggerMobileRef}
-            onClick={(e) => { e.stopPropagation(); setMenuTarget('mobile'); setMenuOpen((s) => !s); }}
-            title="Actions"
-            className="p-2 rounded-md text-gray-500 hover:bg-gray-100"
-            aria-label="Open actions"
-          >
-            <MoreHorizontal size={18} />
-          </button>
-          {menuOpen && menuTarget === 'mobile' && menuPos && createPortal(
-            <div ref={menuRefMobile} onPointerDown={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()} style={{ position: 'absolute', top: menuPos.top, left: menuPos.left, width: 192 }} className="bg-white border border-gray-200 rounded-xl shadow-xl z-50 overflow-hidden backdrop-blur-sm">
-              <button
-                aria-label="Rename"
-                onClick={() => { setMenuOpen(false); setMenuTarget(null); onRequestEdit?.(player.id); }}
-                className="w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 cursor-pointer transition-colors"
-              >
-                <Pencil size={16} className="text-gray-500" />
-                <span>Rename</span>
-              </button>
-              <div className="h-px bg-gray-100" />
-              <button
-                aria-label="Delete"
-                onClick={() => { setMenuOpen(false); setMenuTarget(null); setConfirmOpen(true); }}
-                className="group w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 cursor-pointer transition-colors"
-              >
-                <Trash size={16} className="text-gray-500" />
-                <span>Delete</span>
-              </button>
-            </div>,
-            document.body
-          )}
-        </div>
+        ) : (
+          <p className="truncate text-sm font-medium text-gray-950 dark:text-zinc-100">
+            {player.roomName}
+          </p>
+        )}
+        <p className="mt-0.5 truncate text-xs text-gray-400">{metaParts.join(" · ")}</p>
       </div>
 
-      {/* menu */}
-      {/* menu is now rendered adjacent to the buttons above */}
+      <p className="hidden truncate text-xs text-gray-400 sm:block">{playbackLabel}</p>
 
-      <ConfirmDialog
-        open={confirmOpen}
-        title="Delete player"
-        description={`This will remove “${player.roomName}” from your players. You can re-add it later, but its current playback state will be lost.`}
-        confirmLabel="Delete player"
-        cancelLabel="Cancel"
-        onCancel={() => setConfirmOpen(false)}
-        onConfirm={() => {
-          setConfirmOpen(false);
-          onDelete?.(player.id);
-        }}
-      />
-    </div>
+      <p className="hidden truncate text-xs text-gray-400 sm:block">{playlistLabel}</p>
+
+      <div className="flex items-center justify-end gap-0.5">
+        <PlayerActions
+          isPlaying={!!player.isPlaying}
+          onPlayPause={() => onPlayPause(player.id)}
+          onSkip={() => onSkip(player.id)}
+          onOpenSchedule={() => router.push(`/schedule?roomId=${encodeURIComponent(player.id)}`)}
+        />
+
+        <button
+          type="button"
+          onClick={() => onRequestEdit?.(player.id)}
+          aria-label={`Rename ${player.roomName}`}
+          className={cn(
+            rowActionClass,
+            "hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
+          )}
+        >
+          <Pencil size={14} />
+        </button>
+
+        {isSuperAdmin && onRequestDelete ? (
+          <button
+            type="button"
+            onClick={onRequestDelete}
+            disabled={deleting}
+            aria-label={`Delete ${player.roomName}`}
+            className={cn(
+              rowActionClass,
+              "hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-950/30",
+              deleting && "cursor-wait opacity-50"
+            )}
+          >
+            {deleting ? (
+              <Loader2 size={14} className="animate-spin" />
+            ) : (
+              <Trash2 size={14} />
+            )}
+          </button>
+        ) : null}
+      </div>
+    </article>
   );
 }

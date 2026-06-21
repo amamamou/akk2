@@ -1,6 +1,8 @@
 import type { AudioItem } from "@/app/library/components/AudioTile";
 
 export type AudioSortKey =
+  | "updated-desc"
+  | "created-desc"
   | "title-asc"
   | "title-desc"
   | "duration-desc"
@@ -13,6 +15,30 @@ export type AudioSizeFilterKey = "all" | "small" | "medium" | "large";
 export type AudioCategoryFilterKey = string;
 
 const MB = 1024 * 1024;
+
+function parseTimestamp(value?: string): number | null {
+  if (!value) return null;
+  const ts = Date.parse(value);
+  return Number.isNaN(ts) ? null : ts;
+}
+
+function resolveUpdatedSortKey(
+  item: AudioItem,
+  loadOrder?: Map<string, number>
+): number {
+  const ts = parseTimestamp(item.modifiedAt ?? item.addedAt);
+  if (ts != null) return ts;
+  return loadOrder?.get(item.id) ?? 0;
+}
+
+function resolveCreatedSortKey(
+  item: AudioItem,
+  loadOrder?: Map<string, number>
+): number {
+  const ts = parseTimestamp(item.addedAt ?? item.modifiedAt);
+  if (ts != null) return ts;
+  return loadOrder?.get(item.id) ?? 0;
+}
 
 export function formatFileSize(bytes?: number): string | null {
   if (bytes == null || !Number.isFinite(bytes) || bytes <= 0) return null;
@@ -34,9 +60,23 @@ export function matchesSizeFilter(
   return mb > 20;
 }
 
-export function sortAudioItems(items: AudioItem[], sort: AudioSortKey): AudioItem[] {
+export function sortAudioItems(
+  items: AudioItem[],
+  sort: AudioSortKey,
+  loadOrder?: Map<string, number>
+): AudioItem[] {
   const sorted = [...items];
   switch (sort) {
+    case "updated-desc":
+      sorted.sort(
+        (a, b) => resolveUpdatedSortKey(b, loadOrder) - resolveUpdatedSortKey(a, loadOrder)
+      );
+      break;
+    case "created-desc":
+      sorted.sort(
+        (a, b) => resolveCreatedSortKey(b, loadOrder) - resolveCreatedSortKey(a, loadOrder)
+      );
+      break;
     case "title-asc":
       sorted.sort((a, b) => a.title.localeCompare(b.title));
       break;

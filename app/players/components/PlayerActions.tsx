@@ -1,6 +1,11 @@
 "use client";
+
 import React from "react";
-import { Play, Pause, SkipForward, CalendarDays } from "lucide-react";
+import { CalendarDays, Pause, Play, SkipForward } from "lucide-react";
+import { cn } from "@/utils/cn";
+
+const ghostBtnClass =
+  "inline-flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-zinc-800 dark:hover:text-zinc-300";
 
 export default function PlayerActions({
   isPlaying = false,
@@ -12,9 +17,10 @@ export default function PlayerActions({
   onPlayPause?: (e?: React.MouseEvent<HTMLButtonElement>) => void;
   onSkip?: (e?: React.MouseEvent<HTMLButtonElement>) => void;
   onOpenSchedule?: (e?: React.MouseEvent<HTMLButtonElement>) => void;
+  compact?: boolean;
 }) {
   return (
-    <div className="flex items-center gap-2 text-gray-700">
+    <div className="flex items-center gap-0.5">
       <button
         type="button"
         onClick={(e) => {
@@ -24,9 +30,9 @@ export default function PlayerActions({
         aria-label={isPlaying ? "Pause" : "Play"}
         title={isPlaying ? "Pause" : "Play"}
         aria-pressed={isPlaying}
-        className="rounded-md border border-gray-200 bg-white p-2 text-gray-700 transition-colors duration-150 hover:bg-gray-100"
+        className={cn(ghostBtnClass, isPlaying && "text-[#8B5CF6] dark:text-[#A473FF]")}
       >
-        {isPlaying ? <Pause size={14} /> : <Play size={14} />}
+        {isPlaying ? <Pause size={14} strokeWidth={2} /> : <Play size={14} strokeWidth={2} />}
       </button>
       <button
         type="button"
@@ -34,26 +40,26 @@ export default function PlayerActions({
           e.stopPropagation();
           onSkip?.(e);
         }}
-        aria-label="Skip"
-        title="Skip"
-        className="rounded-md border border-gray-200 bg-white p-2 text-gray-700 transition-colors duration-150 hover:bg-gray-100"
+        aria-label="Skip track"
+        title="Skip track"
+        className={ghostBtnClass}
       >
-        <SkipForward size={14} />
+        <SkipForward size={14} strokeWidth={2} />
       </button>
-      {onOpenSchedule && (
+      {onOpenSchedule ? (
         <button
           type="button"
           onClick={(e) => {
             e.stopPropagation();
-            onOpenSchedule?.(e);
+            onOpenSchedule(e);
           }}
           aria-label="Open schedule"
           title="View schedule"
-          className="rounded-md border border-gray-200 bg-white p-2 text-gray-700 transition-colors duration-150 hover:bg-gray-100"
+          className={ghostBtnClass}
         >
-          <CalendarDays size={14} />
+          <CalendarDays size={14} strokeWidth={2} />
         </button>
-      )}
+      ) : null}
     </div>
   );
 }

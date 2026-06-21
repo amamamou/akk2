@@ -279,7 +279,7 @@ export function PlaylistsResultsSummary({
   }
 
   return (
-    <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-zinc-400">
+    <div className="flex flex-wrap items-center justify-end gap-x-2 gap-y-1 text-right text-sm text-gray-500 dark:text-zinc-400">
       <ListMusic size={14} strokeWidth={2} className="shrink-0 text-gray-400" />
       <p>{primary}</p>
       {isPaginated && isFiltered && (

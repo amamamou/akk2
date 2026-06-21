@@ -7,11 +7,20 @@ import { usePathname, useRouter } from "next/navigation";
 import { ChevronDown, LogOut, Moon, Settings, Sun } from "lucide-react";
 import { useAuth } from "@/app/context/AuthContext";
 import { useTheme } from "@/app/context/ThemeContext";
-import { ConfirmDialog } from "./ConfirmDialog";
+import SignOutModal from "./SignOutModal";
 
 import type { UserProfileEventDetail } from "@/lib/user-profile-events";
+import { cn } from "@/utils/cn";
 
 const USER_STORAGE_KEY = "akou.user";
+
+const shellTrackClass = "bg-zinc-100/80 dark:bg-[#09090C]/90";
+
+const shellActiveClass =
+  "bg-zinc-900 text-white shadow-sm shadow-zinc-900/15 dark:bg-zinc-100 dark:text-zinc-900 dark:shadow-none";
+
+const shellInactiveClass =
+  "text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100 dark:hover:bg-[#18181B]/60";
 
 function readStoredAvatar(): string | null {
   if (typeof window === "undefined") return null;
@@ -74,11 +83,11 @@ export default function Navbar() {
 
   return (
     <>
-      <header className="h-16 lg:h-[76px] bg-white dark:bg-zinc-900 px-4 lg:px-5 border-b border-zinc-200 dark:border-zinc-800">
-        <div className="flex h-full items-center justify-between lg:grid lg:grid-cols-[300px_1fr_340px]">
+      <header className="relative z-50 h-16 bg-white/85 px-4 backdrop-blur-md dark:bg-[#18181B]/95 lg:h-[76px] lg:px-5">
+        <div className="grid h-full items-center justify-between lg:grid-cols-[300px_1fr_340px]">
           <div className="justify-self-start">
-            <div className="flex items-center gap-3 rounded-full bg-[#F4F4F5] dark:bg-zinc-900 px-3 lg:px-4 py-2">
-              <div className="relative h-8 w-8 overflow-hidden rounded-lg shrink-0 bg-linear-to-br from-gray-100 to-gray-50 dark:from-zinc-800 dark:to-zinc-900 flex items-center justify-center">
+            <div className={cn("flex items-center gap-3 rounded-full px-3 py-2 lg:px-4", shellTrackClass)}>
+              <div className="relative flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-white dark:bg-[#09090C]">
                 <Image
                   src="/akousticarts.webp"
                   alt="Akoustic Arts"
@@ -89,14 +98,14 @@ export default function Navbar() {
                 />
               </div>
 
-              <span className="hidden lg:block text-[15px] font-medium text-zinc-900 dark:text-zinc-100">
+              <span className="hidden text-[15px] font-semibold tracking-tight text-zinc-900 lg:block dark:text-zinc-100">
                 Akoustic Arts
               </span>
             </div>
           </div>
 
           <div className="hidden lg:flex justify-center">
-            <nav className="flex items-center rounded-full bg-[#F4F4F5] dark:bg-zinc-900 p-1">
+            <nav className={cn("flex items-center rounded-full p-1", shellTrackClass)}>
               <NavItem href="/dashboard">Overview</NavItem>
               <NavItem href="/schedule">Schedule</NavItem>
               {(() => {
@@ -116,11 +125,11 @@ export default function Navbar() {
           <div className="flex items-center justify-end gap-2 lg:gap-3">
      
 
-            <div className="hidden lg:flex items-center gap-2 rounded-full bg-[#F4F4F5] dark:bg-zinc-900 px-2 py-1">
+            <div className={cn("hidden items-center gap-1.5 rounded-full px-2 py-1 lg:flex", shellTrackClass)}>
               <button
                 type="button"
                 aria-label="Switch to English"
-                className="flex h-8 w-8 items-center justify-center rounded-full text-zinc-500 dark:text-zinc-400 transition-all duration-200 hover:bg-zinc-50 dark:hover:bg-zinc-800 focus:outline-none focus:ring-2 focus:ring-[#A473FF]"
+                className="flex h-8 w-8 items-center justify-center rounded-full text-zinc-500 transition-all duration-200 hover:bg-white/70 hover:text-zinc-800 focus:outline-none focus:ring-2 focus:ring-[#A473FF]/30 dark:text-zinc-400 dark:hover:bg-[#18181B]/60 dark:hover:text-zinc-100"
               >
                 <span role="img" aria-hidden className="text-sm">
                   🇬🇧
@@ -130,7 +139,7 @@ export default function Navbar() {
               <button
                 type="button"
                 aria-label="Switch to French"
-                className="flex h-8 w-8 items-center justify-center rounded-full text-zinc-500 dark:text-zinc-400 transition-all duration-200 hover:bg-zinc-50 dark:hover:bg-zinc-800 focus:outline-none focus:ring-2 focus:ring-[#A473FF]"
+                className="flex h-8 w-8 items-center justify-center rounded-full text-zinc-500 transition-all duration-200 hover:bg-white/70 hover:text-zinc-800 focus:outline-none focus:ring-2 focus:ring-[#A473FF]/30 dark:text-zinc-400 dark:hover:bg-[#18181B]/60 dark:hover:text-zinc-100"
               >
                 <span role="img" aria-hidden className="text-sm">
                   🇫🇷
@@ -148,12 +157,13 @@ export default function Navbar() {
               {isProfileOpen && (
                 <>
                   <div
-                    className="fixed inset-0 z-30"
+                    className="fixed inset-0 z-[90]"
                     onClick={() => setIsProfileOpen(false)}
                     onKeyDown={(e) => e.key === "Escape" && setIsProfileOpen(false)}
+                    aria-hidden
                   />
-                  <div className="absolute right-0 top-full mt-2 w-56 bg-white dark:bg-zinc-900 rounded-xl shadow-xl border border-zinc-200 dark:border-zinc-800 z-50 overflow-hidden">
-                    <div className="p-4 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/80">
+                  <div className="fixed right-4 top-16 z-[100] mt-1 w-56 overflow-hidden rounded-xl bg-white shadow-lg shadow-black/[0.06] dark:bg-[#18181B] dark:shadow-black/20 lg:right-5 lg:top-[76px]">
+                    <div className="bg-zinc-50/80 p-4 dark:bg-[#09090C]/50">
                       <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
                         {(user as { name?: string } | undefined)?.name ||
                           (user as { email?: string } | undefined)?.email ||
@@ -170,7 +180,7 @@ export default function Navbar() {
                           router.push("/settings");
                           setIsProfileOpen(false);
                         }}
-                        className="w-full px-4 py-2.5 flex items-center gap-3 text-sm text-zinc-700 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors"
+                        className="flex w-full items-center gap-3 px-4 py-2.5 text-sm text-zinc-700 transition-colors hover:bg-zinc-50/90 dark:text-zinc-200 dark:hover:bg-zinc-800/60"
                       >
                         <Settings size={16} className="text-zinc-500 dark:text-zinc-400" />
                         Settings
@@ -181,7 +191,7 @@ export default function Navbar() {
                           setShowLogoutDialog(true);
                           setIsProfileOpen(false);
                         }}
-                        className="w-full px-4 py-2.5 flex items-center gap-3 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
+                        className="flex w-full items-center gap-3 px-4 py-2.5 text-sm text-red-600 transition-colors hover:bg-red-50/90 dark:text-red-400 dark:hover:bg-red-950/30"
                       >
                         <LogOut size={16} className="scale-x-[-1]" />
                         Sign Out
@@ -195,15 +205,12 @@ export default function Navbar() {
         </div>
       </header>
 
-      <ConfirmDialog
-        isOpen={showLogoutDialog}
-        title="Sign out?"
-        description="You'll be logged out of your account."
-        confirmText="Sign Out"
-        cancelText="Cancel"
+      <SignOutModal
+        open={showLogoutDialog}
+        onClose={() => setShowLogoutDialog(false)}
         onConfirm={handleLogoutConfirm}
-        onCancel={() => setShowLogoutDialog(false)}
-        isDangerous={false}
+        userName={user?.name}
+        userEmail={user?.email}
       />
     </>
   );
@@ -232,21 +239,10 @@ function NavItem({
       type="button"
       onClick={onClick}
       aria-current={isActive ? "page" : undefined}
-      className={`
-        rounded-full
-        px-5
-        py-2
-        text-[14px]
-        font-medium
-        transition-all duration-200
-        relative
-        group
-        ${
-          isActive
-            ? "bg-[#111827] text-white dark:bg-zinc-100 dark:text-zinc-900"
-            : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200"
-        }
-      `}
+      className={cn(
+        "group relative rounded-full px-5 py-2 text-[13px] font-medium tracking-tight transition-all duration-200",
+        isActive ? shellActiveClass : shellInactiveClass
+      )}
     >
       {isActive && (
         <div className="absolute inset-0 rounded-full overflow-hidden">
@@ -306,7 +302,11 @@ function UserProfile({
   return (
     <button
       onClick={onToggle}
-      className="flex items-center gap-2 lg:gap-3 rounded-full bg-[#F4F4F5] dark:bg-zinc-900 px-2 lg:px-3 py-1 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+      className={cn(
+        "flex items-center gap-2 rounded-full px-2 py-1 transition-colors lg:gap-3 lg:px-3",
+        shellTrackClass,
+        "hover:bg-zinc-100 dark:hover:bg-[#09090C]/80"
+      )}
     >
       {avatarUrl && !avatarError ? (
         // eslint-disable-next-line @next/next/no-img-element
@@ -318,17 +318,17 @@ function UserProfile({
         />
       ) : (
         <div
-          className="h-8 w-8 rounded-full bg-gradient-to-br from-[#A473FF] to-[#7A42FF] flex items-center justify-center text-xs font-semibold text-white"
+          className="flex h-8 w-8 items-center justify-center rounded-full bg-zinc-200 text-[11px] font-semibold tracking-wide text-zinc-600 dark:bg-[#09090C] dark:text-zinc-200"
           aria-hidden
         >
           {initials || "U"}
         </div>
       )}
 
-      <div className="hidden lg:block leading-tight text-left">
-        <div className="text-[13px] font-medium text-zinc-900 dark:text-zinc-100">{name}</div>
-        <div className="text-[11px] text-zinc-400 dark:text-zinc-500">{email}</div>
-      </div>
+        <div className="hidden text-left leading-tight lg:block">
+          <div className="text-[13px] font-medium tracking-tight text-zinc-900 dark:text-zinc-100">{name}</div>
+          <div className="text-[11px] text-zinc-400 dark:text-zinc-500">{email}</div>
+        </div>
 
       <ChevronDown
         size={14}

@@ -5,8 +5,9 @@ import { AlertCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
 import PlaylistCard from "../components/PlaylistCard";
 import PlaylistModal from "../components/PlaylistModal";
-import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import type { Playlist } from "../components/PlaylistModal";
+import DeletePlaylistModal from "./components/DeletePlaylistModal";
+import { usePlaylistDeleteModal } from "./hooks/usePlaylistDeleteModal";
 import { getApiClient } from "@/lib/api-client";
 import { apiPlaylistToUi, isValidPlaylistId } from "@/lib/playlist-mapper";
 import { dashboardContainerClass, dashboardPageClass } from "@/app/dashboard/dashboard-styles";
@@ -18,7 +19,10 @@ import PlaylistsToolbar, {
   type PlaylistFilterKey,
   type PlaylistSortKey,
 } from "./components/PlaylistsToolbar";
-import { PlaylistGridSkeleton } from "./components/PlaylistCardSkeleton";
+import {
+  PlaylistGridSkeleton,
+  PlaylistsResultsSummarySkeleton,
+} from "./components/PlaylistCardSkeleton";
 import PlaylistsEmptyState from "./components/PlaylistsEmptyState";
 import PlaylistsPagination from "./components/PlaylistsPagination";
 
@@ -69,10 +73,6 @@ export default function LibraryPlaylistsClient() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [deleteOpen, setDeleteOpen] = useState(false);
-  const [selectedPlaylistForDelete, setSelectedPlaylistForDelete] = useState<Playlist | null>(
-    null
-  );
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<PlaylistSortKey>("updated-desc");
   const [filter, setFilter] = useState<PlaylistFilterKey>("all");
@@ -163,7 +163,7 @@ export default function LibraryPlaylistsClient() {
   }, [playlists, query, filter, sort, loadOrder]);
 
   const [page, setPage] = useState(1);
-  const [perPage, setPerPage] = useState(5);
+  const [perPage, setPerPage] = useState(10);
   const perPageOptions = [5, 10, 20, 50];
   const filteredCount = filteredPlaylists.length;
   const totalCount = playlists.length;
@@ -201,6 +201,21 @@ export default function LibraryPlaylistsClient() {
   const showEmptyNoResults =
     !loading && totalCount > 0 && filteredCount === 0;
 
+  const {
+    playlistToDelete,
+    deleteOpen,
+    deleteLoading,
+    requestDelete,
+    closeDeleteModal,
+    confirmDelete,
+  } = usePlaylistDeleteModal({
+    apiClient,
+    setError,
+    onDeleted: async () => {
+      await loadPlaylists({ refresh: true });
+    },
+  });
+
   return (
     <div className={dashboardPageClass}>
       <div className={dashboardContainerClass}>
@@ -230,16 +245,19 @@ export default function LibraryPlaylistsClient() {
           />
         )}
 
-        {!loading && !showEmptyNoPlaylists && (
-          <PlaylistsResultsSummary
-            page={page}
-            perPage={perPage}
-            filteredCount={filteredCount}
-            totalCount={totalCount}
-            displayedCount={paginatedPlaylists.length}
-            hasActiveFilters={hasActiveFilters}
-          />
-        )}
+        {!showEmptyNoPlaylists &&
+          (loading ? (
+            <PlaylistsResultsSummarySkeleton />
+          ) : (
+            <PlaylistsResultsSummary
+              page={page}
+              perPage={perPage}
+              filteredCount={filteredCount}
+              totalCount={totalCount}
+              displayedCount={paginatedPlaylists.length}
+              hasActiveFilters={hasActiveFilters}
+            />
+          ))}
 
         {loading ? (
           <PlaylistGridSkeleton count={perPage} />
@@ -280,9 +298,8 @@ export default function LibraryPlaylistsClient() {
                   }
                 }}
                 onDelete={(id) => {
-                  const p = playlists.find((pl) => pl.id === id) || null;
-                  setSelectedPlaylistForDelete(p);
-                  setDeleteOpen(true);
+                  const p = playlists.find((pl) => pl.id === id);
+                  if (p) requestDelete(p);
                 }}
               />
             ))}
@@ -340,29 +357,12 @@ export default function LibraryPlaylistsClient() {
         }}
       />
 
-      <ConfirmDialog
+      <DeletePlaylistModal
         open={deleteOpen}
-        title="Delete playlist"
-        description={`This will permanently delete "${selectedPlaylistForDelete?.title}". This action cannot be undone.`}
-        confirmLabel="Delete"
-        cancelLabel="Cancel"
-        onCancel={() => {
-          setDeleteOpen(false);
-          setSelectedPlaylistForDelete(null);
-        }}
-        onConfirm={async () => {
-          const id = selectedPlaylistForDelete?.id;
-          if (!id) return;
-          try {
-            await apiClient.deletePlaylist(id);
-            await loadPlaylists();
-          } catch {
-            setPlaylists((prev) => prev.filter((p) => p.id !== id));
-            persistCache(playlists.filter((p) => p.id !== id));
-          }
-          setSelectedPlaylistForDelete(null);
-          setDeleteOpen(false);
-        }}
+        playlist={playlistToDelete}
+        onClose={closeDeleteModal}
+        onConfirm={confirmDelete}
+        isDeleting={deleteLoading}
       />
     </div>
   );

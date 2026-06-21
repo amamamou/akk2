@@ -4,7 +4,6 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter, useParams } from "next/navigation";
 import { AlertCircle, Check } from "lucide-react";
-import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import type { Playlist } from "../../components/PlaylistModal";
 import { getApiClient } from "@/lib/api-client";
 import { formatApiError } from "@/lib/format-api-error";
@@ -22,6 +21,10 @@ import {
 import { cn } from "@/utils/cn";
 import PlaylistDetailSkeleton from "./components/PlaylistDetailSkeleton";
 import PlaylistDetailWorkspace from "./components/PlaylistDetailWorkspace";
+import DeletePlaylistModal from "../components/DeletePlaylistModal";
+import RemovePlaylistTrackModal from "../components/RemovePlaylistTrackModal";
+import { usePlaylistDeleteModal } from "../hooks/usePlaylistDeleteModal";
+import { useRemovePlaylistTrackModal } from "../hooks/useRemovePlaylistTrackModal";
 import EditPlaylistModal, { type CoverKey } from "./components/EditPlaylistModal";
 import AddTrackModal from "./components/AddTrackModal";
 import PreviewPlayer from "./components/PreviewPlayer";
@@ -74,7 +77,6 @@ export default function PlaylistDetailClient({
   const [tracks, setTracks] = useState<PlaylistTrackInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [deleteOpen, setDeleteOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [editSaved, setEditSaved] = useState(false);
   const [mediaPickerOpen, setMediaPickerOpen] = useState(false);
@@ -91,7 +93,6 @@ export default function PlaylistDetailClient({
   const [toast, setToast] = useState<string | null>(null);
   const [successToast, setSuccessToast] = useState<string | null>(null);
   const [addingMediaId, setAddingMediaId] = useState<string | null>(null);
-  const [removingItemId, setRemovingItemId] = useState<string | null>(null);
   const [trackQuery, setTrackQuery] = useState("");
   const titleRef = useRef<HTMLInputElement | null>(null);
 
@@ -130,6 +131,19 @@ export default function PlaylistDetailClient({
     "This audio track is already present inside this playlist.";
 
   const activePlaylistId = playlist?.id ?? playlistId;
+
+  const {
+    playlistToDelete,
+    deleteOpen,
+    deleteLoading,
+    requestDelete,
+    closeDeleteModal,
+    confirmDelete,
+  } = usePlaylistDeleteModal({
+    apiClient,
+    router,
+    setError,
+  });
 
   useEffect(() => {
     if (!toast) return;
@@ -303,6 +317,25 @@ export default function PlaylistDetailClient({
     syncPlaybackState();
   }, [setActiveTrack, syncPlaybackState]);
 
+  const {
+    trackToRemove,
+    removeOpen,
+    removeLoading,
+    requestRemove,
+    closeRemoveModal,
+    confirmRemove,
+  } = useRemovePlaylistTrackModal({
+    activePlaylistId,
+    playlistTitle: playlist?.title,
+    activeTrackId,
+    stopPreview,
+    removePlaylistItemMutation,
+    setPlaylist,
+    setTracks,
+    setError,
+    setSuccessToast,
+  });
+
   const hydrateMediaCatalog = useCallback(
     async (res: Awaited<ReturnType<typeof apiClient.listMedia>>) => {
       const urls: Record<string, string> = {};
@@ -370,34 +403,6 @@ export default function PlaylistDetailClient({
       setError(formatApiError(err, "Failed to save playlist"));
     } finally {
       setSaving(false);
-    }
-  }
-
-  async function removeTrack(itemId: string) {
-    if (!isValidPlaylistId(activePlaylistId)) {
-      setError("Cannot remove track — playlist ID is missing.");
-      return;
-    }
-    if (!itemId?.trim()) {
-      setError("Cannot remove track — invalid item ID from server.");
-      return;
-    }
-
-    if (activeTrackId === itemId) {
-      stopPreview();
-    }
-    setRemovingItemId(itemId);
-    try {
-      const res = await removePlaylistItemMutation.mutateAsync({
-        playlistId: activePlaylistId,
-        itemId,
-      });
-      syncPlaylistState(res, { setPlaylist, setTracks });
-      setSuccessToast("Track removed");
-    } catch (err) {
-      setError(formatApiError(err, "Failed to remove track"));
-    } finally {
-      setRemovingItemId(null);
     }
   }
 
@@ -639,13 +644,14 @@ export default function PlaylistDetailClient({
           tracks={tracks}
           trackQuery={trackQuery}
           onTrackQueryChange={setTrackQuery}
-          removingId={removingItemId}
+          removingId={removeLoading ? trackToRemove?.id ?? null : null}
           getPreview={getPreviewForTrack}
           onPreviewPlay={(t) => void handlePreviewLaunch(t)}
-          onRemove={(id) => void removeTrack(id)}
+          onRemove={requestRemove}
           onAddTracks={() => void openMediaPicker()}
           onEdit={openEdit}
-          onDelete={() => setDeleteOpen(true)}
+          onDelete={() => requestDelete(playlist)}
+          deleteLoading={deleteLoading}
         />
       </div>
 
@@ -683,23 +689,21 @@ export default function PlaylistDetailClient({
         sessionAddedCount={sessionAddedCount}
       />
 
-      <ConfirmDialog
+      <RemovePlaylistTrackModal
+        open={removeOpen}
+        track={trackToRemove}
+        playlistTitle={playlist.title}
+        onClose={closeRemoveModal}
+        onConfirm={confirmRemove}
+        isRemoving={removeLoading}
+      />
+
+      <DeletePlaylistModal
         open={deleteOpen}
-        title="Delete playlist"
-        description={`This will permanently delete "${playlist.title}". This action cannot be undone.`}
-        confirmLabel="Delete"
-        cancelLabel="Cancel"
-        onCancel={() => setDeleteOpen(false)}
-        onConfirm={async () => {
-          if (!isValidPlaylistId(activePlaylistId)) return;
-          try {
-            await apiClient.deletePlaylist(activePlaylistId);
-            router.push("/library/playlists");
-          } catch (err) {
-            setError(formatApiError(err, "Failed to delete playlist"));
-          }
-          setDeleteOpen(false);
-        }}
+        playlist={playlistToDelete}
+        onClose={closeDeleteModal}
+        onConfirm={confirmDelete}
+        isDeleting={deleteLoading}
       />
 
       {previewPlayerState && (

@@ -1,13 +1,11 @@
 "use client";
 
 import React from "react";
-import { Building2, CalendarRange, Radio } from "lucide-react";
+import { Radio, Users } from "lucide-react";
 import { dashboardMutedSurface, dashboardSectionLabel } from "@/app/dashboard/dashboard-styles";
 import { cn } from "@/utils/cn";
 import type { PlayerInfo } from "@/types/api";
 import type { WorkspaceClientOption } from "@/lib/workspace-clients";
-
-type TimeRange = "today" | "7d" | "month";
 
 const filterSelectClass =
   "h-10 w-full appearance-none rounded-xl border border-gray-200 bg-white py-0 pl-9 pr-8 text-sm text-gray-700 focus:border-[#A473FF]/40 focus:outline-none focus:ring-2 focus:ring-[#A473FF]/15 disabled:cursor-not-allowed disabled:opacity-60 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200";
@@ -26,8 +24,6 @@ interface AnalyticsToolbarProps {
     device: string;
     lastActive: string;
   };
-  timeRange: TimeRange;
-  onTimeRangeChange: (range: TimeRange) => void;
 }
 
 export default function AnalyticsToolbar({
@@ -40,8 +36,6 @@ export default function AnalyticsToolbar({
   playerOptions,
   resolveDeviceLabel,
   selectedPlayerMeta,
-  timeRange,
-  onTimeRangeChange,
 }: AnalyticsToolbarProps) {
   return (
     <div className="space-y-3">
@@ -51,7 +45,7 @@ export default function AnalyticsToolbar({
             <>
               <span className={cn("mr-0.5", dashboardSectionLabel)}>Client</span>
               <div className="relative min-w-[160px] flex-1 sm:flex-none sm:min-w-[200px]">
-                <Building2
+                <Users
                   size={14}
                   strokeWidth={2}
                   className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
@@ -117,27 +111,6 @@ export default function AnalyticsToolbar({
               <span className="text-gray-500 dark:text-zinc-400">{selectedPlayerMeta.device}</span>
             </div>
           )}
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2">
-          <span className={cn("mr-0.5", dashboardSectionLabel)}>Period</span>
-          <div className="relative min-w-[160px] flex-1 sm:flex-none sm:min-w-[180px]">
-            <CalendarRange
-              size={14}
-              strokeWidth={2}
-              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-            />
-            <select
-              value={timeRange}
-              onChange={(e) => onTimeRangeChange(e.target.value as TimeRange)}
-              aria-label="Time range"
-              className={filterSelectClass}
-            >
-              <option value="today">Today</option>
-              <option value="7d">Last 7 days</option>
-              <option value="month">This month</option>
-            </select>
-          </div>
         </div>
       </div>
     </div>

@@ -471,7 +471,7 @@ export default function AnalyticsClient() {
   return (
     <div className={dashboardPageClass}>
       <div className={dashboardContainerClass}>
-        <AnalyticsHero />
+        <AnalyticsHero timeRange={timeRange} onTimeRangeChange={setTimeRange} />
 
         <AnalyticsToolbar
           isSuperAdmin={isSuperAdmin}
@@ -483,8 +483,6 @@ export default function AnalyticsClient() {
           playerOptions={playerOptions}
           resolveDeviceLabel={resolveDeviceLabel}
           selectedPlayerMeta={selectedPlayerMeta}
-          timeRange={timeRange}
-          onTimeRangeChange={setTimeRange}
         />
 
         {isLoading ? (

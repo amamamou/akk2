@@ -5,7 +5,6 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { AlertCircle, Check } from "lucide-react";
 import EditAudioModal from "../components/EditAudioModal";
-import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import type { AudioItem } from "../components/AudioTile";
 import { getApiClient } from "@/lib/api-client";
 import { fetchMedia } from "@/lib/query-fetchers";
@@ -34,6 +33,8 @@ import AudioListRow, { type AudioRowPreviewState } from "./components/AudioListR
 import AudioListPanel from "./components/AudioListPanel";
 import AudioEmptyState from "./components/AudioEmptyState";
 import AudioPageSkeleton from "./components/AudioPageSkeleton";
+import DeleteAudioModal from "./components/DeleteAudioModal";
+import { useAudioDeleteModal } from "./hooks/useAudioDeleteModal";
 import {
   getCategoryOptions,
   matchesSizeFilter,
@@ -55,6 +56,17 @@ function mapMediaToAudioItem(
     item.artist?.trim() ||
     parseMediaArtist(item.category);
 
+  const addedAt =
+    item.addedAt ??
+    item.createdAt ??
+    item.created_at ??
+    undefined;
+  const modifiedAt =
+    item.modifiedAt ??
+    item.updatedAt ??
+    item.updated_at ??
+    addedAt;
+
   return {
     id: item.id,
     title: item.title,
@@ -69,6 +81,8 @@ function mapMediaToAudioItem(
     singer,
     url: item.url,
     size: item.fileSize,
+    addedAt,
+    modifiedAt,
   };
 }
 
@@ -80,7 +94,7 @@ export default function LibraryAudioClient() {
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState<AudioCategoryFilter>("all");
   const [sizeFilter, setSizeFilter] = useState<AudioSizeFilterKey>("all");
-  const [sort, setSort] = useState<AudioSortKey>("title-asc");
+  const [sort, setSort] = useState<AudioSortKey>("updated-desc");
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -101,6 +115,14 @@ export default function LibraryAudioClient() {
     () => (mediaQuery.data ?? []).map((item) => mapMediaToAudioItem(item, singerOverrides)),
     [mediaQuery.data, singerOverrides]
   );
+
+  const loadOrder = useMemo(() => {
+    const order = new Map<string, number>();
+    (mediaQuery.data ?? []).forEach((item, index) => {
+      order.set(item.id, index);
+    });
+    return order;
+  }, [mediaQuery.data]);
 
   const loading = mediaQuery.isPending && !mediaQuery.data;
 
@@ -133,8 +155,8 @@ export default function LibraryAudioClient() {
       items = items.filter((a) => a.category === category);
     }
     items = items.filter((a) => matchesSizeFilter(a.size, sizeFilter));
-    return sortAudioItems(items, sort);
-  }, [audios, query, category, sizeFilter, sort]);
+    return sortAudioItems(items, sort, loadOrder);
+  }, [audios, query, category, sizeFilter, sort, loadOrder]);
 
   const totalCount = audios.length;
   const filteredCount = filteredAudios.length;
@@ -389,10 +411,23 @@ export default function LibraryAudioClient() {
 
   // --- Edit / delete ---
   const [editing, setEditing] = useState<AudioItem | null>(null);
-  const [deleteOpen, setDeleteOpen] = useState(false);
-  const [selectedAudioForDelete, setSelectedAudioForDelete] = useState<AudioItem | null>(null);
-  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [successToast, setSuccessToast] = useState<string | null>(null);
+
+  const {
+    audioToDelete,
+    deleteOpen,
+    deleteLoading,
+    requestDelete,
+    closeDeleteModal,
+    confirmDelete,
+  } = useAudioDeleteModal({
+    apiClient,
+    queryClient,
+    activeTrackId,
+    stopPreview,
+    setError,
+    setSuccessToast,
+  });
 
   useEffect(() => {
     if (!successToast) return;
@@ -413,6 +448,7 @@ export default function LibraryAudioClient() {
       setEditing(null);
     } catch {
       setError("Could not save changes. Please try again.");
+      throw new Error("Failed to save audio");
     }
   };
 
@@ -503,11 +539,8 @@ export default function LibraryAudioClient() {
                       preview={getPreviewForRow(item.id)}
                       onPreview={() => void handlePreviewLaunch(item)}
                       onEdit={() => setEditing(item)}
-                      onDelete={() => {
-                        setSelectedAudioForDelete(item);
-                        setDeleteOpen(true);
-                      }}
-                      deleting={deletingId === item.id}
+                      onDelete={() => requestDelete(item)}
+                      deleting={deleteLoading && audioToDelete?.id === item.id}
                     />
                   ))}
                 </div>
@@ -541,33 +574,12 @@ export default function LibraryAudioClient() {
         />
       )}
 
-      <ConfirmDialog
+      <DeleteAudioModal
         open={deleteOpen}
-        title="Delete audio"
-        description={`This will permanently delete "${selectedAudioForDelete?.title}". This action cannot be undone.`}
-        confirmLabel="Delete"
-        cancelLabel="Cancel"
-        onCancel={() => {
-          setDeleteOpen(false);
-          setSelectedAudioForDelete(null);
-        }}
-        onConfirm={async () => {
-          const id = selectedAudioForDelete?.id;
-          if (!id) return;
-          if (activeTrackId === id) stopPreview();
-          setDeletingId(id);
-          try {
-            await apiClient.deleteMedia(id);
-            await queryClient.invalidateQueries({ queryKey: queryKeys.media() });
-            setSuccessToast("Audio deleted");
-          } catch {
-            setError("Failed to delete audio. Please try again.");
-          } finally {
-            setDeletingId(null);
-            setDeleteOpen(false);
-            setSelectedAudioForDelete(null);
-          }
-        }}
+        audio={audioToDelete}
+        onClose={closeDeleteModal}
+        onConfirm={confirmDelete}
+        isDeleting={deleteLoading}
       />
 
       {previewPlayerState && (

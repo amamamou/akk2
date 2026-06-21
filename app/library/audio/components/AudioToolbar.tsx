@@ -3,37 +3,85 @@
 import React, { useRef } from "react";
 import {
   HardDrive,
+  Hash,
   Layers,
-  ListMusic,
+  Music,
   RefreshCw,
   Search,
   SlidersHorizontal,
   X,
 } from "lucide-react";
-import { dashboardSectionLabel } from "@/app/dashboard/dashboard-styles";
+import {
+  dashboardMutedSurface,
+  dashboardSectionLabel,
+} from "@/app/dashboard/dashboard-styles";
 import { cn } from "@/utils/cn";
 import type { AudioSizeFilterKey, AudioSortKey } from "../lib/audio-library-utils";
 
 export type AudioCategoryFilter = "all" | string;
 
-const SIZE_OPTIONS: { value: AudioSizeFilterKey; label: string }[] = [
-  { value: "all", label: "All sizes" },
-  { value: "small", label: "< 5 MB" },
-  { value: "medium", label: "5–20 MB" },
-  { value: "large", label: "> 20 MB" },
+const SIZE_OPTIONS: {
+  value: AudioSizeFilterKey;
+  label: string;
+  icon: React.ElementType;
+}[] = [
+  { value: "all", label: "All sizes", icon: Music },
+  { value: "small", label: "< 5 MB", icon: HardDrive },
+  { value: "medium", label: "5–20 MB", icon: HardDrive },
+  { value: "large", label: "> 20 MB", icon: HardDrive },
 ];
 
-const SORT_OPTIONS: { value: AudioSortKey; label: string }[] = [
+const SORT_OPTIONS: {
+  value: AudioSortKey;
+  label: string;
+}[] = [
+  { value: "updated-desc", label: "Recently updated" },
+  { value: "created-desc", label: "Recently created" },
   { value: "title-asc", label: "Title A–Z" },
   { value: "title-desc", label: "Title Z–A" },
   { value: "duration-desc", label: "Longest" },
   { value: "duration-asc", label: "Shortest" },
-  { value: "size-desc", label: "Largest file" },
-  { value: "size-asc", label: "Smallest file" },
+  { value: "size-desc", label: "Largest" },
+  { value: "size-asc", label: "Smallest" },
 ];
 
-const filterSelectClass =
+const sortSelectClass =
   "h-10 w-full appearance-none rounded-xl border border-gray-200 bg-white py-0 pl-9 pr-8 text-sm text-gray-700 focus:border-[#A473FF]/40 focus:outline-none focus:ring-2 focus:ring-[#A473FF]/15 disabled:cursor-not-allowed disabled:opacity-60 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200";
+
+function FilterPill({
+  active,
+  disabled,
+  onClick,
+  icon: Icon,
+  label,
+}: {
+  active: boolean;
+  disabled?: boolean;
+  onClick: () => void;
+  icon: React.ElementType;
+  label: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className={cn(
+        "inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors",
+        active
+          ? "bg-[#A473FF]/10 text-[#7C3AED] ring-1 ring-[#A473FF]/20 dark:text-[#A473FF]"
+          : cn(
+              dashboardMutedSurface,
+              "text-gray-600 hover:text-gray-900 dark:text-zinc-400 dark:hover:text-zinc-200"
+            ),
+        disabled && "pointer-events-none opacity-60"
+      )}
+    >
+      <Icon size={12} strokeWidth={2} className="opacity-70" />
+      {label}
+    </button>
+  );
+}
 
 export function AudioSearch({
   query,
@@ -113,7 +161,7 @@ export function AudioResultsSummary({
         <span className="font-medium tabular-nums text-gray-900 dark:text-zinc-100">
           {filteredCount}
         </span>{" "}
-        {filteredCount === 1 ? "file" : "files"}
+        {filteredCount === 1 ? "audio" : "audios"}
       </>
     );
   } else if (isFiltered) {
@@ -126,7 +174,7 @@ export function AudioResultsSummary({
         <span className="font-medium tabular-nums text-gray-900 dark:text-zinc-100">
           {totalCount}
         </span>{" "}
-        match your filters
+        {totalCount === 1 ? "audio" : "audios"} match your filters
       </>
     );
   } else {
@@ -135,14 +183,14 @@ export function AudioResultsSummary({
         <span className="font-medium tabular-nums text-gray-900 dark:text-zinc-100">
           {totalCount}
         </span>{" "}
-        {totalCount === 1 ? "file" : "files"}
+        {totalCount === 1 ? "audio" : "audios"}
       </>
     );
   }
 
   return (
-    <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-zinc-400">
-      <ListMusic size={14} strokeWidth={2} className="shrink-0 text-gray-400" />
+    <div className="flex flex-wrap items-center justify-end gap-x-2 gap-y-1 text-right text-sm text-gray-500 dark:text-zinc-400">
+      <Music size={14} strokeWidth={2} className="shrink-0 text-gray-400" />
       <p>{primary}</p>
       {isPaginated && isFiltered && (
         <span className="text-xs text-gray-400">· {totalCount} total in library</span>
@@ -180,52 +228,42 @@ export default function AudioToolbar({
     <div className="space-y-3">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex flex-wrap items-center gap-2">
-          <span className={cn("mr-0.5", dashboardSectionLabel)}>Category</span>
-          <div className="relative min-w-[160px] flex-1 sm:flex-none sm:min-w-[180px]">
-            <Layers
-              size={14}
-              strokeWidth={2}
-              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-            />
-            <select
-              value={category}
+          <span className={cn("mr-0.5", dashboardSectionLabel)}>Show</span>
+          {SIZE_OPTIONS.map((opt) => (
+            <FilterPill
+              key={opt.value}
+              active={sizeFilter === opt.value}
               disabled={refreshing}
-              onChange={(e) => setCategory(e.target.value)}
-              aria-label="Filter by category"
-              className={filterSelectClass}
-            >
-              <option value="all">All</option>
+              onClick={() => setSizeFilter(opt.value)}
+              icon={opt.icon}
+              label={opt.label}
+            />
+          ))}
+
+          {categoryOptions.length > 0 ? (
+            <>
+              <span className={cn("ml-1 mr-0.5", dashboardSectionLabel)}>Category</span>
+              <FilterPill
+                active={category === "all"}
+                disabled={refreshing}
+                onClick={() => setCategory("all")}
+                icon={Layers}
+                label="All"
+              />
               {categoryOptions.map((cat) => (
-                <option key={cat} value={cat}>
-                  {cat}
-                </option>
+                <FilterPill
+                  key={cat}
+                  active={category === cat}
+                  disabled={refreshing}
+                  onClick={() => setCategory(cat)}
+                  icon={Hash}
+                  label={cat}
+                />
               ))}
-            </select>
-          </div>
+            </>
+          ) : null}
 
-          <span className={cn("ml-1 mr-0.5", dashboardSectionLabel)}>File size</span>
-          <div className="relative min-w-[160px] flex-1 sm:flex-none sm:min-w-[180px]">
-            <HardDrive
-              size={14}
-              strokeWidth={2}
-              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-            />
-            <select
-              value={sizeFilter}
-              disabled={refreshing}
-              onChange={(e) => setSizeFilter(e.target.value as AudioSizeFilterKey)}
-              aria-label="Filter by file size"
-              className={filterSelectClass}
-            >
-              {SIZE_OPTIONS.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.label}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {hasActiveFilters && (
+          {hasActiveFilters ? (
             <button
               type="button"
               onClick={onClearFilters}
@@ -235,7 +273,7 @@ export default function AudioToolbar({
               <X size={12} />
               Reset
             </button>
-          )}
+          ) : null}
         </div>
 
         <div className="flex items-center gap-2">
@@ -250,7 +288,7 @@ export default function AudioToolbar({
               disabled={refreshing}
               onChange={(e) => setSort(e.target.value as AudioSortKey)}
               aria-label="Sort audio"
-              className={filterSelectClass}
+              className={sortSelectClass}
             >
               {SORT_OPTIONS.map((opt) => (
                 <option key={opt.value} value={opt.value}>

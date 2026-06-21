@@ -104,7 +104,7 @@ function TrackRow({
         aria-label={`Remove ${track.title}`}
         className={cn(
           "inline-flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 transition-colors",
-          "hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-zinc-800 dark:hover:text-zinc-300",
+          "hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-950/30",
           "opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-visible:opacity-100",
           removing && "cursor-wait opacity-50"
         )}
@@ -169,6 +169,7 @@ export default function PlaylistDetailWorkspace({
   onAddTracks,
   onEdit,
   onDelete,
+  deleteLoading = false,
 }: {
   playlist: Playlist;
   tracks: PlaylistTrackInfo[];
@@ -177,10 +178,11 @@ export default function PlaylistDetailWorkspace({
   removingId?: string | null;
   getPreview: (trackId: string) => TrackPreviewState | undefined;
   onPreviewPlay: (track: PlaylistTrackInfo) => void;
-  onRemove: (itemId: string) => void;
+  onRemove: (track: PlaylistTrackInfo) => void;
   onAddTracks: () => void;
   onEdit: () => void;
   onDelete: () => void;
+  deleteLoading?: boolean;
 }) {
   const relativeUpdated = formatRelativeDate(playlist.lastModified);
 
@@ -254,7 +256,8 @@ export default function PlaylistDetailWorkspace({
             <button
               type="button"
               onClick={onDelete}
-              className="inline-flex h-10 items-center justify-center gap-1.5 rounded-xl px-3 text-sm font-medium text-rose-600 transition-colors hover:bg-rose-50 dark:hover:bg-rose-950/20"
+              disabled={deleteLoading}
+              className="inline-flex h-10 items-center justify-center gap-1.5 rounded-xl border border-gray-200 bg-white px-4 text-sm font-medium text-rose-600 transition-colors hover:border-[#A473FF]/30 hover:bg-[#A473FF]/5 disabled:cursor-wait disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-rose-400 dark:hover:border-[#A473FF]/30 dark:hover:bg-[#A473FF]/10"
             >
               <Trash2 size={15} strokeWidth={1.9} />
               Delete
@@ -354,7 +357,7 @@ export default function PlaylistDetailWorkspace({
                         preview={getPreview(track.id)}
                         removing={removingId === track.id}
                         onPreviewPlay={() => onPreviewPlay(track)}
-                        onRemove={() => onRemove(track.id)}
+                        onRemove={() => onRemove(track)}
                       />
                     );
                   })}

@@ -25,34 +25,10 @@ const TIER_LABELS: Record<string, string> = {
   ENTERPRISE: "Enterprise",
 };
 
-const STATUS_STYLES: Record<
-  ClientInfo["status"],
-  { label: string; className: string }
-> = {
-  ACTIVE: {
-    label: "Active",
-    className:
-      "bg-emerald-50 text-emerald-700 ring-emerald-600/20 dark:bg-emerald-950/40 dark:text-emerald-400 dark:ring-emerald-500/30",
-  },
-  INACTIVE: {
-    label: "Inactive",
-    className:
-      "bg-gray-100 text-gray-600 ring-gray-500/10 dark:bg-zinc-800 dark:text-zinc-400 dark:ring-zinc-600/30",
-  },
-  TRIAL: {
-    label: "Trial",
-    className:
-      "bg-amber-50 text-amber-700 ring-amber-600/20 dark:bg-amber-950/40 dark:text-amber-400 dark:ring-amber-500/30",
-  },
-};
-
-const TIER_STYLES: Record<string, string> = {
-  STARTER:
-    "bg-slate-50 text-slate-700 ring-slate-500/10 dark:bg-zinc-800 dark:text-zinc-300 dark:ring-zinc-600/30",
-  PROFESSIONAL:
-    "bg-violet-50 text-violet-700 ring-violet-600/20 dark:bg-violet-950/40 dark:text-violet-400 dark:ring-violet-500/30",
-  ENTERPRISE:
-    "bg-indigo-50 text-indigo-700 ring-indigo-600/20 dark:bg-indigo-950/40 dark:text-indigo-400 dark:ring-indigo-500/30",
+const STATUS_LABELS: Record<ClientInfo["status"], string> = {
+  ACTIVE: "Active",
+  INACTIVE: "Inactive",
+  TRIAL: "Trial",
 };
 
 function clientInitials(name: string): string {
@@ -84,7 +60,7 @@ export default function ClientCard({
   const outstanding = billing?.outstandingBalance ?? 0;
   const paidTotal = billing?.paidTotal ?? 0;
   const totalInvoiced = billing?.totalInvoiced ?? 0;
-  const statusStyle = STATUS_STYLES[client.status];
+  const statusLabel = STATUS_LABELS[client.status];
   const tierLabel = TIER_LABELS[client.subscriptionTier] ?? client.subscriptionTier;
 
   return (
@@ -92,10 +68,7 @@ export default function ClientCard({
       <div className="flex items-start justify-between gap-4 p-5 pb-4">
         <div className="flex min-w-0 items-start gap-3">
           <div
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-sm font-semibold text-white"
-            style={{
-              background: "linear-gradient(135deg, #18181B 0%, #202538 38%, #A473FF 100%)",
-            }}
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gray-100 text-sm font-medium text-gray-500 dark:bg-zinc-800/80 dark:text-zinc-400"
             aria-hidden
           >
             {clientInitials(client.name)}
@@ -109,26 +82,10 @@ export default function ClientCard({
                 {client.businessType}
               </p>
             ) : null}
+            <p className="mt-1 text-xs text-gray-400">
+              {statusLabel} · {tierLabel}
+            </p>
           </div>
-        </div>
-
-        <div className="flex shrink-0 flex-col items-end gap-2">
-          <span
-            className={cn(
-              "inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ring-1 ring-inset",
-              statusStyle.className
-            )}
-          >
-            {statusStyle.label}
-          </span>
-          <span
-            className={cn(
-              "inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ring-1 ring-inset",
-              TIER_STYLES[client.subscriptionTier] ?? TIER_STYLES.STARTER
-            )}
-          >
-            {tierLabel}
-          </span>
         </div>
       </div>
 

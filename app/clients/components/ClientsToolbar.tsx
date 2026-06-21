@@ -4,11 +4,15 @@ import React, { useRef } from "react";
 import {
   ArrowDownAZ,
   ArrowUpAZ,
+  Building2,
   CircleDot,
   Clock3,
   RefreshCw,
+  Repeat,
   Search,
   SlidersHorizontal,
+  Sparkles,
+  TrendingUp,
   Users,
   Wallet,
   X,
@@ -18,6 +22,7 @@ import {
   dashboardSectionLabel,
 } from "@/app/dashboard/dashboard-styles";
 import { cn } from "@/utils/cn";
+import { PLAN_OPTIONS as SUBSCRIPTION_PLANS } from "../lib/client-form-validation";
 
 export type ClientStatusFilter = "all" | "ACTIVE" | "INACTIVE" | "TRIAL";
 export type ClientPlanFilter = "all" | "STARTER" | "PROFESSIONAL" | "ENTERPRISE";
@@ -38,11 +43,23 @@ const STATUS_OPTIONS: {
   { value: "TRIAL", label: "Trial", icon: CircleDot },
 ];
 
-const PLAN_OPTIONS: { value: ClientPlanFilter; label: string }[] = [
-  { value: "all", label: "All plans" },
-  { value: "STARTER", label: "Starter" },
-  { value: "PROFESSIONAL", label: "Growth" },
-  { value: "ENTERPRISE", label: "Enterprise" },
+const PLAN_ICONS: Record<Exclude<ClientPlanFilter, "all">, React.ElementType> = {
+  STARTER: Sparkles,
+  PROFESSIONAL: TrendingUp,
+  ENTERPRISE: Building2,
+};
+
+const PLAN_FILTER_OPTIONS: {
+  value: ClientPlanFilter;
+  label: string;
+  icon: React.ElementType;
+}[] = [
+  { value: "all", label: "All plans", icon: Repeat },
+  ...SUBSCRIPTION_PLANS.map((plan) => ({
+    value: plan.tier,
+    label: plan.label,
+    icon: PLAN_ICONS[plan.tier],
+  })),
 ];
 
 const SORT_OPTIONS: {
@@ -69,6 +86,41 @@ interface ClientsToolbarProps {
   onRefresh: () => void;
   refreshing?: boolean;
   showSearch?: boolean;
+}
+
+function FilterPill({
+  active,
+  disabled,
+  onClick,
+  icon: Icon,
+  label,
+}: {
+  active: boolean;
+  disabled?: boolean;
+  onClick: () => void;
+  icon: React.ElementType;
+  label: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className={cn(
+        "inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors",
+        active
+          ? "bg-[#A473FF]/10 text-[#7C3AED] ring-1 ring-[#A473FF]/20 dark:text-[#A473FF]"
+          : cn(
+              dashboardMutedSurface,
+              "text-gray-600 hover:text-gray-900 dark:text-zinc-400 dark:hover:text-zinc-200"
+            ),
+        disabled && "pointer-events-none opacity-60"
+      )}
+    >
+      <Icon size={12} strokeWidth={2} className="opacity-70" />
+      {label}
+    </button>
+  );
 }
 
 export function ClientsSearch({
@@ -138,30 +190,28 @@ export default function ClientsToolbar({
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex flex-wrap items-center gap-2">
           <span className={cn("mr-0.5", dashboardSectionLabel)}>Show</span>
-          {STATUS_OPTIONS.map((opt) => {
-            const Icon = opt.icon;
-            return (
-              <button
-                key={opt.value}
-                type="button"
-                onClick={() => setStatusFilter(opt.value)}
-                disabled={refreshing}
-                className={cn(
-                  "inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors",
-                  statusFilter === opt.value
-                    ? "bg-[#A473FF]/10 text-[#7C3AED] ring-1 ring-[#A473FF]/20 dark:text-[#A473FF]"
-                    : cn(
-                        dashboardMutedSurface,
-                        "text-gray-600 hover:text-gray-900 dark:text-zinc-400 dark:hover:text-zinc-200"
-                      ),
-                  refreshing && "pointer-events-none opacity-60"
-                )}
-              >
-                <Icon size={12} strokeWidth={2} className="opacity-70" />
-                {opt.label}
-              </button>
-            );
-          })}
+          {STATUS_OPTIONS.map((opt) => (
+            <FilterPill
+              key={opt.value}
+              active={statusFilter === opt.value}
+              disabled={refreshing}
+              onClick={() => setStatusFilter(opt.value)}
+              icon={opt.icon}
+              label={opt.label}
+            />
+          ))}
+
+          <span className={cn("ml-1 mr-0.5", dashboardSectionLabel)}>Subscription</span>
+          {PLAN_FILTER_OPTIONS.map((opt) => (
+            <FilterPill
+              key={opt.value}
+              active={planFilter === opt.value}
+              disabled={refreshing}
+              onClick={() => setPlanFilter(opt.value)}
+              icon={opt.icon}
+              label={opt.label}
+            />
+          ))}
 
           {hasActiveFilters ? (
             <button
@@ -180,22 +230,6 @@ export default function ClientsToolbar({
           {showSearch ? (
             <ClientsSearch query={query} setQuery={setQuery} className="sm:max-w-xs" />
           ) : null}
-
-          <div className="relative min-w-[140px] flex-1 sm:flex-none sm:min-w-[150px]">
-            <select
-              value={planFilter}
-              disabled={refreshing}
-              onChange={(e) => setPlanFilter(e.target.value as ClientPlanFilter)}
-              aria-label="Filter by plan"
-              className="h-10 w-full appearance-none rounded-xl border border-gray-200 bg-white py-0 pl-3 pr-8 text-sm text-gray-700 focus:border-[#A473FF]/40 focus:outline-none focus:ring-2 focus:ring-[#A473FF]/15 disabled:cursor-not-allowed disabled:opacity-60 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200"
-            >
-              {PLAN_OPTIONS.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.label}
-                </option>
-              ))}
-            </select>
-          </div>
 
           <div className="relative min-w-[160px] flex-1 sm:flex-none sm:min-w-[180px]">
             <SlidersHorizontal
@@ -239,23 +273,46 @@ export default function ClientsToolbar({
 }
 
 interface ClientsResultsSummaryProps {
+  page: number;
+  perPage: number;
   filteredCount: number;
   totalCount: number;
+  displayedCount: number;
   hasActiveFilters: boolean;
 }
 
 export function ClientsResultsSummary({
+  page,
+  perPage,
   filteredCount,
   totalCount,
+  displayedCount,
   hasActiveFilters,
 }: ClientsResultsSummaryProps) {
   if (filteredCount === 0) return null;
 
+  const rangeStart = (page - 1) * perPage + 1;
+  const rangeEnd = rangeStart + displayedCount - 1;
+  const isPaginated = filteredCount > perPage;
   const isFiltered = hasActiveFilters && filteredCount !== totalCount;
 
   let primary: React.ReactNode;
 
-  if (isFiltered) {
+  if (isPaginated) {
+    primary = (
+      <>
+        Showing{" "}
+        <span className="font-medium tabular-nums text-gray-900 dark:text-zinc-100">
+          {rangeStart}–{rangeEnd}
+        </span>{" "}
+        of{" "}
+        <span className="font-medium tabular-nums text-gray-900 dark:text-zinc-100">
+          {filteredCount}
+        </span>{" "}
+        {filteredCount === 1 ? "client" : "clients"}
+      </>
+    );
+  } else if (isFiltered) {
     primary = (
       <>
         <span className="font-medium tabular-nums text-gray-900 dark:text-zinc-100">
@@ -280,9 +337,12 @@ export function ClientsResultsSummary({
   }
 
   return (
-    <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-zinc-400">
+    <div className="flex flex-wrap items-center justify-end gap-x-2 gap-y-1 text-right text-sm text-gray-500 dark:text-zinc-400">
       <Users size={14} strokeWidth={2} className="shrink-0 text-gray-400" aria-hidden />
       <p>{primary}</p>
+      {isPaginated && isFiltered ? (
+        <span className="text-xs text-gray-400">· {totalCount} total in portfolio</span>
+      ) : null}
     </div>
   );
 }

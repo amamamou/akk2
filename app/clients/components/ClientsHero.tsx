@@ -14,10 +14,9 @@ import { cn } from "@/utils/cn";
 interface ClientsHeroProps {
   onCreateClick: () => void;
   searchSlot: React.ReactNode;
-  summarySlot?: React.ReactNode;
 }
 
-export default function ClientsHero({ onCreateClick, searchSlot, summarySlot }: ClientsHeroProps) {
+export default function ClientsHero({ onCreateClick, searchSlot }: ClientsHeroProps) {
   return (
     <section className={dashboardHeroSectionClass}>
       <div className="flex flex-col gap-8 lg:flex-row lg:items-end lg:justify-between">
@@ -30,7 +29,6 @@ export default function ClientsHero({ onCreateClick, searchSlot, summarySlot }: 
             Manage tenant accounts, subscription plans, and billing health across your client
             portfolio.
           </p>
-          {summarySlot ? <div className="pt-1">{summarySlot}</div> : null}
         </div>
 
         <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center lg:min-w-[420px] lg:w-auto">
