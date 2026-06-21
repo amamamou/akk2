@@ -1,771 +1,409 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { AlertCircle, ShieldAlert } from "lucide-react";
 import { useAuth } from "@/app/context/AuthContext";
 import { getApiClient } from "@/lib/api-client";
 import { fetchWorkspaceClientsBundle } from "@/lib/query-fetchers";
 import { queryKeys } from "@/lib/query-keys";
-import type {
-	ClientBillingSummary,
-	ClientCreateInput,
-	ClientInfo,
-} from "@/types/api";
+import type { ClientBillingSummary, ClientCreateInput, ClientInfo } from "@/types/api";
 import IssueInvoiceModal from "./components/IssueInvoiceModal";
-import { formatMoney } from "@/lib/format-currency";
-import AdminAddModal from "@/app/admin/components/AdminAddModal";
+import CreateClientModal from "./components/CreateClientModal";
+import EditClientModal, { type ClientUpdatePayload } from "./components/EditClientModal";
+import DeleteClientModal from "./components/DeleteClientModal";
 import AdminToast from "@/app/admin/components/AdminToast";
+import ClientsHero from "./components/ClientsHero";
+import ClientsToolbar, {
+  ClientsResultsSummary,
+  ClientsSearch,
+  type ClientPlanFilter,
+  type ClientSortKey,
+  type ClientStatusFilter,
+} from "./components/ClientsToolbar";
+import ClientCard from "./components/ClientCard";
+import ClientsEmptyState from "./components/ClientsEmptyState";
+import ClientsPageSkeleton from "./components/ClientsPageSkeleton";
 import {
-	Building2,
-	ChevronRight,
-	Mail,
-	Phone,
-	Search,
-	Receipt,
-	ShieldAlert,
-	X,
-	Plus,
-} from "lucide-react";
+  dashboardCardClass,
+  dashboardContainerClass,
+  dashboardPageClass,
+} from "@/app/dashboard/dashboard-styles";
+import { cn } from "@/utils/cn";
 
-const subscriptionTiers = ["STARTER", "PROFESSIONAL", "ENTERPRISE"] as const;
+function sortClients(
+  items: ClientInfo[],
+  sort: ClientSortKey,
+  billingByClientId: Record<string, ClientBillingSummary>
+): ClientInfo[] {
+  const sorted = [...items];
 
-type ClientFormState = {
-	name: string;
-	businessType: string;
-	subscriptionTier: ClientCreateInput["subscriptionTier"];
-	maxPlayers: string;
-	maxStorageGb: string;
-	contactPerson: string;
-	email: string;
-	phone: string;
-};
+  switch (sort) {
+    case "name-asc":
+      sorted.sort((a, b) => a.name.localeCompare(b.name));
+      break;
+    case "name-desc":
+      sorted.sort((a, b) => b.name.localeCompare(a.name));
+      break;
+    case "outstanding-desc":
+      sorted.sort(
+        (a, b) =>
+          (billingByClientId[b.id]?.outstandingBalance ?? 0) -
+          (billingByClientId[a.id]?.outstandingBalance ?? 0)
+      );
+      break;
+    case "created-desc":
+      sorted.sort((a, b) => {
+        const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        return bTime - aTime;
+      });
+      break;
+  }
 
-const initialFormState: ClientFormState = {
-	name: "",
-	businessType: "",
-	subscriptionTier: "STARTER",
-	maxPlayers: "5",
-	maxStorageGb: "2",
-	contactPerson: "",
-	email: "",
-	phone: "",
-};
-
-const tierLocks: Record<Exclude<ClientFormState["subscriptionTier"], "ENTERPRISE">, { maxPlayers: number; maxStorageGb: number }> = {
-	STARTER: { maxPlayers: 5, maxStorageGb: 2 },
-	PROFESSIONAL: { maxPlayers: 20, maxStorageGb: 20 },
-};
+  return sorted;
+}
 
 export default function ClientsClient() {
-	const apiClient = getApiClient();
-	const { user, isLoading: authLoading } = useAuth();
-	const role = String(user?.role || "").toUpperCase();
-	const isSuperAdmin = role === "SUPER_ADMIN";
+  const apiClient = getApiClient();
+  const { user, isLoading: authLoading } = useAuth();
+  const role = String(user?.role || "").toUpperCase();
+  const isSuperAdmin = role === "SUPER_ADMIN";
 
-	const [query, setQuery] = useState("");
-	const [createOpen, setCreateOpen] = useState(false);
-	const [createLoading, setCreateLoading] = useState(false);
-	const [toastOpen, setToastOpen] = useState(false);
-	const [toastMessage, setToastMessage] = useState("Client created successfully");
-	const [form, setForm] = useState<ClientFormState>(initialFormState);
-	const [formError, setFormError] = useState<string | null>(null);
-	const [invoiceClient, setInvoiceClient] = useState<ClientInfo | null>(null);
-	const [invoiceModalOpen, setInvoiceModalOpen] = useState(false);
-	const nameRef = useRef<HTMLInputElement>(null);
-	const isEnterpriseTier = form.subscriptionTier === "ENTERPRISE";
+  const [query, setQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<ClientStatusFilter>("all");
+  const [planFilter, setPlanFilter] = useState<ClientPlanFilter>("all");
+  const [sort, setSort] = useState<ClientSortKey>("name-asc");
+  const [createOpen, setCreateOpen] = useState(false);
+  const [createLoading, setCreateLoading] = useState(false);
+  const [toastOpen, setToastOpen] = useState(false);
+  const [toastMessage, setToastMessage] = useState("Client created successfully");
+  const [invoiceClient, setInvoiceClient] = useState<ClientInfo | null>(null);
+  const [invoiceModalOpen, setInvoiceModalOpen] = useState(false);
+  const [editClient, setEditClient] = useState<ClientInfo | null>(null);
+  const [editOpen, setEditOpen] = useState(false);
+  const [editLoading, setEditLoading] = useState(false);
+  const [deleteClient, setDeleteClient] = useState<ClientInfo | null>(null);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
-	const queryClient = useQueryClient();
+  const queryClient = useQueryClient();
 
-	const clientsQuery = useQuery({
-		queryKey: queryKeys.workspaceClients(),
-		queryFn: fetchWorkspaceClientsBundle,
-		enabled: isSuperAdmin && !authLoading,
-	});
+  const clientsQuery = useQuery({
+    queryKey: queryKeys.workspaceClients(),
+    queryFn: fetchWorkspaceClientsBundle,
+    enabled: isSuperAdmin && !authLoading,
+  });
 
-	const createClientMutation = useMutation({
-		mutationFn: (payload: ClientCreateInput) => apiClient.createClient(payload),
-		onSuccess: async () => {
-			await queryClient.invalidateQueries({ queryKey: queryKeys.workspaceClients() });
-			await queryClient.invalidateQueries({ queryKey: queryKeys.clientsBilling() });
-		},
-	});
+  const createClientMutation = useMutation({
+    mutationFn: (payload: ClientCreateInput) => apiClient.createClient(payload),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.workspaceClients() });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.clientsBilling() });
+    },
+  });
 
-	const clients = useMemo(
-		() => clientsQuery.data?.clients ?? [],
-		[clientsQuery.data]
-	);
+  const updateClientMutation = useMutation({
+    mutationFn: ({ clientId, payload }: { clientId: string; payload: ClientUpdatePayload }) =>
+      apiClient.updateClient(clientId, {
+        name: payload.name,
+        business_type: payload.businessType,
+        contact_person: payload.contactPerson,
+        email: payload.email,
+        phone: payload.phone,
+        subscription_tier: payload.subscriptionTier,
+        max_players: payload.maxPlayers,
+        max_storage_gb: payload.maxStorageGb,
+      }),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.workspaceClients() });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.clientsBilling() });
+    },
+  });
 
-	const billingByClientIdResolved = useMemo(
-		() => clientsQuery.data?.billingByClientId ?? {},
-		[clientsQuery.data]
-	);
+  const deleteClientMutation = useMutation({
+    mutationFn: (clientId: string) => apiClient.deleteClient(clientId),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.workspaceClients() });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.clientsBilling() });
+    },
+  });
 
-	const pageLoading =
-		authLoading || (isSuperAdmin && clientsQuery.isPending && !clientsQuery.data);
+  const clients = useMemo(() => clientsQuery.data?.clients ?? [], [clientsQuery.data]);
 
-	const queryError = clientsQuery.error as
-		| { response?: { status?: number; data?: { error?: string } }; message?: string }
-		| undefined;
-	const loadError = queryError
-		? queryError.response?.status === 403
-			? "You do not have permission to view this page."
-			: queryError.response?.data?.error ||
-				queryError.message ||
-				"Failed to load clients"
-		: null;
+  const billingByClientIdResolved = useMemo(
+    () => clientsQuery.data?.billingByClientId ?? {},
+    [clientsQuery.data]
+  );
 
-	useEffect(() => {
-		if (!createOpen) {
-			setFormError(null);
-			setForm(initialFormState);
-		}
-	}, [createOpen]);
+  const loading = authLoading || (isSuperAdmin && clientsQuery.isPending && !clientsQuery.data);
+  const refreshing = isSuperAdmin && clientsQuery.isFetching && !clientsQuery.isPending;
 
-	useEffect(() => {
-		if (form.subscriptionTier === "ENTERPRISE") return;
+  const queryError = clientsQuery.error as
+    | { response?: { status?: number; data?: { error?: string } }; message?: string }
+    | undefined;
+  const loadError = queryError
+    ? queryError.response?.status === 403
+      ? "You do not have permission to view this page."
+      : queryError.response?.data?.error ||
+        queryError.message ||
+        "Failed to load clients"
+    : null;
 
-		const lock = tierLocks[form.subscriptionTier];
-		setForm((prev) => {
-			const nextPlayers = String(lock.maxPlayers);
-			const nextStorage = String(lock.maxStorageGb);
-			if (prev.maxPlayers === nextPlayers && prev.maxStorageGb === nextStorage) return prev;
-			return { ...prev, maxPlayers: nextPlayers, maxStorageGb: nextStorage };
-		});
-	}, [form.subscriptionTier]);
+  const hasActiveFilters =
+    statusFilter !== "all" || planFilter !== "all" || query.trim().length > 0;
 
-	const filteredClients = useMemo(() => {
-		const normalizedQuery = query.trim().toLowerCase();
-		if (!normalizedQuery) return clients;
-		return clients.filter((client) => {
-			const haystack = [
-				client.name,
-				client.businessType,
-				client.contactPerson,
-				client.email,
-				client.phone,
-				client.subscriptionTier,
-			]
-				.filter(Boolean)
-				.join(" ")
-				.toLowerCase();
-			return haystack.includes(normalizedQuery);
-		});
-	}, [clients, query]);
+  const filteredClients = useMemo(() => {
+    const normalizedQuery = query.trim().toLowerCase();
 
-	const handleCreateClient = async () => {
-		const trimmedName = form.name.trim();
-		const trimmedType = form.businessType.trim();
-		const trimmedContact = form.contactPerson.trim();
-		const trimmedEmail = form.email.trim();
-		const trimmedPhone = form.phone.trim();
+    let result = clients;
 
-		if (!trimmedName || !trimmedType || !trimmedContact || !trimmedEmail || !trimmedPhone) {
-			setFormError("Please complete all required fields before saving.");
-			return;
-		}
+    if (statusFilter !== "all") {
+      result = result.filter((client) => client.status === statusFilter);
+    }
 
-		const maxPlayers = Number(form.maxPlayers);
-		const maxStorageGb = Number(form.maxStorageGb);
+    if (planFilter !== "all") {
+      result = result.filter((client) => client.subscriptionTier === planFilter);
+    }
 
-		if (isEnterpriseTier && (!Number.isFinite(maxPlayers) || maxPlayers < 1)) {
-			setFormError("Max registered players must be a positive number.");
-			return;
-		}
+    if (normalizedQuery) {
+      result = result.filter((client) => {
+        const haystack = [
+          client.name,
+          client.businessType,
+          client.contactPerson,
+          client.email,
+          client.phone,
+          client.subscriptionTier,
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase();
+        return haystack.includes(normalizedQuery);
+      });
+    }
 
-		if (isEnterpriseTier && (!Number.isFinite(maxStorageGb) || maxStorageGb < 1)) {
-			setFormError("Cloud storage quota must be a positive number.");
-			return;
-		}
+    return sortClients(result, sort, billingByClientIdResolved);
+  }, [clients, query, statusFilter, planFilter, sort, billingByClientIdResolved]);
 
-		setCreateLoading(true);
-		setFormError(null);
+  const clearFilters = () => {
+    setQuery("");
+    setStatusFilter("all");
+    setPlanFilter("all");
+  };
 
-		try {
-			const tier = form.subscriptionTier;
-			const tierLock = tier === "ENTERPRISE" ? null : tierLocks[tier];
-			const payload: ClientCreateInput = {
-				name: trimmedName,
-				businessType: trimmedType,
-				subscriptionTier: tier,
-				contactPerson: trimmedContact,
-				email: trimmedEmail,
-				phone: trimmedPhone,
-				maxPlayers: tierLock ? tierLock.maxPlayers : maxPlayers,
-				maxStorageGb: tierLock ? tierLock.maxStorageGb : maxStorageGb,
-			};
+  const handleRefresh = () => {
+    void queryClient.invalidateQueries({ queryKey: queryKeys.workspaceClients() });
+  };
 
-			await createClientMutation.mutateAsync(payload);
-			setCreateOpen(false);
-			setToastMessage(`Created client: ${trimmedName}`);
-			setToastOpen(true);
-			window.setTimeout(() => setToastOpen(false), 2500);
-		} catch (err: any) {
-			setFormError(err?.response?.data?.error || err?.message || "Failed to create client");
-		} finally {
-			setCreateLoading(false);
-		}
-	};
+  const handleCreateClient = async (payload: ClientCreateInput) => {
+    setCreateLoading(true);
+    try {
+      await createClientMutation.mutateAsync(payload);
+      setToastMessage(`Created client: ${payload.name}`);
+      setToastOpen(true);
+      window.setTimeout(() => setToastOpen(false), 2500);
+    } finally {
+      setCreateLoading(false);
+    }
+  };
 
-	if (authLoading || pageLoading) {
-		return (
-			<div className="flex-1 flex flex-col overflow-hidden bg-white dark:bg-zinc-900">
-				<div className="sticky top-0 z-10 bg-white dark:bg-zinc-900">
-					<div className="px-8 py-6">
-						<div className="flex items-center justify-between">
-							<div>
-								<h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">Clients</h1>
-								<p className="mt-1 text-sm text-gray-500">Manage tenant accounts, subscription tiers, and operational limits.</p>
-							</div>
+  const handleUpdateClient = async (clientId: string, payload: ClientUpdatePayload) => {
+    setEditLoading(true);
+    try {
+      await updateClientMutation.mutateAsync({ clientId, payload });
+      setToastMessage(`Updated client: ${payload.name}`);
+      setToastOpen(true);
+      window.setTimeout(() => setToastOpen(false), 2500);
+    } finally {
+      setEditLoading(false);
+    }
+  };
 
-							<div className="flex items-center gap-3">
-								<button
-									type="button"
-									onClick={() => setCreateOpen(true)}
-									className={
-										`group inline-flex items-center gap-3 h-12 px-5 bg-white dark:bg-zinc-900 text-gray-900 dark:text-gray-100 font-medium text-sm rounded-2xl border border-gray-100 dark:border-zinc-800 shadow-[0_8px_30px_rgba(0,0,0,0.04)] transition-all hover:shadow-lg hover:translate-y-0.5 cursor-pointer`
-									}
-								>
-									<span className="inline-flex items-center justify-center transition-colors">
-										<Plus size={18} className="text-zinc-500 group-hover:text-[#A473FF] transition-colors" />
-									</span>
+  const handleDeleteClient = async (clientId: string) => {
+    setDeleteLoading(true);
+    try {
+      const name = deleteClient?.name ?? "Client";
+      await deleteClientMutation.mutateAsync(clientId);
+      setDeleteOpen(false);
+      setDeleteClient(null);
+      setToastMessage(`Deleted client: ${name}`);
+      setToastOpen(true);
+      window.setTimeout(() => setToastOpen(false), 2500);
+    } catch (err: unknown) {
+      const ax = err as { response?: { data?: { error?: string } }; message?: string };
+      setToastMessage(
+        ax?.response?.data?.error ||
+          (err instanceof Error ? err.message : "Failed to delete client")
+      );
+      setToastOpen(true);
+      window.setTimeout(() => setToastOpen(false), 3500);
+    } finally {
+      setDeleteLoading(false);
+    }
+  };
 
-									<span>New Client</span>
-								</button>
-							</div>
-						</div>
+  if (loading) {
+    return <ClientsPageSkeleton />;
+  }
 
-						<div className="mt-5 max-w-xl">
-							<div className="relative">
-								<div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">
-									<Search size={16} strokeWidth={1.9} />
-								</div>
+  if (!isSuperAdmin) {
+    return (
+      <div className={dashboardPageClass}>
+        <div className={dashboardContainerClass}>
+          <div className={cn(dashboardCardClass, "max-w-2xl p-8")}>
+            <div className="flex items-center gap-3 text-gray-900 dark:text-gray-100">
+              <ShieldAlert className="h-5 w-5 text-amber-500" />
+              <h1 className="text-xl font-semibold">Clients</h1>
+            </div>
+            <p className="mt-3 text-sm text-gray-600 dark:text-zinc-400">
+              This area is available to{" "}
+              <span className="font-semibold">SUPER_ADMIN</span> users only.
+            </p>
+            <p className="mt-2 text-sm text-gray-500 dark:text-zinc-500">
+              Your current role is{" "}
+              <span className="font-medium">{role || "UNKNOWN"}</span>.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
-								<input
-									value={query}
-									onChange={(e) => setQuery(e.target.value)}
-									aria-label="Search clients"
-									placeholder="Search by client, business type, or contact..."
-									className="
-										w-88
-										h-12
-										pl-11
-										pr-10
-										bg-white dark:bg-zinc-900
-										rounded-2xl
-										border
-										border-gray-100 dark:border-zinc-800
-										shadow-[0_8px_30px_rgba(0,0,0,0.04)]
-										text-sm
-										text-gray-700
-										placeholder:text-gray-400
-										focus:outline-none
-										focus:ring-2
-										focus:ring-[#A473FF]/20
-									"
-								/>
+  const totalCount = clients.length;
+  const showToolbar = totalCount > 0;
+  const emptyVariant =
+    totalCount === 0 ? ("no-clients" as const) : ("no-results" as const);
 
-								{query ? (
-									<button
-										aria-label="Clear search"
-										onClick={() => setQuery("")}
-										className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-									>
-										<X size={14} />
-									</button>
-								) : null}
-							</div>
-						</div>
-					</div>
-				</div>
+  return (
+    <div className={dashboardPageClass}>
+      <div className={dashboardContainerClass}>
+        <ClientsHero
+          onCreateClick={() => setCreateOpen(true)}
+          searchSlot={<ClientsSearch query={query} setQuery={setQuery} />}
+          summarySlot={
+            totalCount > 0 ? (
+              <ClientsResultsSummary
+                filteredCount={filteredClients.length}
+                totalCount={totalCount}
+                hasActiveFilters={hasActiveFilters}
+              />
+            ) : null
+          }
+        />
 
-				<div className="flex-1 overflow-auto">
-					<div className="px-8 py-6">
-						<div className="space-y-6">
-							{[1, 2, 3, 4].map((i) => (
-								<div key={i}>
-									<div className="bg-white dark:bg-zinc-900/90 rounded-[28px] border border-gray-100 dark:border-zinc-800/80 shadow-[0_8px_30px_rgba(0,0,0,0.04)] dark:shadow-none flex flex-col overflow-hidden animate-pulse">
-										<div className="px-5 py-5">
-											<div className="flex items-start justify-between gap-4">
-												<div className="min-w-0 flex-1">
-													<div className="flex items-center gap-3">
-														<div className="h-10 w-10 rounded-full bg-gray-200 dark:bg-zinc-800" />
-														<div className="flex-1">
-															<div className="h-4 bg-gray-200 dark:bg-zinc-800 rounded w-48 mb-2" />
-															<div className="h-3 bg-gray-200 dark:bg-zinc-800 rounded w-32" />
-														</div>
-													</div>
+        {loadError ? (
+          <div className="flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-300">
+            <AlertCircle size={16} className="mt-0.5 shrink-0" />
+            <p>{loadError}</p>
+          </div>
+        ) : null}
 
-													<div className="mt-4 grid gap-3 text-sm text-gray-600 sm:grid-cols-2 lg:grid-cols-4">
-														<div className="h-3 bg-gray-200 dark:bg-zinc-800 rounded w-full" />
-														<div className="h-3 bg-gray-200 dark:bg-zinc-800 rounded w-full" />
-														<div className="h-3 bg-gray-200 dark:bg-zinc-800 rounded w-full" />
-														<div className="h-3 bg-gray-200 dark:bg-zinc-800 rounded w-full" />
-													</div>
+        {showToolbar ? (
+          <ClientsToolbar
+            query={query}
+            setQuery={setQuery}
+            statusFilter={statusFilter}
+            setStatusFilter={setStatusFilter}
+            planFilter={planFilter}
+            setPlanFilter={setPlanFilter}
+            sort={sort}
+            setSort={setSort}
+            onClearFilters={clearFilters}
+            onRefresh={handleRefresh}
+            refreshing={refreshing}
+          />
+        ) : null}
 
-													<div className="mt-4 grid gap-3 sm:grid-cols-3">
-														<div className="h-6 bg-gray-200 dark:bg-zinc-800 rounded w-full" />
-														<div className="h-6 bg-gray-200 dark:bg-zinc-800 rounded w-full" />
-														<div className="h-6 bg-gray-200 dark:bg-zinc-800 rounded w-full" />
-													</div>
-												</div>
+        {filteredClients.length === 0 ? (
+          <ClientsEmptyState
+            variant={emptyVariant}
+            onCreateClick={() => setCreateOpen(true)}
+            onClearFilters={clearFilters}
+          />
+        ) : (
+          <div
+            className={cn(
+              "grid grid-cols-1 gap-5 lg:grid-cols-2",
+              refreshing && "pointer-events-none opacity-60"
+            )}
+          >
+            {filteredClients.map((client) => {
+              const billing = billingByClientIdResolved[client.id];
+              return (
+                <ClientCard
+                  key={client.id}
+                  client={client}
+                  billing={billing}
+                  onEdit={() => {
+                    setEditClient(client);
+                    setEditOpen(true);
+                  }}
+                  onDelete={() => {
+                    setDeleteClient(client);
+                    setDeleteOpen(true);
+                  }}
+                  onIssueInvoice={() => {
+                    setInvoiceClient({
+                      ...client,
+                      tenantId: client.tenantId ?? billing?.tenantId ?? undefined,
+                    });
+                    setInvoiceModalOpen(true);
+                  }}
+                />
+              );
+            })}
+          </div>
+        )}
+      </div>
 
-												<div className="flex shrink-0 flex-col items-end gap-2 pt-1">
-													<div className="h-8 w-24 bg-gray-200 dark:bg-zinc-800 rounded" />
-													<div className="h-5 w-5 bg-gray-200 dark:bg-zinc-800 rounded-full" />
-												</div>
-											</div>
-										</div>
-									</div>
-								</div>
-							))}
-						</div>
-					</div>
-				</div>
-			</div>
-		);
-	}
+      <CreateClientModal
+        open={createOpen}
+        onClose={() => setCreateOpen(false)}
+        onSubmit={handleCreateClient}
+        isSubmitting={createLoading}
+      />
 
-	if (!isSuperAdmin) {
-		return (
-			<div className="flex-1 overflow-auto ">
-				<div className="px-8 py-8">
-					<div className="max-w-2xl rounded-2xl border border-gray-200  p-8 shadow-sm">
-						<div className="flex items-center gap-3 text-gray-900 dark:text-gray-100">
-							<ShieldAlert className="h-5 w-5 text-amber-500" />
-							<h1 className="text-xl font-semibold">Clients</h1>
-						</div>
-						<p className="mt-3 text-sm text-gray-600">
-							This area is available to{" "}
-							<span className="font-semibold">SUPER_ADMIN</span> users only.
-						</p>
-						<p className="mt-2 text-sm text-gray-500">
-							Your current role is{" "}
-							<span className="font-medium">{role || "UNKNOWN"}</span>.
-						</p>
-					</div>
-				</div>
-			</div>
-		);
-	}
+      <EditClientModal
+        open={editOpen}
+        client={editClient}
+        onClose={() => {
+          setEditOpen(false);
+          setEditClient(null);
+        }}
+        onSubmit={handleUpdateClient}
+        isSubmitting={editLoading}
+      />
 
-	return (
-		<div className="flex-1 flex flex-col overflow-hidden bg-white dark:bg-zinc-900">
-			<div className="sticky top-0 z-10 bg-white dark:bg-zinc-900">
-				<div className="px-8 py-6">
-					<div className="flex items-center justify-between">
-						<div>
-							<h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">Clients</h1>
-							<p className="mt-1 text-sm text-gray-500">Manage tenant accounts, subscription tiers, and operational limits.</p>
-						</div>
+      <DeleteClientModal
+        open={deleteOpen}
+        client={deleteClient}
+        onClose={() => {
+          if (!deleteLoading) {
+            setDeleteOpen(false);
+            setDeleteClient(null);
+          }
+        }}
+        onConfirm={handleDeleteClient}
+        isDeleting={deleteLoading}
+      />
 
-						<div className="flex items-center gap-3">
-							<button
-								type="button"
-								onClick={() => setCreateOpen(true)}
-								className={
-									`group inline-flex items-center gap-3 h-12 px-5 bg-white dark:bg-zinc-900 text-gray-900 dark:text-gray-100 font-medium text-sm rounded-2xl border border-gray-100 dark:border-zinc-800 shadow-[0_8px_30px_rgba(0,0,0,0.04)] transition-all hover:shadow-lg hover:translate-y-0.5 cursor-pointer`
-								}
-							>
-								<span className="inline-flex items-center justify-center transition-colors">
-									<Plus size={18} className="text-zinc-500 group-hover:text-[#A473FF] transition-colors" />
-								</span>
+      <IssueInvoiceModal
+        open={invoiceModalOpen}
+        client={invoiceClient}
+        onClose={() => {
+          setInvoiceModalOpen(false);
+          setInvoiceClient(null);
+        }}
+        onSuccess={() => {
+          void queryClient.invalidateQueries({ queryKey: queryKeys.workspaceClients() });
+          void queryClient.invalidateQueries({ queryKey: queryKeys.clientsBilling() });
+          setToastMessage("Invoice registered successfully");
+          setToastOpen(true);
+        }}
+      />
 
-								<span>New Client</span>
-							</button>
-						</div>
-					</div>
-
-					<div className="mt-5 max-w-xl">
-						<div className="relative">
-							<div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">
-								<Search size={16} strokeWidth={1.9} />
-							</div>
-
-							<input
-								value={query}
-								onChange={(e) => setQuery(e.target.value)}
-								aria-label="Search clients"
-								placeholder="Search by client, business type, or contact..."
-								className="
-									w-88
-									h-12
-									pl-11
-									pr-10
-									bg-white dark:bg-zinc-900
-									rounded-2xl
-									border
-									border-gray-100 dark:border-zinc-800
-									shadow-[0_8px_30px_rgba(0,0,0,0.04)]
-									text-sm
-									text-gray-700
-									placeholder:text-gray-400
-									focus:outline-none
-									focus:ring-2
-									focus:ring-[#A473FF]/20
-								"
-							/>
-
-							{query ? (
-								<button
-									aria-label="Clear search"
-									onClick={() => setQuery("")}
-									className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-								>
-									<X size={14} />
-								</button>
-							) : null}
-						</div>
-					</div>
-				</div>
-			</div>
-
-			<div className="flex-1 overflow-auto">
-				<div className="px-8 py-6">
-					{loadError && (
-						<div className="mb-6 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">
-							{loadError}
-						</div>
-					)}
-
-					{filteredClients.length === 0 ? (
-						<div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-gray-200 bg-white dark:bg-zinc-900 py-16 text-center">
-							<div className="rounded-full bg-gray-100 p-3 text-gray-500">
-								<Building2 size={24} />
-							</div>
-							<h2 className="mt-4 text-sm font-semibold text-gray-900 dark:text-gray-100">
-								{query ? "No clients match your search" : "No clients available"}
-							</h2>
-							<p className="mt-2 max-w-sm text-sm text-gray-500">
-								{query
-									? "Try a different search term or clear the query to see all records."
-									: "Use the Create New Client button to add the first tenant record."}
-							</p>
-						</div>
-					) : (
-						<div className="space-y-3">
-							{filteredClients.map((client) => {
-								const billing = billingByClientIdResolved[client.id];
-								return (
-									<ClientCard
-										key={client.id}
-										client={client}
-										billing={billing}
-										onIssueInvoice={() => {
-											setInvoiceClient({
-												...client,
-												tenantId:
-													client.tenantId ?? billing?.tenantId ?? undefined,
-											});
-											setInvoiceModalOpen(true);
-										}}
-									/>
-								);
-							})}
-						</div>
-					)}
-				</div>
-			</div>
-
-			<AdminAddModal
-				open={createOpen}
-				onClose={() => setCreateOpen(false)}
-				title="Create New Client"
-				onSave={handleCreateClient}
-				saveDisabled={createLoading}
-				initialFocusRef={nameRef}
-			>
-				<div className="space-y-5">
-					{formError && (
-						<div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
-							{formError}
-						</div>
-					)}
-
-					<div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-						<Field label="Client / Business Name" required>
-							<input
-								ref={nameRef}
-								value={form.name}
-								onChange={(e) =>
-									setForm((prev) => ({ ...prev, name: e.target.value }))
-								}
-								placeholder="e.g. Horizon Wellness Group"
-								className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:border-[#A473FF]/40 focus:outline-none focus:ring-2 focus:ring-[#A473FF]/15"
-							/>
-						</Field>
-
-						<Field label="Business Type / Domain" required>
-							<input
-								value={form.businessType}
-								onChange={(e) =>
-									setForm((prev) => ({ ...prev, businessType: e.target.value }))
-								}
-								placeholder="e.g. Retail, Hospitality"
-								className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:border-[#A473FF]/40 focus:outline-none focus:ring-2 focus:ring-[#A473FF]/15"
-							/>
-						</Field>
-					</div>
-
-					<div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-						<Field label="Subscription Tier" required>
-							<select
-								value={form.subscriptionTier}
-																	onChange={(e) => {
-																		const nextTier = e.target.value as ClientFormState["subscriptionTier"];
-																		setForm((prev) => {
-																			if (nextTier === "ENTERPRISE") {
-																				return { ...prev, subscriptionTier: nextTier };
-																			}
-																			const lock = tierLocks[nextTier];
-																			return {
-																				...prev,
-																				subscriptionTier: nextTier,
-																				maxPlayers: String(lock.maxPlayers),
-																				maxStorageGb: String(lock.maxStorageGb),
-																			};
-																		});
-																	}}
-								className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:border-[#A473FF]/40 focus:outline-none focus:ring-2 focus:ring-[#A473FF]/15"
-							>
-								{subscriptionTiers.map((tier) => (
-									<option key={tier} value={tier}>
-										{tier}
-									</option>
-								))}
-							</select>
-						</Field>
-
-						<Field label="Max Registered Players" required>
-							<input
-								type="number"
-																	min={1}
-																	max={!isEnterpriseTier ? tierLocks[form.subscriptionTier as Exclude<ClientFormState["subscriptionTier"], "ENTERPRISE">].maxPlayers : undefined}
-								value={form.maxPlayers}
-																	onChange={(e) => setForm((prev) => ({ ...prev, maxPlayers: e.target.value }))}
-								placeholder="e.g. 25"
-																	disabled={!isEnterpriseTier}
-																	className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:border-[#A473FF]/40 focus:outline-none focus:ring-2 focus:ring-[#A473FF]/15 disabled:bg-gray-50 dark:bg-zinc-800/50 disabled:text-gray-500"
-							/>
-																{!isEnterpriseTier && (
-																	<p className="mt-1 text-xs text-gray-500">Locked to the selected tier limit.</p>
-																)}
-						</Field>
-
-						<Field label="Cloud Storage Quota (GB)" required>
-							<input
-								type="number"
-								min={1}
-																	max={!isEnterpriseTier ? tierLocks[form.subscriptionTier as Exclude<ClientFormState["subscriptionTier"], "ENTERPRISE">].maxStorageGb : undefined}
-								value={form.maxStorageGb}
-								onChange={(e) => setForm((prev) => ({ ...prev, maxStorageGb: e.target.value }))}
-								placeholder="e.g. 50"
-																	disabled={!isEnterpriseTier}
-																	className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:border-[#A473FF]/40 focus:outline-none focus:ring-2 focus:ring-[#A473FF]/15 disabled:bg-gray-50 dark:bg-zinc-800/50 disabled:text-gray-500"
-							/>
-																{!isEnterpriseTier && (
-																	<p className="mt-1 text-xs text-gray-500">Locked to the selected tier limit.</p>
-																)}
-						</Field>
-					</div>
-
-					<div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-						<Field label="Primary Contact Name" required>
-							<input
-								value={form.contactPerson}
-								onChange={(e) => setForm((prev) => ({ ...prev, contactPerson: e.target.value }))}
-								placeholder="e.g. Maya Patel"
-								className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:border-[#A473FF]/40 focus:outline-none focus:ring-2 focus:ring-[#A473FF]/15"
-							/>
-						</Field>
-
-						<Field label="Active Email" required>
-							<input
-								type="email"
-								value={form.email}
-								onChange={(e) => setForm((prev) => ({ ...prev, email: e.target.value }))}
-								placeholder="contact@example.com"
-								className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:border-[#A473FF]/40 focus:outline-none focus:ring-2 focus:ring-[#A473FF]/15"
-							/>
-						</Field>
-
-						<Field label="Phone Number" required>
-							<input
-								value={form.phone}
-								onChange={(e) => setForm((prev) => ({ ...prev, phone: e.target.value }))}
-								placeholder="+1 555 123 4567"
-								className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:border-[#A473FF]/40 focus:outline-none focus:ring-2 focus:ring-[#A473FF]/15"
-							/>
-						</Field>
-					</div>
-				</div>
-			</AdminAddModal>
-
-			<IssueInvoiceModal
-				open={invoiceModalOpen}
-				client={invoiceClient}
-				onClose={() => {
-					setInvoiceModalOpen(false);
-					setInvoiceClient(null);
-				}}
-				onSuccess={() => {
-					void queryClient.invalidateQueries({ queryKey: queryKeys.workspaceClients() });
-					void queryClient.invalidateQueries({ queryKey: queryKeys.clientsBilling() });
-					setToastMessage("Invoice registered successfully");
-					setToastOpen(true);
-				}}
-			/>
-
-			<AdminToast open={toastOpen} message={toastMessage} />
-		</div>
-	);
+      <AdminToast open={toastOpen} message={toastMessage} />
+    </div>
+  );
 }
-
-function Field({
-	label,
-	required,
-	children,
-}: {
-	label: string;
-	required?: boolean;
-	children: React.ReactNode;
-}) {
-	return (
-		<label className="block">
-			<span className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-gray-500">
-				{label} {required ? <span className="text-red-500">*</span> : null}
-			</span>
-			{children}
-		</label>
-	);
-}
-
-
-function ClientCard({
-	client,
-	billing,
-	onIssueInvoice,
-}: {
-	client: ClientInfo;
-	billing?: ClientBillingSummary;
-	onIssueInvoice: () => void;
-}) {
-	const statusStyles: Record<ClientInfo["status"], string> = {
-		ACTIVE: "bg-green-50 text-green-700 border-green-100",
-		INACTIVE: "bg-gray-50 dark:bg-zinc-800/50 text-gray-700 border-gray-200",
-		TRIAL: "bg-blue-50 text-blue-700 border-blue-100",
-	};
-
-	const subscriptionStyles: Record<ClientInfo["subscriptionTier"], string> = {
-		STARTER: "bg-gray-50 dark:bg-zinc-800/50 text-gray-700",
-		PROFESSIONAL: "bg-purple-50 text-purple-700",
-		ENTERPRISE: "bg-amber-50 text-amber-700",
-	};
-
-	return (
-		<div className="">
-			<div className="bg-white dark:bg-zinc-900/90 rounded-[28px] border border-gray-100 dark:border-zinc-800/80 shadow-[0_8px_30px_rgba(0,0,0,0.04)] dark:shadow-none flex flex-col overflow-hidden">
-				<div className="px-5 py-4">
-					<div className="flex items-start justify-between gap-4">
-						<div className="min-w-0 flex-1">
-							<div className="flex flex-wrap items-center gap-3">
-								<h3 className="truncate text-sm font-semibold text-gray-900 dark:text-gray-100">
-									{client.name}
-								</h3>
-								<span
-									className={`rounded-full border px-2.5 py-1 text-xs font-medium ${statusStyles[client.status]}`}
-								>
-									{client.status}
-								</span>
-							</div>
-
-							<div className="mt-3 grid gap-3 text-sm text-gray-600 dark:text-zinc-300 sm:grid-cols-2 lg:grid-cols-4">
-								<Info label="Business Type" value={client.businessType || "—"} />
-								<Info label="Contact" value={client.contactPerson || "—"} />
-								<Info label="Email" value={client.email || "—"} icon={<Mail size={14} />} />
-								<Info label="Phone" value={client.phone || "—"} icon={<Phone size={14} />} />
-							</div>
-
-							<div className="mt-4 flex flex-wrap items-center gap-3 text-xs">
-								<span
-									className={`rounded-full px-2.5 py-1 font-medium ${subscriptionStyles[client.subscriptionTier]}`}
-								>
-									{billing?.planName || client.subscriptionTier}
-								</span>
-								<span className="rounded-full bg-gray-50 dark:bg-zinc-800/50 px-2.5 py-1 text-gray-600 dark:text-zinc-300">
-									{client.maxPlayers} players max
-								</span>
-								<span className="rounded-full bg-gray-50 dark:bg-zinc-800/50 px-2.5 py-1 text-gray-600 dark:text-zinc-300">
-									{client.maxStorageGb} GB storage max
-								</span>
-							</div>
-
-							{billing && (
-								<div className="mt-4 grid gap-3 rounded-xl border border-gray-100 dark:border-zinc-800/80 bg-gray-50 dark:bg-zinc-800/80 p-4 sm:grid-cols-3">
-									<Info
-										label="Total invoiced"
-										value={formatMoney(billing.totalInvoiced)}
-									/>
-									<Info
-										label="Outstanding"
-										value={formatMoney(billing.outstandingBalance)}
-									/>
-									<Info
-										label="Paid"
-										value={formatMoney(billing.paidTotal)}
-									/>
-								</div>
-							)}
-
-							{billing && billing.recentInvoices.length > 0 && (
-								<div className="mt-3 text-xs text-gray-500 dark:text-zinc-400">
-									<span className="font-medium text-gray-700 dark:text-zinc-300">Recent: </span>
-									{billing.recentInvoices
-										.slice(0, 3)
-										.map((inv) => inv.invoiceNumber)
-										.join(" · ")}
-								</div>
-							)}
-						</div>
-
-						<div className="flex shrink-0 flex-col items-end gap-2 pt-1">
-							<button
-								type="button"
-								onClick={onIssueInvoice}
-								disabled={!(client.tenantId ?? billing?.tenantId)}
-								className="inline-flex items-center gap-1.5 rounded-md border border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-1.5 text-xs font-medium text-gray-700 dark:text-zinc-200 shadow-sm hover:bg-gray-50 dark:hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50"
-							>
-								<Receipt size={14} />
-								Issue invoice
-							</button>
-							<div className="text-gray-400">
-								<ChevronRight size={20} />
-							</div>
-						</div>
-					</div>
-				</div>
-			</div>
-		</div>
-	);
-}
-
-function Info({
-	label,
-	value,
-	icon,
-}: {
-	label: string;
-	value: string;
-	icon?: React.ReactNode;
-}) {
-	return (
-		<div className="min-w-0">
-			<div className="text-xs uppercase tracking-wide text-gray-400 dark:text-zinc-500">{label}</div>
-			<div className="mt-1 flex items-center gap-1.5 truncate text-sm text-gray-700 dark:text-zinc-200">
-				{icon}
-				<span className="truncate">{value}</span>
-			</div>
-		</div>
-	);
-}
-
