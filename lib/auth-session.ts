@@ -6,8 +6,7 @@ export const AUTH_TENANT_ID_KEY = process.env.NEXT_PUBLIC_TENANT_ID_KEY || 'akou
 export const AUTH_TENANT_SLUG_KEY = process.env.NEXT_PUBLIC_TENANT_SLUG_KEY || 'akou_tenant_slug';
 export const AUTH_USER_EMAIL_KEY = process.env.NEXT_PUBLIC_USER_EMAIL_KEY || 'akou_user_email';
 export const AUTH_META_KEY = process.env.NEXT_PUBLIC_AUTH_META_KEY || 'akou_auth_meta';
-export const AUTH_REFRESH_TOKEN_KEY =
-  process.env.NEXT_PUBLIC_REFRESH_TOKEN_KEY || 'akou_refresh_token';
+export const AUTH_REFRESH_TOKEN_KEY = process.env.NEXT_PUBLIC_REFRESH_TOKEN_KEY || 'akou_refresh_token';
 
 export interface AuthSessionMeta {
   expiresAt: number;
