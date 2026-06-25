@@ -89,6 +89,10 @@ export default function PlaylistDetailClient({
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [coverColor, setCoverColor] = useState<CoverKey>("indigo");
+  const [coverSelection, setCoverSelection] = useState<{ file: File | null; removed: boolean }>({
+    file: null,
+    removed: false,
+  });
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [successToast, setSuccessToast] = useState<string | null>(null);
@@ -188,6 +192,7 @@ export default function PlaylistDetailClient({
     title: string;
     description: string;
     coverColor: CoverKey;
+    coverUrl?: string | null;
   };
 
   const updatePlaylistMutation = useMutation({
@@ -196,6 +201,7 @@ export default function PlaylistDetailClient({
         title: payload.title,
         description: payload.description,
         coverColor: payload.coverColor,
+        coverUrl: payload.coverUrl,
       }),
     onSuccess: () => void invalidatePlaylistQueries(),
   });
@@ -389,13 +395,23 @@ export default function PlaylistDetailClient({
     setSaving(true);
     setEditSaved(false);
     try {
+      let coverUrl: string | null | undefined;
+      if (coverSelection.file) {
+        const upload = await apiClient.uploadImage(coverSelection.file);
+        coverUrl = upload.url;
+      } else if (coverSelection.removed) {
+        coverUrl = null;
+      }
+
       const res = await updatePlaylistMutation.mutateAsync({
         playlistId: activePlaylistId,
         title: trimmed || playlist.title,
         description: descTrim,
         coverColor,
+        coverUrl,
       });
       syncPlaylistState(res, { setPlaylist, setTracks });
+      setCoverSelection({ file: null, removed: false });
       setEditSaved(true);
       setSuccessToast("Playlist updated");
       setTimeout(() => setEditOpen(false), 600);
@@ -571,13 +587,16 @@ export default function PlaylistDetailClient({
     playlist &&
     (name.trim() !== (playlist.title ?? "") ||
       description.trim() !== (playlist.description ?? "") ||
-      coverColor !== resolveCoverKey(playlist.coverColor));
+      coverColor !== resolveCoverKey(playlist.coverColor) ||
+      coverSelection.file !== null ||
+      coverSelection.removed);
 
   const openEdit = () => {
     if (!playlist) return;
     setName(playlist.title ?? "");
     setDescription(playlist.description ?? "");
     setCoverColor(resolveCoverKey(playlist.coverColor));
+    setCoverSelection({ file: null, removed: false });
     setEditOpen(true);
   };
 
@@ -660,6 +679,7 @@ export default function PlaylistDetailClient({
         name={name}
         description={description}
         coverColor={coverColor}
+        existingCoverUrl={playlist.cover}
         saving={saving}
         saved={editSaved}
         hasChanges={!!hasChanges}
@@ -667,11 +687,13 @@ export default function PlaylistDetailClient({
         onNameChange={setName}
         onDescriptionChange={setDescription}
         onCoverColorChange={setCoverColor}
+        onCoverSelectionChange={setCoverSelection}
         onClose={() => {
           setEditOpen(false);
           setName(playlist.title ?? "");
           setDescription(playlist.description ?? "");
           setCoverColor(resolveCoverKey(playlist.coverColor));
+          setCoverSelection({ file: null, removed: false });
         }}
         onSave={() => void saveChanges()}
       />

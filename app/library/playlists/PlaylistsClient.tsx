@@ -324,12 +324,18 @@ export default function LibraryPlaylistsClient() {
         open={playlistModalOpen}
         onClose={() => setPlaylistModalOpen(false)}
         playlists={playlists}
-        onCreatePlaylist={async (playlist) => {
+        onCreatePlaylist={async (playlist, options) => {
           try {
+            let coverUrl: string | undefined;
+            if (options?.coverFile) {
+              const upload = await apiClient.uploadImage(options.coverFile);
+              coverUrl = upload.url;
+            }
             const res = await apiClient.createPlaylist({
               title: playlist.title,
               description: playlist.description,
-              coverColor: playlist.coverColor,
+              coverColor: options?.coverFile ? undefined : playlist.coverColor,
+              coverUrl,
             });
             const created = apiPlaylistToUi(res.playlist);
             if (!created || !isValidPlaylistId(created.id)) {

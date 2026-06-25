@@ -88,7 +88,7 @@ function mapApiPlayerToLocal(p: PlayerInfo): PlayerViewModel {
   const lastSeenMs = p.lastSeen ? new Date(p.lastSeen).getTime() : 0;
   const isOnline = lastSeenMs > 0 && Date.now() - lastSeenMs <= 2 * 60 * 1000;
   const metadata = p.metadata as Record<string, unknown> | null | undefined;
-  const row = p as Record<string, unknown>;
+  const row = p as unknown as Record<string, unknown>;
   const createdAt = readIsoDate(
     metadata?.createdAt,
     metadata?.created_at,

@@ -12,7 +12,6 @@ import { queryKeys } from "@/lib/query-keys";
 import { parseMediaArtist, parseMediaTags } from "@/lib/media-tags";
 import {
   loadSingerOverrides,
-  persistSingerOverride,
 } from "@/lib/audio-singer-overrides";
 import type { MediaInfo } from "@/types/api";
 import {
@@ -102,9 +101,7 @@ export default function LibraryAudioClient() {
   const [perPage, setPerPage] = useState(10);
   const perPageOptions = [5, 10, 20, 50];
 
-  const [singerOverrides, setSingerOverrides] = useState<Record<string, string>>(() =>
-    loadSingerOverrides()
-  );
+  const [singerOverrides] = useState<Record<string, string>>(() => loadSingerOverrides());
 
   const mediaQuery = useQuery({
     queryKey: queryKeys.media(),
@@ -127,8 +124,15 @@ export default function LibraryAudioClient() {
   const loading = mediaQuery.isPending && !mediaQuery.data;
 
   const updateMediaMutation = useMutation({
-    mutationFn: ({ id, title }: { id: string; title: string }) =>
-      apiClient.updateMedia(id, { title }),
+    mutationFn: ({
+      id,
+      title,
+      artist,
+    }: {
+      id: string;
+      title: string;
+      artist?: string;
+    }) => apiClient.updateMedia(id, { title, artist }),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: queryKeys.media() });
     },
@@ -413,6 +417,34 @@ export default function LibraryAudioClient() {
   const [editing, setEditing] = useState<AudioItem | null>(null);
   const [successToast, setSuccessToast] = useState<string | null>(null);
 
+  const playlistsQuery = useQuery({
+    queryKey: queryKeys.playlists(),
+    queryFn: async () => {
+      const response = await apiClient.listPlaylists();
+      return response.playlists;
+    },
+    enabled: editing !== null,
+  });
+
+  const playlistMembership = useMemo(() => {
+    const byMediaId = new Map<string, { playlistId: string; itemId: string }>();
+    for (const playlist of playlistsQuery.data ?? []) {
+      for (const track of playlist.tracks ?? []) {
+        byMediaId.set(track.mediaId, { playlistId: playlist.id, itemId: track.id });
+      }
+    }
+    return byMediaId;
+  }, [playlistsQuery.data]);
+
+  const playlistOptions = useMemo(
+    () =>
+      (playlistsQuery.data ?? []).map((playlist) => ({
+        id: playlist.id,
+        name: playlist.title,
+      })),
+    [playlistsQuery.data]
+  );
+
   const {
     audioToDelete,
     deleteOpen,
@@ -435,15 +467,39 @@ export default function LibraryAudioClient() {
     return () => window.clearTimeout(timer);
   }, [successToast]);
 
-  const saveEdit = async (v: { id: string; title: string; singer?: string }) => {
+  const saveEdit = async (v: {
+    id: string;
+    title: string;
+    singer?: string;
+    playlistId?: string | null;
+  }) => {
     try {
+      const previous = playlistMembership.get(v.id);
+      const nextPlaylistId = v.playlistId ?? null;
+      const previousPlaylistId = previous?.playlistId ?? null;
+
       await updateMediaMutation.mutateAsync({
         id: v.id,
         title: v.title.trim(),
+        artist: v.singer?.trim() ?? "",
       });
-      if (v.singer?.trim()) {
-        setSingerOverrides(persistSingerOverride(v.id, v.singer));
+
+      if (nextPlaylistId !== previousPlaylistId) {
+        if (previous?.playlistId && previous.itemId) {
+          await apiClient.removePlaylistItem(previous.playlistId, previous.itemId);
+        }
+        if (nextPlaylistId) {
+          await apiClient.addPlaylistItem(nextPlaylistId, { mediaId: v.id });
+        }
+        await queryClient.invalidateQueries({ queryKey: queryKeys.playlists() });
+        if (previousPlaylistId) {
+          await queryClient.invalidateQueries({ queryKey: queryKeys.playlist(previousPlaylistId) });
+        }
+        if (nextPlaylistId) {
+          await queryClient.invalidateQueries({ queryKey: queryKeys.playlist(nextPlaylistId) });
+        }
       }
+
       setSuccessToast("Audio updated");
       setEditing(null);
     } catch {
@@ -568,7 +624,13 @@ export default function LibraryAudioClient() {
       {editing && (
         <EditAudioModal
           open
-          initial={{ id: editing.id, title: editing.title, singer: editing.singer }}
+          initial={{
+            id: editing.id,
+            title: editing.title,
+            singer: editing.singer,
+            playlistId: playlistMembership.get(editing.id)?.playlistId ?? null,
+          }}
+          playlists={playlistOptions}
           onClose={() => setEditing(null)}
           onSave={saveEdit}
         />

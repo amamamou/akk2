@@ -13,6 +13,7 @@ import {
   User,
 } from "lucide-react";
 import { useAuth } from "@/app/context/AuthContext";
+import { getApiClient } from "@/lib/api-client";
 import {
   dashboardBrandGradient,
   dashboardCardClass,
@@ -56,6 +57,9 @@ export default function LoginPage() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [currentView, setCurrentView] = useState<AuthView>("login");
   const { login, isLoading, error, clearError } = useAuth();
+  const [submitting, setSubmitting] = useState(false);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
     email: "",
@@ -70,15 +74,28 @@ export default function LoginPage() {
     const { id, value } = e.target;
     setFormData((prev) => ({ ...prev, [id]: value }));
     if (error) clearError();
+    if (formError) setFormError(null);
   };
 
   const switchView = (view: AuthView) => {
     setCurrentView(view);
     clearError();
+    setFormError(null);
+    setSuccessMessage(null);
+  };
+
+  const resolveApiError = (err: unknown, fallback: string) => {
+    const ax = err as { response?: { data?: { detail?: { error?: string } | string } } };
+    const detail = ax.response?.data?.detail;
+    if (typeof detail === "string" && detail.trim()) return detail;
+    if (detail && typeof detail === "object" && detail.error) return detail.error;
+    if (err instanceof Error && err.message) return err.message;
+    return fallback;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setSuccessMessage(null);
 
     if (currentView === "login") {
       try {
@@ -89,12 +106,47 @@ export default function LoginPage() {
       } catch (err) {
         console.error("Login error:", err);
       }
-    } else if (currentView === "register") {
-      alert("Registration via frontend coming soon. Please contact support.");
-    } else {
-      alert("Password reset coming soon. Please contact support.");
+      return;
+    }
+
+    const apiClient = getApiClient();
+    setSubmitting(true);
+    clearError();
+
+    try {
+      if (currentView === "register") {
+        if (formData.password.length < 8) {
+          setFormError("Password must be at least 8 characters.");
+          return;
+        }
+        if (formData.password !== formData.confirmPassword) {
+          setFormError("Passwords do not match.");
+          return;
+        }
+        const res = await apiClient.register({
+          name: formData.name.trim(),
+          email: formData.email.trim().toLowerCase(),
+          password: formData.password,
+        });
+        setSuccessMessage(res.message);
+        setFormError(null);
+        setCurrentView("login");
+        clearError();
+      } else {
+        const res = await apiClient.requestPasswordReset({
+          email: formData.email.trim().toLowerCase(),
+        });
+        setSuccessMessage(res.message);
+        setFormError(null);
+      }
+    } catch (err) {
+      setFormError(resolveApiError(err, "Request failed. Please try again."));
+    } finally {
+      setSubmitting(false);
     }
   };
+
+  const busy = isLoading || submitting;
 
   const passwordToggle = (visible: boolean, toggle: () => void) => (
     <button
@@ -209,12 +261,21 @@ export default function LoginPage() {
                 />
               )}
 
-              {error ? (
+              {(error || formError) ? (
                 <div
                   role="alert"
                   className="rounded-xl border border-rose-100 bg-rose-50/80 px-4 py-3 text-sm text-rose-700"
                 >
-                  {error}
+                  {error || formError}
+                </div>
+              ) : null}
+
+              {successMessage ? (
+                <div
+                  role="status"
+                  className="rounded-xl border border-emerald-100 bg-emerald-50/80 px-4 py-3 text-sm text-emerald-700"
+                >
+                  {successMessage}
                 </div>
               ) : null}
 
@@ -240,7 +301,7 @@ export default function LoginPage() {
 
               <button
                 type="submit"
-                disabled={isLoading}
+                disabled={busy}
                 className={cn(
                   "group relative flex h-12 w-full items-center justify-center gap-2 overflow-hidden rounded-xl text-sm font-medium text-white transition-all",
                   "hover:opacity-95 active:scale-[0.99]",
@@ -248,7 +309,7 @@ export default function LoginPage() {
                 )}
                 style={{ background: dashboardBrandGradient }}
               >
-                {isLoading ? (
+                {busy ? (
                   <>
                     <Loader2 size={16} className="animate-spin" strokeWidth={2} />
                     {copy.loading}

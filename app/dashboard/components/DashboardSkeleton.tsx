@@ -39,7 +39,7 @@ function PanelShell({
   children,
 }: {
   title?: string;
-  subtitle?: string;
+  subtitle?: string | boolean;
   action?: boolean;
   noPadding?: boolean;
   bodyClassName?: string;

@@ -59,12 +59,14 @@ function resetForm(setters: {
   setColor: (v: CoverKey) => void;
   setError: (v: string | null) => void;
   fileInput: HTMLInputElement | null;
+  coverFile: { current: File | null };
 }) {
   setters.setName("");
   setters.setDesc("");
   setters.setCover(undefined);
   setters.setColor("indigo");
   setters.setError(null);
+  setters.coverFile.current = null;
   if (setters.fileInput) setters.fileInput.value = "";
 }
 
@@ -78,7 +80,7 @@ export default function PlaylistModal({
   open: boolean;
   onClose: () => void;
   playlists?: Playlist[];
-  onCreatePlaylist?: (playlist: Playlist) => void;
+  onCreatePlaylist?: (playlist: Playlist, options?: { coverFile?: File | null }) => void | Promise<void>;
   onAddToPlaylist?: (playlistId: string, trackId: string) => void;
 }) {
   const [newPlaylistName, setNewPlaylistName] = useState("");
@@ -87,6 +89,7 @@ export default function PlaylistModal({
   const [selectedCoverColor, setSelectedCoverColor] = useState<CoverKey>("indigo");
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const coverFileRef = useRef<File | null>(null);
 
   void _playlists;
   void _onAddToPlaylist;
@@ -118,11 +121,10 @@ export default function PlaylistModal({
       usedInSchedule: false,
       spacesCount: 0,
       lastModified: new Date().toISOString(),
-      cover: coverPreview,
-      coverColor: coverPreview ? undefined : selectedCoverColor,
+      coverColor: coverFileRef.current ? undefined : selectedCoverColor,
     };
 
-    onCreatePlaylist?.(playlist);
+    void onCreatePlaylist?.(playlist, { coverFile: coverFileRef.current });
     if (coverPreview) URL.revokeObjectURL(coverPreview);
     resetForm({
       setName: setNewPlaylistName,
@@ -131,6 +133,7 @@ export default function PlaylistModal({
       setColor: setSelectedCoverColor,
       setError,
       fileInput: fileInputRef.current,
+      coverFile: coverFileRef,
     });
     onClose();
   };
@@ -144,6 +147,7 @@ export default function PlaylistModal({
       setColor: setSelectedCoverColor,
       setError,
       fileInput: fileInputRef.current,
+      coverFile: coverFileRef,
     });
     onClose();
   };
@@ -216,6 +220,7 @@ export default function PlaylistModal({
                     return;
                   }
                   if (coverPreview) URL.revokeObjectURL(coverPreview);
+                  coverFileRef.current = f;
                   setCoverPreview(URL.createObjectURL(f));
                 }}
               />
@@ -246,6 +251,7 @@ export default function PlaylistModal({
                   type="button"
                   onClick={() => {
                     if (coverPreview) URL.revokeObjectURL(coverPreview);
+                    coverFileRef.current = null;
                     setCoverPreview(undefined);
                     if (fileInputRef.current) fileInputRef.current.value = "";
                   }}

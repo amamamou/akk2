@@ -7,11 +7,99 @@ import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
 import { Eye, EyeOff } from "lucide-react"
 import Image from "next/image"
+import { useAuth } from "@/app/context/AuthContext"
+import { getApiClient } from "@/lib/api-client"
 
 export default function CreateAccountPage() {
+  const { login, isLoading, error, clearError } = useAuth()
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [currentView, setCurrentView] = useState<"login" | "register" | "forgot">("register")
+  const [submitting, setSubmitting] = useState(false)
+  const [formError, setFormError] = useState<string | null>(null)
+  const [successMessage, setSuccessMessage] = useState<string | null>(null)
+  const [formData, setFormData] = useState({
+    name: "",
+    email: "",
+    password: "",
+    confirmPassword: "",
+  })
+
+  const resolveApiError = (err: unknown, fallback: string) => {
+    const ax = err as { response?: { data?: { detail?: { error?: string } | string } } }
+    const detail = ax.response?.data?.detail
+    if (typeof detail === "string" && detail.trim()) return detail
+    if (detail && typeof detail === "object" && detail.error) return detail.error
+    if (err instanceof Error && err.message) return err.message
+    return fallback
+  }
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { id, value } = e.target
+    setFormData((prev) => ({ ...prev, [id]: value }))
+    if (error) clearError()
+    if (formError) setFormError(null)
+    if (successMessage) setSuccessMessage(null)
+  }
+
+  const switchView = (view: "login" | "register" | "forgot") => {
+    setCurrentView(view)
+    clearError()
+    setFormError(null)
+    setSuccessMessage(null)
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setSuccessMessage(null)
+
+    if (currentView === "login") {
+      try {
+        await login({
+          email: formData.email.trim().toLowerCase(),
+          password: formData.password,
+        })
+      } catch (err) {
+        console.error("Login error:", err)
+      }
+      return
+    }
+
+    setSubmitting(true)
+    clearError()
+    setFormError(null)
+
+    try {
+      if (currentView === "register") {
+        if (formData.password.length < 8) {
+          setFormError("Password must be at least 8 characters.")
+          return
+        }
+        if (formData.password !== formData.confirmPassword) {
+          setFormError("Passwords do not match.")
+          return
+        }
+        const res = await getApiClient().register({
+          name: formData.name.trim(),
+          email: formData.email.trim().toLowerCase(),
+          password: formData.password,
+        })
+        setSuccessMessage(res.message)
+        setCurrentView("login")
+      } else {
+        const res = await getApiClient().requestPasswordReset({
+          email: formData.email.trim().toLowerCase(),
+        })
+        setSuccessMessage(res.message)
+      }
+    } catch (err) {
+      setFormError(resolveApiError(err, "Request failed. Please try again."))
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const busy = isLoading || submitting
 
   return (
     <div className="min-h-screen flex font-sans">
@@ -51,24 +139,48 @@ export default function CreateAccountPage() {
             {currentView === "forgot" && "Enter your email address and we'll send you a reset link."}
           </p>
 
-          <div className="space-y-4">
+          <form className="space-y-4" onSubmit={(e) => void handleSubmit(e)}>
             {currentView === "register" && (
               <div className="space-y-2">
                 <Label htmlFor="name" className="text-sm font-medium text-foreground">Full Name</Label>
-                <Input id="name" type="text" placeholder="John Doe" className="h-12 border border-gray-200 rounded-lg bg-white px-3 focus:outline-none focus:ring-2 focus:ring-[#A473FF]" />
+                <Input
+                  id="name"
+                  type="text"
+                  placeholder="John Doe"
+                  value={formData.name}
+                  onChange={handleInputChange}
+                  autoComplete="name"
+                  className="h-12 border border-gray-200 rounded-lg bg-white px-3 focus:outline-none focus:ring-2 focus:ring-[#A473FF]"
+                />
               </div>
             )}
 
             <div className="space-y-2">
               <Label htmlFor="email" className="text-sm font-medium text-foreground">Email</Label>
-              <Input id="email" type="email" placeholder="user@company.com" className="h-12 border border-gray-200 rounded-lg bg-white px-3 focus:outline-none focus:ring-2 focus:ring-[#A473FF]" />
+              <Input
+                id="email"
+                type="email"
+                placeholder="user@company.com"
+                value={formData.email}
+                onChange={handleInputChange}
+                autoComplete="email"
+                className="h-12 border border-gray-200 rounded-lg bg-white px-3 focus:outline-none focus:ring-2 focus:ring-[#A473FF]"
+              />
             </div>
 
             {currentView !== "forgot" && (
               <div className="space-y-2">
                 <Label htmlFor="password" className="text-sm font-medium text-foreground">Password</Label>
                 <div className="relative">
-                  <Input id="password" type={showPassword ? "text" : "password"} placeholder="Enter password" className="h-12 pr-10 border border-gray-200 rounded-lg bg-white px-3 focus:outline-none focus:ring-2 focus:ring-[#A473FF]" />
+                  <Input
+                    id="password"
+                    type={showPassword ? "text" : "password"}
+                    placeholder="Enter password"
+                    value={formData.password}
+                    onChange={handleInputChange}
+                    autoComplete={currentView === "login" ? "current-password" : "new-password"}
+                    className="h-12 pr-10 border border-gray-200 rounded-lg bg-white px-3 focus:outline-none focus:ring-2 focus:ring-[#A473FF]"
+                  />
                   <Button type="button" variant="ghost" size="sm" className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent" onClick={() => setShowPassword(!showPassword)}>
                     {showPassword ? <EyeOff className="h-4 w-4 text-muted-foreground" /> : <Eye className="h-4 w-4 text-muted-foreground" />}
                   </Button>
@@ -80,7 +192,15 @@ export default function CreateAccountPage() {
               <div className="space-y-2">
                 <Label htmlFor="confirmPassword" className="text-sm font-medium text-foreground">Confirm Password</Label>
                 <div className="relative">
-                  <Input id="confirmPassword" type={showConfirmPassword ? "text" : "password"} placeholder="Confirm password" className="h-12 pr-10 border border-gray-200 rounded-lg bg-white px-3 focus:outline-none focus:ring-2 focus:ring-[#A473FF]" />
+                  <Input
+                    id="confirmPassword"
+                    type={showConfirmPassword ? "text" : "password"}
+                    placeholder="Confirm password"
+                    value={formData.confirmPassword}
+                    onChange={handleInputChange}
+                    autoComplete="new-password"
+                    className="h-12 pr-10 border border-gray-200 rounded-lg bg-white px-3 focus:outline-none focus:ring-2 focus:ring-[#A473FF]"
+                  />
                   <Button type="button" variant="ghost" size="sm" className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent" onClick={() => setShowConfirmPassword(!showConfirmPassword)}>
                     {showConfirmPassword ? <EyeOff className="h-4 w-4 text-muted-foreground" /> : <Eye className="h-4 w-4 text-muted-foreground" />}
                   </Button>
@@ -88,26 +208,51 @@ export default function CreateAccountPage() {
               </div>
             )}
 
+            {(error || formError) ? (
+              <p className="rounded-lg border border-rose-100 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+                {error || formError}
+              </p>
+            ) : null}
+
+            {successMessage ? (
+              <p className="rounded-lg border border-emerald-100 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
+                {successMessage}
+              </p>
+            ) : null}
+
             {currentView === "login" && (
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-2">
                   <input type="checkbox" id="remember" className="rounded border-gray-300 cursor-pointer" />
                   <Label htmlFor="remember" className="text-sm text-muted-foreground cursor-pointer">Remember Me</Label>
                 </div>
-                <Button variant="link" className="p-0 h-auto text-sm hover:text-opacity-80" style={{ color: "#A473FF" }} onClick={() => setCurrentView("forgot") }>
+                <Button type="button" variant="link" className="p-0 h-auto text-sm hover:text-opacity-80" style={{ color: "#A473FF" }} onClick={() => switchView("forgot")}>
                   Forgot Your Password?
                 </Button>
               </div>
             )}
-          </div>
+
+            <Button
+              type="submit"
+              disabled={busy}
+              className="mt-4 w-full h-12 text-sm font-medium text-white hover:opacity-90 rounded-lg shadow-none"
+              style={{ backgroundColor: "#A473FF" }}
+            >
+              {busy
+                ? currentView === "login"
+                  ? "Signing in…"
+                  : currentView === "register"
+                    ? "Creating account…"
+                    : "Sending…"
+                : currentView === "login"
+                  ? "Log In"
+                  : currentView === "register"
+                    ? "Create Account"
+                    : "Send Reset Link"}
+            </Button>
+          </form>
 
           <div className="mt-4">
-            <Button className="w-full h-12 text-sm font-medium text-white hover:opacity-90 rounded-lg shadow-none" style={{ backgroundColor: "#A473FF" }}>
-              {currentView === "login" && "Log In"}
-              {currentView === "register" && "Create Account"}
-              {currentView === "forgot" && "Send Reset Link"}
-            </Button>
-
             {currentView !== "forgot" && (
               <>
                 <div className="relative my-4">
@@ -127,10 +272,31 @@ export default function CreateAccountPage() {
                 </div>
               </>
             )}
+
+            {currentView === "login" ? (
+              <p className="mt-6 text-center text-sm text-muted-foreground">
+                Don&apos;t have an account?{" "}
+                <button type="button" className="font-medium text-[#A473FF]" onClick={() => switchView("register")}>
+                  Create one
+                </button>
+              </p>
+            ) : currentView === "register" ? (
+              <p className="mt-6 text-center text-sm text-muted-foreground">
+                Already have an account?{" "}
+                <button type="button" className="font-medium text-[#A473FF]" onClick={() => switchView("login")}>
+                  Log in
+                </button>
+              </p>
+            ) : (
+              <p className="mt-6 text-center text-sm text-muted-foreground">
+                <button type="button" className="font-medium text-[#A473FF]" onClick={() => switchView("login")}>
+                  Back to sign in
+                </button>
+              </p>
+            )}
           </div>
         </div>
       </div>
     </div>
   )
 }
-

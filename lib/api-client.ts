@@ -8,6 +8,10 @@ import axios, { AxiosInstance, AxiosError, AxiosProgressEvent, InternalAxiosRequ
 import type {
   LoginRequest,
   LoginResponse,
+  PasswordResetRequest,
+  PasswordResetResponse,
+  RegisterRequest,
+  RegisterResponse,
   PlayersListResponse,
   PlayerResponse,
   PlayerCreate,
@@ -41,6 +45,7 @@ import type {
 } from '@/types/api';
 import {
   AUTH_META_KEY,
+  AUTH_REFRESH_TOKEN_KEY,
   AUTH_TOKEN_KEY,
   AUTH_TENANT_ID_KEY,
   AUTH_TENANT_SLUG_KEY,
@@ -56,6 +61,24 @@ type AuthMeta = {
   expiresAt: number;
   issuedAt: number;
 };
+
+type RetryableRequestConfig = InternalAxiosRequestConfig & {
+  _retry?: boolean;
+};
+
+type RefreshTokenResponse = {
+  ok?: boolean;
+  token: string;
+  refreshToken?: string;
+  refresh_token?: string;
+};
+
+type RefreshQueueEntry = {
+  resolve: (token: string) => void;
+  reject: (error: unknown) => void;
+};
+
+const AUTH_REFRESH_PATH = '/auth/refresh';
 
 export interface TokenSet {
   token: string;
@@ -73,6 +96,8 @@ export class ApiClient {
   private tokenExpiresAt: number | null = null;
   /** In-memory tenant override for SUPER_ADMIN workspace switching (not persisted). */
   private workspaceTenant: { tenantId: string; tenantSlug?: string } | null = null;
+  private isRefreshing = false;
+  private refreshQueue: RefreshQueueEntry[] = [];
 
   constructor(baseURL: string = process.env.NEXT_PUBLIC_API_BASE_URL || '') {
     this.instance = axios.create({
@@ -102,26 +127,63 @@ export class ApiClient {
       (error) => Promise.reject(error)
     );
 
-    // Response interceptor: handle errors
-    // On 401, clear tokens and emit a global event so the Auth layer can
-    // respond (logout, clear UI state, redirect). Avoid hard redirect here
-    // so the app can perform a proper logout flow.
+    // Response interceptor: attempt silent refresh on 401 before logging out.
     this.instance.interceptors.response.use(
       (response) => response,
-      (error: AxiosError) => {
-        if (error.response?.status === 401) {
-          // Token expired or invalid
-          this.clearTokens();
-          if (typeof window !== 'undefined') {
-            try {
-              window.dispatchEvent(new CustomEvent('akou:unauthorized'));
-            } catch (e) {
-              // fallback to direct navigation
-              window.location.href = '/login';
-            }
-          }
+      async (error: AxiosError) => {
+        const originalRequest = error.config as RetryableRequestConfig | undefined;
+
+        if (!originalRequest || error.response?.status !== 401) {
+          return Promise.reject(error);
         }
-        return Promise.reject(error);
+
+        const requestUrl = originalRequest.url ?? '';
+        if (
+          requestUrl.includes(AUTH_REFRESH_PATH) ||
+          requestUrl.includes('/auth/login')
+        ) {
+          this.handleUnauthorized();
+          return Promise.reject(error);
+        }
+
+        if (originalRequest._retry) {
+          this.handleUnauthorized();
+          return Promise.reject(error);
+        }
+
+        const refreshToken = this.getRefreshToken();
+        if (!refreshToken) {
+          this.handleUnauthorized();
+          return Promise.reject(error);
+        }
+
+        if (this.isRefreshing) {
+          return new Promise((resolve, reject) => {
+            this.refreshQueue.push({
+              resolve: (token: string) => {
+                this.applyAuthorizationHeader(originalRequest, token);
+                resolve(this.instance(originalRequest));
+              },
+              reject,
+            });
+          });
+        }
+
+        originalRequest._retry = true;
+        this.isRefreshing = true;
+
+        try {
+          const newToken = await this.refreshAccessToken(refreshToken);
+          this.flushRefreshQueue(null, newToken);
+          this.applyAuthorizationHeader(originalRequest, newToken);
+          return this.instance(originalRequest);
+        } catch (refreshError) {
+          this.flushRefreshQueue(refreshError);
+          this.handleUnauthorized();
+          return Promise.reject(refreshError);
+        } finally {
+          this.isRefreshing = false;
+        }
       }
     );
 
@@ -165,7 +227,11 @@ export class ApiClient {
     }
 
     if (this.tokenSet?.token && isSessionExpired(this.tokenExpiresAt)) {
-      this.clearTokens();
+      if (this.getRefreshToken()) {
+        this.clearAccessTokenOnly();
+      } else {
+        this.clearTokens();
+      }
       return null;
     }
 
@@ -190,7 +256,11 @@ export class ApiClient {
         }
 
         if (isSessionExpired(expiresAt)) {
-          this.clearTokens();
+          if (this.getRefreshToken()) {
+            this.clearAccessTokenOnly();
+          } else {
+            this.clearTokens();
+          }
           return null;
         }
 
@@ -208,7 +278,11 @@ export class ApiClient {
       if (cookieToken) {
         const expiresAt = getSessionExpiryMs(cookieToken);
         if (isSessionExpired(expiresAt)) {
-          this.clearTokens();
+          if (this.getRefreshToken()) {
+            this.clearAccessTokenOnly();
+          } else {
+            this.clearTokens();
+          }
           return null;
         }
 
@@ -266,7 +340,7 @@ export class ApiClient {
   }
 
   /**
-   * Clear all stored tokens
+   * Clear all stored tokens (access + refresh)
    */
   clearTokens() {
     this.tokenSet = null;
@@ -278,6 +352,7 @@ export class ApiClient {
       localStorage.removeItem(AUTH_TENANT_SLUG_KEY);
       localStorage.removeItem(AUTH_USER_EMAIL_KEY);
       localStorage.removeItem(AUTH_META_KEY);
+      localStorage.removeItem(AUTH_REFRESH_TOKEN_KEY);
 
       try {
         document.cookie = removeCookieString(AUTH_TOKEN_KEY);
@@ -285,6 +360,101 @@ export class ApiClient {
         // ignore cookie removal errors
       }
     }
+  }
+
+  getRefreshToken(): string | null {
+    if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
+      return localStorage.getItem(AUTH_REFRESH_TOKEN_KEY);
+    }
+    return null;
+  }
+
+  setRefreshToken(refreshToken: string) {
+    if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
+      localStorage.setItem(AUTH_REFRESH_TOKEN_KEY, refreshToken);
+    }
+  }
+
+  private clearAccessTokenOnly() {
+    this.tokenSet = null;
+    this.tokenExpiresAt = null;
+
+    if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
+      localStorage.removeItem(AUTH_TOKEN_KEY);
+      localStorage.removeItem(AUTH_META_KEY);
+
+      try {
+        document.cookie = removeCookieString(AUTH_TOKEN_KEY);
+      } catch {
+        // ignore cookie removal errors
+      }
+    }
+  }
+
+  private handleUnauthorized() {
+    this.clearTokens();
+    if (typeof window !== 'undefined') {
+      try {
+        window.dispatchEvent(new CustomEvent('akou:unauthorized'));
+      } catch {
+        window.location.href = '/login';
+      }
+    }
+  }
+
+  private applyAuthorizationHeader(config: InternalAxiosRequestConfig, token: string) {
+    if (!config.headers) {
+      config.headers = {} as InternalAxiosRequestConfig['headers'];
+    }
+
+    const headers = config.headers;
+    if (typeof (headers as { set?: (key: string, value: string) => void }).set === 'function') {
+      (headers as { set: (key: string, value: string) => void }).set('Authorization', `Bearer ${token}`);
+      return;
+    }
+
+    (headers as Record<string, string>).Authorization = `Bearer ${token}`;
+  }
+
+  private flushRefreshQueue(error: unknown | null, token: string | null = null) {
+    this.refreshQueue.forEach((pending) => {
+      if (error || !token) {
+        pending.reject(error ?? new Error('Token refresh failed'));
+      } else {
+        pending.resolve(token);
+      }
+    });
+    this.refreshQueue = [];
+  }
+
+  private async refreshAccessToken(refreshToken: string): Promise<string> {
+    const baseURL = (this.instance.defaults.baseURL ?? '').replace(/\/$/, '');
+    const response = await axios.post<RefreshTokenResponse>(
+      `${baseURL}${AUTH_REFRESH_PATH}`,
+      { refresh_token: refreshToken },
+      { headers: { 'Content-Type': 'application/json' } }
+    );
+
+    const { token: newToken, refreshToken: rotatedCamel, refresh_token: rotatedSnake } = response.data;
+    if (!newToken) {
+      throw new Error('Refresh response missing access token');
+    }
+
+    const tenantId = this.getTenantId();
+    const tenantSlug = this.getTenantSlug();
+    const userEmail = this.getUserEmail();
+    if (!tenantId || !tenantSlug || !userEmail) {
+      throw new Error('Session metadata missing during token refresh');
+    }
+
+    this.setTokens(newToken, tenantId, tenantSlug, userEmail);
+
+    const rotatedRefresh = rotatedCamel ?? rotatedSnake;
+    if (rotatedRefresh) {
+      this.setRefreshToken(rotatedRefresh);
+    }
+
+    return newToken;
   }
 
   /**
@@ -316,6 +486,8 @@ export class ApiClient {
         if (!isSessionExpired(expiresAt)) {
           this.tokenSet = { token, tenantId, tenantSlug, userEmail };
           this.tokenExpiresAt = expiresAt;
+        } else if (this.getRefreshToken()) {
+          this.clearAccessTokenOnly();
         } else {
           this.clearTokens();
         }
@@ -352,6 +524,11 @@ export class ApiClient {
     // Store tokens
     this.setTokens(token, tenant.id, tenant.slug, user.email);
 
+    const refreshToken = response.data.refreshToken ?? response.data.refresh_token;
+    if (refreshToken) {
+      this.setRefreshToken(refreshToken);
+    }
+
     return response.data;
   }
 
@@ -360,6 +537,28 @@ export class ApiClient {
    */
   logout() {
     this.clearTokens();
+  }
+
+  /**
+   * POST /auth/register - Create a new account
+   */
+  async register(data: RegisterRequest): Promise<RegisterResponse> {
+    const response = await this.instance.post<RegisterResponse>('/auth/register', {
+      name: data.name.trim(),
+      email: data.email.trim().toLowerCase(),
+      password: data.password,
+    });
+    return response.data;
+  }
+
+  /**
+   * POST /auth/password-reset - Request password reset email
+   */
+  async requestPasswordReset(data: PasswordResetRequest): Promise<PasswordResetResponse> {
+    const response = await this.instance.post<PasswordResetResponse>('/auth/password-reset', {
+      email: data.email.trim().toLowerCase(),
+    });
+    return response.data;
   }
 
   // ============ Player Endpoints ============
@@ -481,6 +680,7 @@ export class ApiClient {
     category: string = 'Audio',
     onUploadProgress?: (progressPercent: number, event: AxiosProgressEvent) => void,
     tags?: string[],
+    artist?: string,
   ): Promise<MediaResponse> {
     const formData = new FormData();
     formData.append('file', file);
@@ -489,6 +689,9 @@ export class ApiClient {
     formData.append('category', category);
     if (tags && tags.length > 0) {
       formData.append('tags', tags.map((t) => `TAG:${t}`).join(','));
+    }
+    if (artist?.trim()) {
+      formData.append('artist', artist.trim());
     }
 
     // Use multipart content type
@@ -514,6 +717,7 @@ export class ApiClient {
     const response = await this.instance.put<MediaResponse>(`/media/${mediaId}`, {
       title: data.title,
       category: data.category,
+      artist: data.artist,
     });
     return response.data;
   }
@@ -676,6 +880,16 @@ export class ApiClient {
     return response.data;
   }
 
+  /**
+   * DELETE /clients/{id} - Delete client (SUPER_ADMIN only)
+   */
+  async deleteClient(id: string): Promise<{ ok: boolean; message?: string }> {
+    const response = await this.instance.delete<{ ok: boolean; message?: string }>(
+      `/clients/${id}`
+    );
+    return response.data;
+  }
+
    // ============ Analytics Endpoints ============
 
    /**
@@ -801,6 +1015,7 @@ export class ApiClient {
       title: data.title,
       description: data.description,
       cover_color: data.coverColor,
+      cover_url: data.coverUrl,
     });
     return response.data;
   }
@@ -813,6 +1028,7 @@ export class ApiClient {
     if (data.title !== undefined) body.title = data.title;
     if (data.description !== undefined) body.description = data.description;
     if (data.coverColor !== undefined) body.cover_color = data.coverColor;
+    if (data.coverUrl !== undefined) body.cover_url = data.coverUrl;
 
     const response = await this.instance.put<PlaylistDetailResponse>(
       this.playlistPath(playlistId),

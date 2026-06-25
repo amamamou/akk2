@@ -105,6 +105,7 @@ export interface MediaCreate {
 export interface MediaUpdateInput {
   title?: string;
   category?: string;
+  artist?: string;
 }
 
 // ============ Schedule Types ============
@@ -158,9 +159,31 @@ export interface LoginRequest {
   password: string;
 }
 
+export interface RegisterRequest {
+  name: string;
+  email: string;
+  password: string;
+}
+
+export interface RegisterResponse {
+  ok: boolean;
+  message: string;
+}
+
+export interface PasswordResetRequest {
+  email: string;
+}
+
+export interface PasswordResetResponse {
+  ok: boolean;
+  message: string;
+}
+
 export interface LoginResponse {
   ok: boolean;
   token: string;
+  refreshToken?: string;
+  refresh_token?: string;
   user: {
     id: string;
     email: string;
@@ -388,6 +411,8 @@ export interface PlaylistApiInfo {
   totalDurationSeconds: number;
   totalDuration: string;
   coverColor?: string | null;
+  coverUrl?: string | null;
+  cover?: string | null;
   lastModified?: string | null;
   tracks?: PlaylistTrackInfo[];
   tenantId?: string;
@@ -409,12 +434,14 @@ export interface PlaylistCreateInput {
   title: string;
   description?: string;
   coverColor?: string;
+  coverUrl?: string | null;
 }
 
 export interface PlaylistUpdateInput {
   title?: string;
   description?: string;
   coverColor?: string;
+  coverUrl?: string | null;
 }
 
 export interface PlaylistItemAddInput {

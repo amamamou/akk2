@@ -1,10 +1,20 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { getApiClient } from "@/lib/api-client";
 
 export default function SignupClient() {
+  const router = useRouter();
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
   useEffect(() => {
     if (typeof document === "undefined") return;
     const sidebar = document.querySelector("aside") as HTMLElement | null;
@@ -17,6 +27,45 @@ export default function SignupClient() {
       sidebar.style.display = previousDisplay;
     };
   }, []);
+
+  const resolveApiError = (err: unknown, fallback: string) => {
+    const ax = err as { response?: { data?: { detail?: { error?: string } | string } } };
+    const detail = ax.response?.data?.detail;
+    if (typeof detail === "string" && detail.trim()) return detail;
+    if (detail && typeof detail === "object" && detail.error) return detail.error;
+    if (err instanceof Error && err.message) return err.message;
+    return fallback;
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+
+    if (password.length < 8) {
+      setError("Password must be at least 8 characters.");
+      return;
+    }
+
+    const name = [firstName.trim(), lastName.trim()].filter(Boolean).join(" ").trim();
+    if (!name) {
+      setError("Please enter your name.");
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      await getApiClient().register({
+        name,
+        email: email.trim().toLowerCase(),
+        password,
+      });
+      router.push("/login");
+    } catch (err) {
+      setError(resolveApiError(err, "Could not create account. Please try again."));
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   return (
     <div className="flex min-h-screen ">
@@ -121,41 +170,69 @@ export default function SignupClient() {
               </div>
             </div>
 
-            <form className="space-y-6">
+            <form className="space-y-6" onSubmit={(e) => void handleSubmit(e)}>
+              {error ? (
+                <p className="rounded-lg border border-rose-100 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+                  {error}
+                </p>
+              ) : null}
+
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
-                  <Input className="h-12" placeholder="Dollar" type="text" />
+                  <Input
+                    className="h-12"
+                    placeholder="First name"
+                    type="text"
+                    value={firstName}
+                    onChange={(e) => setFirstName(e.target.value)}
+                    autoComplete="given-name"
+                  />
                 </div>
                 <div className="space-y-2">
-                  <Input className="h-12" placeholder="Gill" type="text" />
+                  <Input
+                    className="h-12"
+                    placeholder="Last name"
+                    type="text"
+                    value={lastName}
+                    onChange={(e) => setLastName(e.target.value)}
+                    autoComplete="family-name"
+                  />
                 </div>
               </div>
 
               <div className="space-y-2">
                 <Input
                   className="h-12"
-                  placeholder="EXAMPLE@FLOWERSANDSAINTS.COM.AU"
+                  placeholder="you@company.com"
                   type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  autoComplete="email"
                 />
               </div>
 
               <div className="space-y-2">
                 <Input
                   className="h-12"
-                  placeholder="YourbestPasword"
+                  placeholder="Your password"
                   type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  autoComplete="new-password"
                 />
                 <p className="text-sm text-gray-400">
                   Must be at least 8 characters.
                 </p>
               </div>
 
-              <Button className="h-12 w-full">Sign Up</Button>
+              <Button className="h-12 w-full" type="submit" disabled={submitting}>
+                {submitting ? "Creating account…" : "Sign Up"}
+              </Button>
 
               <p className="text-center text-sm text-gray-400">
                 Already have an account? {" "}
                 <a
-                  href="/create-account"
+                  href="/login"
                   className="text-gray-900 hover:underline"
                 >
                   Log in

@@ -87,7 +87,10 @@ export function apiPlaylistToUi(
   if (!id) return null;
 
   const row = p as Record<string, unknown>;
-  const cover = String(row.coverColor ?? row.cover_color ?? "indigo") as Playlist["coverColor"];
+  const coverColor = String(row.coverColor ?? row.cover_color ?? "indigo") as Playlist["coverColor"];
+  const coverUrl = row.coverUrl ?? row.cover_url ?? row.cover;
+  const cover =
+    typeof coverUrl === "string" && coverUrl.trim() ? coverUrl.trim() : undefined;
 
   return {
     id,
@@ -100,6 +103,7 @@ export function apiPlaylistToUi(
     lastModified: String(
       row.lastModified ?? row.last_modified ?? new Date().toISOString()
     ),
-    coverColor: cover ?? "indigo",
+    coverColor: coverColor ?? "indigo",
+    cover,
   };
 }

@@ -18,19 +18,34 @@ const INPUT_CLASS =
 export default function EditAudioModal({
   open,
   initial,
+  playlists = [],
   onClose,
   onSave,
 }: {
   open: boolean;
-  initial: { id: string; title: string; singer?: string } | null;
+  initial: {
+    id: string;
+    title: string;
+    singer?: string;
+    playlistId?: string | null;
+  } | null;
+  playlists?: { id: string; name: string }[];
   onClose: () => void;
-  onSave: (v: { id: string; title: string; singer?: string }) => void | Promise<void>;
+  onSave: (v: {
+    id: string;
+    title: string;
+    singer?: string;
+    playlistId?: string | null;
+  }) => void | Promise<void>;
 }) {
   const [title, setTitle] = useState("");
   const [singer, setSinger] = useState("");
-  const [initialState, setInitialState] = useState<{ title: string; singer: string } | null>(
-    null
-  );
+  const [playlistId, setPlaylistId] = useState<string | null>(null);
+  const [initialState, setInitialState] = useState<{
+    title: string;
+    singer: string;
+    playlistId: string | null;
+  } | null>(null);
   const [saving, setSaving] = useState(false);
   const titleInputRef = useRef<HTMLInputElement>(null);
 
@@ -39,11 +54,17 @@ export default function EditAudioModal({
     if (initial) {
       setTitle(initial.title);
       setSinger(initial.singer ?? "");
-      setInitialState({ title: initial.title, singer: initial.singer ?? "" });
+      setPlaylistId(initial.playlistId ?? null);
+      setInitialState({
+        title: initial.title,
+        singer: initial.singer ?? "",
+        playlistId: initial.playlistId ?? null,
+      });
     } else {
       setTitle("");
       setSinger("");
-      setInitialState({ title: "", singer: "" });
+      setPlaylistId(null);
+      setInitialState({ title: "", singer: "", playlistId: null });
     }
   }, [initial, open]);
 
@@ -65,7 +86,9 @@ export default function EditAudioModal({
   const hasChanges = Boolean(
     initialState &&
       title.trim().length > 0 &&
-      (initialState.title !== title || initialState.singer !== singer)
+      (initialState.title !== title ||
+        initialState.singer !== singer ||
+        initialState.playlistId !== playlistId)
   );
   const canSave = hasChanges && !saving;
 
@@ -76,7 +99,8 @@ export default function EditAudioModal({
       await onSave({
         id: initial.id,
         title: title.trim(),
-        singer: singer.trim() || undefined,
+        singer: singer.trim(),
+        playlistId,
       });
       onClose();
     } finally {
@@ -165,6 +189,27 @@ export default function EditAudioModal({
                 disabled={saving}
                 className={INPUT_CLASS}
               />
+            </div>
+
+            <div>
+              <label htmlFor="edit-audio-playlist" className={dashboardSectionLabel}>
+                Playlist{" "}
+                <span className="font-normal text-gray-400 dark:text-zinc-500">(optional)</span>
+              </label>
+              <select
+                id="edit-audio-playlist"
+                value={playlistId ?? ""}
+                onChange={(e) => setPlaylistId(e.target.value || null)}
+                disabled={saving}
+                className={INPUT_CLASS}
+              >
+                <option value="">None</option>
+                {playlists.map((playlist) => (
+                  <option key={playlist.id} value={playlist.id}>
+                    {playlist.name}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
         </div>

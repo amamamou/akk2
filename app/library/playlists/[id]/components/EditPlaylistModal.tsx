@@ -45,6 +45,7 @@ export default function EditPlaylistModal({
   name,
   description,
   coverColor,
+  existingCoverUrl,
   saving,
   saved,
   hasChanges,
@@ -52,6 +53,7 @@ export default function EditPlaylistModal({
   onNameChange,
   onDescriptionChange,
   onCoverColorChange,
+  onCoverSelectionChange,
   onClose,
   onSave,
 }: {
@@ -59,6 +61,7 @@ export default function EditPlaylistModal({
   name: string;
   description: string;
   coverColor: CoverKey;
+  existingCoverUrl?: string | null;
   saving: boolean;
   saved: boolean;
   hasChanges: boolean;
@@ -66,12 +69,23 @@ export default function EditPlaylistModal({
   onNameChange: (v: string) => void;
   onDescriptionChange: (v: string) => void;
   onCoverColorChange: (v: CoverKey) => void;
+  onCoverSelectionChange: (selection: { file: File | null; removed: boolean }) => void;
   onClose: () => void;
   onSave: () => void;
 }) {
   const [coverPreview, setCoverPreview] = useState<string | undefined>(undefined);
+  const [coverRemoved, setCoverRemoved] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const coverFileRef = useRef<File | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    setCoverPreview(undefined);
+    setCoverRemoved(false);
+    coverFileRef.current = null;
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  }, [open, existingCoverUrl]);
 
   useEffect(() => {
     return () => {
@@ -92,6 +106,8 @@ export default function EditPlaylistModal({
 
   const canSave = name.trim().length > 0 && hasChanges && !saving;
   const activeGradient = coverGradients[coverColor];
+  const displayCover =
+    coverPreview ?? (!coverRemoved && existingCoverUrl ? existingCoverUrl : undefined);
 
   return (
     <div
@@ -155,7 +171,10 @@ export default function EditPlaylistModal({
                     return;
                   }
                   if (coverPreview) URL.revokeObjectURL(coverPreview);
+                  coverFileRef.current = f;
+                  setCoverRemoved(false);
                   setCoverPreview(URL.createObjectURL(f));
+                  onCoverSelectionChange({ file: f, removed: false });
                 }}
               />
 
@@ -164,12 +183,12 @@ export default function EditPlaylistModal({
                 onClick={() => fileInputRef.current?.click()}
                 className={cn(
                   "group relative flex h-[88px] w-[88px] items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br ring-1 ring-gray-100 transition-all hover:ring-[#A473FF]/30 dark:ring-zinc-700",
-                  !coverPreview && activeGradient
+                  !displayCover && activeGradient
                 )}
               >
-                {coverPreview ? (
+                {displayCover ? (
                   <>
-                    <Image src={coverPreview} alt="" fill className="object-cover" />
+                    <Image src={displayCover} alt="" fill className="object-cover" unoptimized />
                     <div className="absolute inset-0 bg-black/20 opacity-0 transition-opacity group-hover:opacity-100" />
                     <span className="absolute bottom-1.5 left-1/2 -translate-x-1/2 rounded-md bg-black/50 px-2 py-0.5 text-[9px] font-medium text-white opacity-0 transition-opacity group-hover:opacity-100">
                       Change
@@ -180,7 +199,22 @@ export default function EditPlaylistModal({
                 )}
               </button>
 
-              {!coverPreview && (
+              {displayCover ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (coverPreview) URL.revokeObjectURL(coverPreview);
+                    coverFileRef.current = null;
+                    setCoverPreview(undefined);
+                    setCoverRemoved(true);
+                    if (fileInputRef.current) fileInputRef.current.value = "";
+                    onCoverSelectionChange({ file: null, removed: true });
+                  }}
+                  className="mt-2 w-full text-center text-[10px] font-medium text-gray-400 hover:text-gray-600"
+                >
+                  Remove image
+                </button>
+              ) : (
                 <button
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
@@ -227,7 +261,7 @@ export default function EditPlaylistModal({
             </div>
           </div>
 
-          {!coverPreview && (
+          {!displayCover && (
             <div className="mt-6">
               <div className="mb-3 flex items-center gap-2">
                 <Palette size={14} className="text-gray-400" />

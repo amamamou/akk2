@@ -4,7 +4,6 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AlertCircle, Check, Loader2, Upload } from "lucide-react";
 import { getApiClient } from "@/lib/api-client";
-import { persistSingerOverride } from "@/lib/audio-singer-overrides";
 import {
   dashboardAccentShadow,
   dashboardContainerClass,
@@ -236,12 +235,9 @@ export default function UploadAudioWorkspace({
             durationToUploadMinutes(item.durationSeconds, item.size),
             item.category || "Audio",
             (progressPercent) => updateItem(item.id, { progress: progressPercent }),
-            item.tags ?? []
+            item.tags ?? [],
+            item.artist.trim() || undefined
           );
-
-          if (item.artist.trim()) {
-            persistSingerOverride(response.media.id, item.artist.trim());
-          }
 
           if (item.playlistId) {
             await apiClient.addPlaylistItem(item.playlistId, {
