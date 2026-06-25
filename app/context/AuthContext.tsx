@@ -196,7 +196,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     if (pathname === '/login') return;
 
     const enforceAuth = () => {
-      if (!apiClient.getToken()) {
+      if (!apiClient.getToken() && !apiClient.hasRefreshableSession()) {
         setUser(null);
         router.push('/login');
       }

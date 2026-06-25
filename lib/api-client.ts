@@ -98,6 +98,8 @@ export class ApiClient {
   private workspaceTenant: { tenantId: string; tenantSlug?: string } | null = null;
   private isRefreshing = false;
   private refreshQueue: RefreshQueueEntry[] = [];
+  /** Single-flight refresh shared by request + response interceptors. */
+  private refreshPromise: Promise<string> | null = null;
 
   constructor(baseURL: string = process.env.NEXT_PUBLIC_API_BASE_URL || '') {
     this.instance = axios.create({
@@ -108,10 +110,19 @@ export class ApiClient {
       },
     });
 
-    // Request interceptor: add auth token and tenant header
+    // Request interceptor: reconcile storage, refresh proactively when needed, attach headers.
     this.instance.interceptors.request.use(
-      (config: InternalAxiosRequestConfig) => {
-        const token = this.getToken();
+      async (config: InternalAxiosRequestConfig) => {
+        const requestUrl = config.url ?? '';
+        const isAuthRoute =
+          requestUrl.includes(AUTH_REFRESH_PATH) ||
+          requestUrl.includes('/auth/login') ||
+          requestUrl.includes('/auth/register') ||
+          requestUrl.includes('/auth/password-reset');
+
+        const token = isAuthRoute
+          ? this.getToken()
+          : await this.ensureAccessToken();
         const tenantId = this.getEffectiveTenantId();
 
         if (token) {
@@ -127,7 +138,7 @@ export class ApiClient {
       (error) => Promise.reject(error)
     );
 
-    // Response interceptor: attempt silent refresh on 401 before logging out.
+    // Response interceptor: retry once after shared refresh if server still rejects access.
     this.instance.interceptors.response.use(
       (response) => response,
       async (error: AxiosError) => {
@@ -151,39 +162,16 @@ export class ApiClient {
           return Promise.reject(error);
         }
 
-        const refreshToken = this.getRefreshToken();
-        if (!refreshToken) {
+        originalRequest._retry = true;
+
+        const newToken = await this.ensureAccessToken();
+        if (!newToken) {
           this.handleUnauthorized();
           return Promise.reject(error);
         }
 
-        if (this.isRefreshing) {
-          return new Promise((resolve, reject) => {
-            this.refreshQueue.push({
-              resolve: (token: string) => {
-                this.applyAuthorizationHeader(originalRequest, token);
-                resolve(this.instance(originalRequest));
-              },
-              reject,
-            });
-          });
-        }
-
-        originalRequest._retry = true;
-        this.isRefreshing = true;
-
-        try {
-          const newToken = await this.refreshAccessToken(refreshToken);
-          this.flushRefreshQueue(null, newToken);
-          this.applyAuthorizationHeader(originalRequest, newToken);
-          return this.instance(originalRequest);
-        } catch (refreshError) {
-          this.flushRefreshQueue(refreshError);
-          this.handleUnauthorized();
-          return Promise.reject(refreshError);
-        } finally {
-          this.isRefreshing = false;
-        }
+        this.applyAuthorizationHeader(originalRequest, newToken);
+        return this.instance(originalRequest);
       }
     );
 
@@ -219,17 +207,55 @@ export class ApiClient {
   }
 
   /**
-   * Get current auth token
+   * Get current auth token (sync read; does not proactively refresh).
    */
   getToken(): string | null {
+    this.reconcileTokenFromStorage();
+    return this.readValidAccessToken();
+  }
+
+  /**
+   * True when a refresh token plus session metadata can still recover access.
+   */
+  hasRefreshableSession(): boolean {
+    return !!(
+      this.getRefreshToken() &&
+      this.getTenantId() &&
+      this.getTenantSlug() &&
+      this.getUserEmail()
+    );
+  }
+
+  /**
+   * Resolve a usable access token, refreshing in the background when needed.
+   * Shared single-flight entry point for request/response interceptors.
+   */
+  async ensureAccessToken(): Promise<string | null> {
+    this.reconcileTokenFromStorage();
+
+    const existing = this.readValidAccessToken();
+    if (existing) {
+      return existing;
+    }
+
+    if (!this.hasRefreshableSession()) {
+      return null;
+    }
+
+    try {
+      return await this.refreshAccessTokenSingleFlight(this.getRefreshToken()!);
+    } catch {
+      return null;
+    }
+  }
+
+  private readValidAccessToken(): string | null {
     if (this.tokenSet?.token && !isSessionExpired(this.tokenExpiresAt)) {
       return this.tokenSet.token;
     }
 
     if (this.tokenSet?.token && isSessionExpired(this.tokenExpiresAt)) {
-      if (this.getRefreshToken()) {
-        this.clearAccessTokenOnly();
-      } else {
+      if (!this.getRefreshToken()) {
         this.clearTokens();
       }
       return null;
@@ -238,27 +264,9 @@ export class ApiClient {
     if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
       const token = localStorage.getItem(AUTH_TOKEN_KEY);
       if (token) {
-        const metaRaw = localStorage.getItem(AUTH_META_KEY);
-        let expiresAt: number | null = null;
-
-        if (metaRaw) {
-          try {
-            const meta = JSON.parse(metaRaw) as Partial<AuthMeta>;
-            expiresAt = typeof meta.expiresAt === 'number' ? meta.expiresAt : null;
-          } catch {
-            expiresAt = null;
-          }
-        }
-
-        if (!expiresAt) {
-          expiresAt = getSessionExpiryMs(token);
-          localStorage.setItem(AUTH_META_KEY, JSON.stringify({ expiresAt, issuedAt: Date.now() } satisfies AuthMeta));
-        }
-
+        const expiresAt = this.readAccessExpiryMeta(token);
         if (isSessionExpired(expiresAt)) {
-          if (this.getRefreshToken()) {
-            this.clearAccessTokenOnly();
-          } else {
+          if (!this.getRefreshToken()) {
             this.clearTokens();
           }
           return null;
@@ -278,9 +286,7 @@ export class ApiClient {
       if (cookieToken) {
         const expiresAt = getSessionExpiryMs(cookieToken);
         if (isSessionExpired(expiresAt)) {
-          if (this.getRefreshToken()) {
-            this.clearAccessTokenOnly();
-          } else {
+          if (!this.getRefreshToken()) {
             this.clearTokens();
           }
           return null;
@@ -296,6 +302,77 @@ export class ApiClient {
     }
 
     return null;
+  }
+
+  /**
+   * Keep in-memory auth aligned with localStorage so soft navigations observe
+   * storage edits (e.g. DevTools corruption) without a hard reload.
+   */
+  private reconcileTokenFromStorage() {
+    if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
+      return;
+    }
+
+    const storedToken = localStorage.getItem(AUTH_TOKEN_KEY);
+    const tenantId = localStorage.getItem(AUTH_TENANT_ID_KEY);
+    const tenantSlug = localStorage.getItem(AUTH_TENANT_SLUG_KEY);
+    const userEmail = localStorage.getItem(AUTH_USER_EMAIL_KEY);
+
+    if (!storedToken || !tenantId || !tenantSlug || !userEmail) {
+      return;
+    }
+
+    const expiresAt = this.readAccessExpiryMeta(storedToken);
+    if (this.tokenSet?.token === storedToken && this.tokenExpiresAt === expiresAt) {
+      return;
+    }
+
+    this.tokenSet = { token: storedToken, tenantId, tenantSlug, userEmail };
+    this.tokenExpiresAt = expiresAt;
+  }
+
+  private readAccessExpiryMeta(token: string): number {
+    const metaRaw = localStorage.getItem(AUTH_META_KEY);
+    if (metaRaw) {
+      try {
+        const meta = JSON.parse(metaRaw) as Partial<AuthMeta>;
+        if (typeof meta.expiresAt === 'number') {
+          return meta.expiresAt;
+        }
+      } catch {
+        // fall through
+      }
+    }
+
+    const expiresAt = getSessionExpiryMs(token);
+    localStorage.setItem(
+      AUTH_META_KEY,
+      JSON.stringify({ expiresAt, issuedAt: Date.now() } satisfies AuthMeta)
+    );
+    return expiresAt;
+  }
+
+  private async refreshAccessTokenSingleFlight(refreshToken: string): Promise<string> {
+    if (this.refreshPromise) {
+      return this.refreshPromise;
+    }
+
+    this.refreshPromise = (async () => {
+      this.isRefreshing = true;
+      try {
+        const newToken = await this.refreshAccessToken(refreshToken);
+        this.flushRefreshQueue(null, newToken);
+        return newToken;
+      } catch (error) {
+        this.flushRefreshQueue(error);
+        throw error;
+      } finally {
+        this.isRefreshing = false;
+        this.refreshPromise = null;
+      }
+    })();
+
+    return this.refreshPromise;
   }
 
   /**
@@ -509,7 +586,7 @@ export class ApiClient {
    * Check if user is authenticated
    */
   isAuthenticated(): boolean {
-    return !!this.getToken();
+    return !!this.getToken() || this.hasRefreshableSession();
   }
 
   // ============ Auth Endpoints ============
