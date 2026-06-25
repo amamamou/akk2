@@ -166,14 +166,20 @@ export class ApiClient {
 
         originalRequest._retry = true;
 
-        const newToken = await this.ensureAccessToken();
-        if (!newToken) {
+        const refreshToken = this.getRefreshToken();
+        if (!refreshToken || !this.hasRefreshableSession()) {
           this.handleUnauthorized();
           return Promise.reject(error);
         }
 
-        this.applyAuthorizationHeader(originalRequest, newToken);
-        return this.instance(originalRequest);
+        try {
+          const newToken = await this.refreshAccessTokenSingleFlight(refreshToken);
+          this.applyAuthorizationHeader(originalRequest, newToken);
+          return this.instance(originalRequest);
+        } catch {
+          this.handleUnauthorized();
+          return Promise.reject(error);
+        }
       }
     );
 
@@ -245,13 +251,15 @@ export class ApiClient {
       return existing;
     }
 
-    if (!this.hasRefreshableSession()) {
+    const refreshToken = this.getRefreshToken();
+    if (!refreshToken || !this.hasRefreshableSession()) {
       return null;
     }
 
     try {
-      return await this.refreshAccessTokenSingleFlight(this.getRefreshToken()!);
+      return await this.refreshAccessTokenSingleFlight(refreshToken);
     } catch {
+      // Only evict after the refresh network call fails on the wire.
       this.handleUnauthorized();
       return null;
     }
@@ -259,34 +267,18 @@ export class ApiClient {
 
   private readValidAccessToken(): string | null {
     if (this.tokenSet?.token) {
-      if (!isStructurallyValidAccessToken(this.tokenSet.token)) {
-        this.evictInvalidAccessToken();
+      if (!isAccessTokenUsable(this.tokenSet.token, this.tokenExpiresAt)) {
+        this.abandonInMemoryAccessToken();
         return null;
       }
-
-      if (isAccessTokenUsable(this.tokenSet.token, this.tokenExpiresAt)) {
-        return this.tokenSet.token;
-      }
-
-      if (!this.getRefreshToken()) {
-        this.clearTokens();
-      }
-      return null;
+      return this.tokenSet.token;
     }
 
     if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
       const token = localStorage.getItem(AUTH_TOKEN_KEY);
       if (token) {
-        if (!isStructurallyValidAccessToken(token)) {
-          this.evictInvalidAccessToken();
-          return null;
-        }
-
         const expiresAt = this.readAccessExpiryMeta(token);
         if (!isAccessTokenUsable(token, expiresAt)) {
-          if (!this.getRefreshToken()) {
-            this.clearTokens();
-          }
           return null;
         }
 
@@ -302,16 +294,8 @@ export class ApiClient {
 
       const cookieToken = readBrowserCookie(AUTH_TOKEN_KEY);
       if (cookieToken) {
-        if (!isStructurallyValidAccessToken(cookieToken)) {
-          this.evictInvalidAccessToken();
-          return null;
-        }
-
         const expiresAt = getSessionExpiryMs(cookieToken);
         if (!isAccessTokenUsable(cookieToken, expiresAt)) {
-          if (!this.getRefreshToken()) {
-            this.clearTokens();
-          }
           return null;
         }
 
@@ -327,12 +311,20 @@ export class ApiClient {
     return null;
   }
 
-  /** Drop a corrupted access token but preserve refresh credentials when possible. */
-  private evictInvalidAccessToken() {
-    if (this.getRefreshToken()) {
-      this.clearAccessTokenOnly();
-      return;
-    }
+  /**
+   * Drop the in-memory access token without clearing refresh credentials.
+   * Storage is left intact so ensureAccessToken() can rotate on the wire.
+   */
+  private abandonInMemoryAccessToken() {
+    this.tokenSet = null;
+    this.tokenExpiresAt = null;
+  }
+
+  /**
+   * Full eviction when no refresh token can recover the session.
+   */
+  private evictSessionWithoutRefresh() {
+    this.abandonInMemoryAccessToken();
     this.clearTokens();
   }
 
@@ -354,12 +346,32 @@ export class ApiClient {
       return;
     }
 
-    if (!isStructurallyValidAccessToken(storedToken)) {
-      this.evictInvalidAccessToken();
+    const refreshAvailable = !!this.getRefreshToken();
+    const structurallyValid = isStructurallyValidAccessToken(storedToken);
+
+    if (!structurallyValid) {
+      if (refreshAvailable) {
+        this.abandonInMemoryAccessToken();
+        return;
+      }
+      this.evictSessionWithoutRefresh();
       return;
     }
 
     const expiresAt = this.readAccessExpiryMeta(storedToken);
+    if (!isAccessTokenUsable(storedToken, expiresAt)) {
+      if (refreshAvailable) {
+        this.abandonInMemoryAccessToken();
+        return;
+      }
+      if (isSessionExpired(expiresAt)) {
+        this.clearAccessTokenOnly();
+      } else {
+        this.evictSessionWithoutRefresh();
+      }
+      return;
+    }
+
     if (this.tokenSet?.token === storedToken && this.tokenExpiresAt === expiresAt) {
       return;
     }
@@ -600,12 +612,12 @@ export class ApiClient {
         if (isAccessTokenUsable(token, expiresAt)) {
           this.tokenSet = { token, tenantId, tenantSlug, userEmail };
           this.tokenExpiresAt = expiresAt;
-        } else if (!isStructurallyValidAccessToken(token)) {
-          this.evictInvalidAccessToken();
         } else if (this.getRefreshToken()) {
-          this.clearAccessTokenOnly();
+          this.abandonInMemoryAccessToken();
+        } else if (!isStructurallyValidAccessToken(token)) {
+          this.evictSessionWithoutRefresh();
         } else {
-          this.clearTokens();
+          this.clearAccessTokenOnly();
         }
         return;
       }
@@ -616,8 +628,10 @@ export class ApiClient {
         if (isAccessTokenUsable(cookieToken, expiresAt)) {
           this.tokenSet = { token: cookieToken, tenantId: tenantId || '', tenantSlug: tenantSlug || '', userEmail: userEmail || '' };
           this.tokenExpiresAt = expiresAt;
+        } else if (this.getRefreshToken()) {
+          this.abandonInMemoryAccessToken();
         } else if (!isStructurallyValidAccessToken(cookieToken)) {
-          this.evictInvalidAccessToken();
+          this.evictSessionWithoutRefresh();
         }
       }
     }
