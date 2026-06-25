@@ -52,7 +52,9 @@ import {
   AUTH_USER_EMAIL_KEY,
   buildCookieString,
   getSessionExpiryMs,
+  isAccessTokenUsable,
   isSessionExpired,
+  isStructurallyValidAccessToken,
   readBrowserCookie,
   removeCookieString,
 } from '@/lib/auth-session';
@@ -226,6 +228,11 @@ export class ApiClient {
     );
   }
 
+  /** True while a shared refresh rotation is in flight. */
+  isRefreshingToken(): boolean {
+    return this.isRefreshing || this.refreshPromise !== null;
+  }
+
   /**
    * Resolve a usable access token, refreshing in the background when needed.
    * Shared single-flight entry point for request/response interceptors.
@@ -245,16 +252,22 @@ export class ApiClient {
     try {
       return await this.refreshAccessTokenSingleFlight(this.getRefreshToken()!);
     } catch {
+      this.handleUnauthorized();
       return null;
     }
   }
 
   private readValidAccessToken(): string | null {
-    if (this.tokenSet?.token && !isSessionExpired(this.tokenExpiresAt)) {
-      return this.tokenSet.token;
-    }
+    if (this.tokenSet?.token) {
+      if (!isStructurallyValidAccessToken(this.tokenSet.token)) {
+        this.evictInvalidAccessToken();
+        return null;
+      }
 
-    if (this.tokenSet?.token && isSessionExpired(this.tokenExpiresAt)) {
+      if (isAccessTokenUsable(this.tokenSet.token, this.tokenExpiresAt)) {
+        return this.tokenSet.token;
+      }
+
       if (!this.getRefreshToken()) {
         this.clearTokens();
       }
@@ -264,8 +277,13 @@ export class ApiClient {
     if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
       const token = localStorage.getItem(AUTH_TOKEN_KEY);
       if (token) {
+        if (!isStructurallyValidAccessToken(token)) {
+          this.evictInvalidAccessToken();
+          return null;
+        }
+
         const expiresAt = this.readAccessExpiryMeta(token);
-        if (isSessionExpired(expiresAt)) {
+        if (!isAccessTokenUsable(token, expiresAt)) {
           if (!this.getRefreshToken()) {
             this.clearTokens();
           }
@@ -284,8 +302,13 @@ export class ApiClient {
 
       const cookieToken = readBrowserCookie(AUTH_TOKEN_KEY);
       if (cookieToken) {
+        if (!isStructurallyValidAccessToken(cookieToken)) {
+          this.evictInvalidAccessToken();
+          return null;
+        }
+
         const expiresAt = getSessionExpiryMs(cookieToken);
-        if (isSessionExpired(expiresAt)) {
+        if (!isAccessTokenUsable(cookieToken, expiresAt)) {
           if (!this.getRefreshToken()) {
             this.clearTokens();
           }
@@ -304,6 +327,15 @@ export class ApiClient {
     return null;
   }
 
+  /** Drop a corrupted access token but preserve refresh credentials when possible. */
+  private evictInvalidAccessToken() {
+    if (this.getRefreshToken()) {
+      this.clearAccessTokenOnly();
+      return;
+    }
+    this.clearTokens();
+  }
+
   /**
    * Keep in-memory auth aligned with localStorage so soft navigations observe
    * storage edits (e.g. DevTools corruption) without a hard reload.
@@ -319,6 +351,11 @@ export class ApiClient {
     const userEmail = localStorage.getItem(AUTH_USER_EMAIL_KEY);
 
     if (!storedToken || !tenantId || !tenantSlug || !userEmail) {
+      return;
+    }
+
+    if (!isStructurallyValidAccessToken(storedToken)) {
+      this.evictInvalidAccessToken();
       return;
     }
 
@@ -560,9 +597,11 @@ export class ApiClient {
           localStorage.setItem(AUTH_META_KEY, JSON.stringify({ expiresAt, issuedAt: Date.now() } satisfies AuthMeta));
         }
 
-        if (!isSessionExpired(expiresAt)) {
+        if (isAccessTokenUsable(token, expiresAt)) {
           this.tokenSet = { token, tenantId, tenantSlug, userEmail };
           this.tokenExpiresAt = expiresAt;
+        } else if (!isStructurallyValidAccessToken(token)) {
+          this.evictInvalidAccessToken();
         } else if (this.getRefreshToken()) {
           this.clearAccessTokenOnly();
         } else {
@@ -574,9 +613,11 @@ export class ApiClient {
       const cookieToken = readBrowserCookie(AUTH_TOKEN_KEY);
       if (cookieToken) {
         const expiresAt = getSessionExpiryMs(cookieToken);
-        if (!isSessionExpired(expiresAt)) {
+        if (isAccessTokenUsable(cookieToken, expiresAt)) {
           this.tokenSet = { token: cookieToken, tenantId: tenantId || '', tenantSlug: tenantSlug || '', userEmail: userEmail || '' };
           this.tokenExpiresAt = expiresAt;
+        } else if (!isStructurallyValidAccessToken(cookieToken)) {
+          this.evictInvalidAccessToken();
         }
       }
     }

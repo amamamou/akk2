@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { getApiClient } from '@/lib/api-client';
+import { isStructurallyValidAccessToken } from '@/lib/auth-session';
 import type { AuthUser, LoginRequest, LoginResponse } from '@/types/api';
 
 interface AuthContextType {
@@ -32,129 +33,108 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [error, setError] = useState<string | null>(null);
   const apiClient = getApiClient();
 
-  // Helper: safe parse JWT expiry
-  function isTokenExpired(token: string | null | undefined) {
-    if (!token) return true;
-    try {
-      const parts = token.split('.');
-      if (parts.length !== 3) return true;
-      const payload = JSON.parse(atob(parts[1]));
-      if (!payload || typeof payload !== 'object') return true;
-      if (!payload.exp) return false; // treat tokens with no exp as not expired
-      return Date.now() / 1000 > payload.exp;
-    } catch (e) {
-      return true;
-    }
-  }
-
   // Check if user is already authenticated on mount
   useEffect(() => {
     const initializeAuth = async () => {
       try {
         setIsLoading(true);
 
-        const token = apiClient.getToken();
         const tenantId = apiClient.getTenantId();
         const tenantSlug = apiClient.getTenantSlug();
         const userEmail = apiClient.getUserEmail();
 
-        if (token) {
-          // If token is expired, clear storage and redirect to login immediately
-          if (isTokenExpired(token)) {
-            try {
-              if (typeof window !== 'undefined') {
-                const keys = [
-                  'akou_access_token','akou_tenant_id','akou_tenant_slug','akou_user','akou_user_email',
-                  'fastapi_token','fastapi_tenant_id','fastapi_tenant_slug','fastapi_user','fastapi_user_email'
-                ];
-                keys.forEach(k => window.localStorage.removeItem(k));
-              }
-            } catch (e) {
-              // ignore
-            }
-            if (typeof window !== 'undefined') {
-              window.location.href = '/login';
-              return;
-            } else {
-              router.push('/login');
-              return;
-            }
+        // Recover a rotated access token before any eviction or /auth/me call.
+        const token = await apiClient.ensureAccessToken();
+
+        if (!token) {
+          setUser(null);
+          return;
+        }
+
+        // Prefer authoritative user data from the backend. Call the single
+        // canonical endpoint /auth/me. If it 404s, fall back to any user
+        // object persisted at login time (localStorage 'akou_user').
+        try {
+          const axiosInst = apiClient.getAxiosInstance();
+          const resp = await axiosInst.get('/auth/me');
+          const body = resp?.data || resp;
+
+          // Support { user, tenant } or flat user object
+          let profileUser: any = null;
+          let profileTenant: any = null;
+          if (body?.user) {
+            profileUser = body.user;
+            profileTenant = body.tenant || null;
+          } else if (body?.id && body?.email) {
+            profileUser = body;
           }
-          // Prefer authoritative user data from the backend. Call the single
-          // canonical endpoint /auth/me. If it 404s, fall back to any user
-          // object persisted at login time (localStorage 'akou_user').
-          try {
-            const axiosInst = apiClient.getAxiosInstance();
-            const resp = await axiosInst.get('/auth/me');
-            const body = resp?.data || resp;
 
-            // Support { user, tenant } or flat user object
-            let profileUser: any = null;
-            let profileTenant: any = null;
-            if (body?.user) {
-              profileUser = body.user;
-              profileTenant = body.tenant || null;
-            } else if (body?.id && body?.email) {
-              profileUser = body;
-            }
+          if (profileUser) {
+            const userData: AuthUser = {
+              id: profileUser.id || '',
+              email: profileUser.email || userEmail || '',
+              name: profileUser.name || profileUser.email?.split('@')[0] || (userEmail?.split('@')[0] || ''),
+              tenantId: profileTenant?.id || tenantId || apiClient.getTenantId() || '',
+              tenantSlug: profileTenant?.slug || tenantSlug || apiClient.getTenantSlug() || '',
+              role: (profileUser.role || 'MANAGER').toUpperCase(),
+            };
 
-            if (profileUser) {
-              const userData: AuthUser = {
-                id: profileUser.id || '',
-                email: profileUser.email || userEmail || '',
-                name: profileUser.name || profileUser.email?.split('@')[0] || (userEmail?.split('@')[0] || ''),
-                tenantId: profileTenant?.id || tenantId || apiClient.getTenantId() || '',
-                tenantSlug: profileTenant?.slug || tenantSlug || apiClient.getTenantSlug() || '',
-                role: (profileUser.role || 'MANAGER').toUpperCase(),
-              };
+            setUser(userData);
 
-              setUser(userData);
-
-              // Ensure API client has tenant stored so x-tenant-id is included on requests
-              const currentToken = apiClient.getToken();
-              if (currentToken && userData.tenantId) {
-                try {
-                  apiClient.setTokens(currentToken, userData.tenantId, userData.tenantSlug || '', userData.email);
-                } catch (e) {
-                  // ignore
-                }
-              }
-            } else {
-              // response didn't include a user object — fall back below
-              const stored = typeof window !== 'undefined' ? window.localStorage.getItem('akou_user') : null;
-              if (stored) {
-                try {
-                  const s = JSON.parse(stored) as AuthUser;
-                  setUser(s);
-                } catch (e) {
-                  setUser(null);
-                }
-              } else {
-                setUser(null);
+            // Ensure API client has tenant stored so x-tenant-id is included on requests
+            const currentToken = apiClient.getToken();
+            if (currentToken && userData.tenantId) {
+              try {
+                apiClient.setTokens(currentToken, userData.tenantId, userData.tenantSlug || '', userData.email);
+              } catch (e) {
+                // ignore
               }
             }
-          } catch (err: any) {
-            // If we got a 404 specifically, fall back to the last-login user stored in localStorage
-            const status = err?.response?.status;
-            if (status === 404) {
-              const stored = typeof window !== 'undefined' ? window.localStorage.getItem('akou_user') : null;
-              if (stored) {
-                try {
-                  const s = JSON.parse(stored) as AuthUser;
-                  setUser(s);
-                } catch (e) {
-                  setUser(null);
-                }
-              } else {
+          } else {
+            // response didn't include a user object — fall back below
+            const stored = typeof window !== 'undefined' ? window.localStorage.getItem('akou_user') : null;
+            if (stored) {
+              try {
+                const s = JSON.parse(stored) as AuthUser;
+                setUser(s);
+              } catch (e) {
                 setUser(null);
               }
             } else {
-              // Other errors -> clear user to force login
               setUser(null);
             }
           }
-        } else {
-          setUser(null);
+        } catch (err: any) {
+          // If we got a 404 specifically, fall back to the last-login user stored in localStorage
+          const status = err?.response?.status;
+          if (status === 404) {
+            const stored = typeof window !== 'undefined' ? window.localStorage.getItem('akou_user') : null;
+            if (stored) {
+              try {
+                const s = JSON.parse(stored) as AuthUser;
+                setUser(s);
+              } catch (e) {
+                setUser(null);
+              }
+            } else {
+              setUser(null);
+            }
+          } else if (apiClient.hasRefreshableSession() && isStructurallyValidAccessToken(apiClient.getToken())) {
+            // Transient /auth/me failure with a structurally valid token — keep cached user if present.
+            const stored = typeof window !== 'undefined' ? window.localStorage.getItem('akou_user') : null;
+            if (stored) {
+              try {
+                const s = JSON.parse(stored) as AuthUser;
+                setUser(s);
+              } catch (e) {
+                setUser(null);
+              }
+            } else {
+              setUser(null);
+            }
+          } else {
+            setUser(null);
+          }
         }
       } catch (err) {
         console.error('Failed to initialize auth:', err);
@@ -193,9 +173,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   // Keep protected routes in sync with token deletion from DevTools or other tabs.
   useEffect(() => {
-    if (pathname === '/login') return;
+    if (pathname === '/login' || isLoading) return;
 
     const enforceAuth = () => {
+      if (apiClient.isRefreshingToken()) return;
       if (!apiClient.getToken() && !apiClient.hasRefreshableSession()) {
         setUser(null);
         router.push('/login');
@@ -217,7 +198,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       window.clearInterval(interval);
       window.removeEventListener('storage', onStorage);
     };
-  }, [apiClient, pathname, router]);
+  }, [apiClient, pathname, router, isLoading]);
 
   const login = async (credentials: LoginRequest) => {
     try {

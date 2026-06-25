@@ -48,6 +48,44 @@ export function isSessionExpired(expiresAt: number | null | undefined, now = Dat
   return !expiresAt || now >= expiresAt;
 }
 
+const JWT_SEGMENT_RE = /^[A-Za-z0-9_-]+$/;
+
+/**
+ * Fast structural check for app JWT access tokens.
+ * Does not verify signature — only catches blank/corrupted/non-JWT strings.
+ */
+export function isStructurallyValidAccessToken(token: string | null | undefined): boolean {
+  if (typeof token !== 'string') return false;
+
+  const trimmed = token.trim();
+  if (!trimmed) return false;
+
+  const parts = trimmed.split('.');
+  if (parts.length !== 3) return false;
+
+  if (!parts.every((part) => part.length > 0 && JWT_SEGMENT_RE.test(part))) {
+    return false;
+  }
+
+  try {
+    const decoded = base64UrlDecode(parts[1]);
+    if (!decoded) return false;
+    const payload = JSON.parse(decoded) as unknown;
+    return payload !== null && typeof payload === 'object' && !Array.isArray(payload);
+  } catch {
+    return false;
+  }
+}
+
+/** True when token shape is valid and the cached expiry has not passed. */
+export function isAccessTokenUsable(
+  token: string | null | undefined,
+  expiresAt: number | null | undefined,
+  now = Date.now()
+): boolean {
+  return isStructurallyValidAccessToken(token) && !isSessionExpired(expiresAt, now);
+}
+
 export function readCookieValue(source: string | null | undefined, name: string): string | null {
   if (!source) return null;
   const cookie = source
