@@ -26,10 +26,12 @@ import {
   buildEngagementData,
   buildHourlyTrafficFromLogs,
   buildListenerSegmentationFromLogs,
+  ENGAGEMENT_TIER_META,
   filterLogsByPlayerId,
   heartbeatRateFromLogs,
   isEngagementTier,
   normalizePlayerId,
+  resolveEngagementTier,
   tierDisplayLabel,
   type ListenerSegmentation,
 } from "@/lib/analytics-metrics";
@@ -51,11 +53,14 @@ import { ANALYTICS_ALL_CLIENTS_ID } from "@/lib/global-admin-tenant";
 import KpiGrid from "./components/KpiGrid";
 import ChartsPanel from "./components/ChartsPanel";
 import PlaybackTable from "./components/PlaybackTable";
-import AnalyticsHero from "./components/AnalyticsHero";
+import AnalyticsHero, {
+  type AnalyticsTimeRange,
+} from "./components/AnalyticsHero";
 import AnalyticsToolbar from "./components/AnalyticsToolbar";
 import AnalyticsPageSkeleton from "./components/AnalyticsPageSkeleton";
+import type { DateRangeValue } from "./components/AnalyticsDateRangePicker";
 
-type TimeRange = "today" | "7d" | "month";
+type TimeRange = AnalyticsTimeRange;
 
 function formatDuration(seconds: number | null | undefined): string {
   if (seconds == null || seconds <= 0) return "—";
@@ -77,23 +82,27 @@ function formatLogTime(iso: string | null | undefined): string {
   }
 }
 
-function logIconForStatus(status: string) {
+function logIconForStatus(status: string, durationSeconds?: number | null) {
+  const tier = resolveEngagementTier(durationSeconds, status);
+  if (tier === "DEEP") return CheckCircle;
+  if (tier === "STARTED" || tier === "MODERATE") return PlayCircle;
+  if (tier === "LIGHT") return Clock;
+  if (tier === "BOUNCE") return AlertCircle;
   const s = status.toUpperCase();
-  if (s === "DEEP" || s === "ENGAGED") return CheckCircle;
-  if (s === "LIGHT") return AlertCircle;
-  if (s === "MODERATE") return PlayCircle;
-  if (s === "COMPLETED") return CheckCircle;
+  if (s === "COMPLETED" || s === "ENGAGED") return CheckCircle;
   if (s === "FAILED") return AlertCircle;
   return PlayCircle;
 }
 
-function tierChipClass(status: string): string {
+function tierChipClass(status: string, durationSeconds?: number | null): string {
+  const tier = resolveEngagementTier(durationSeconds, status);
+  if (tier === "DEEP") return "bg-violet-100 text-violet-800";
+  if (tier === "STARTED") return "bg-emerald-100 text-emerald-700";
+  if (tier === "MODERATE") return "bg-blue-50 text-blue-700";
+  if (tier === "LIGHT") return "bg-indigo-50 text-indigo-700";
+  if (tier === "BOUNCE") return "bg-amber-50 text-amber-800";
   const s = status.toUpperCase();
-  if (s === "DEEP") return "bg-violet-100 text-violet-800";
-  if (s === "ENGAGED") return "bg-emerald-100 text-emerald-700";
-  if (s === "MODERATE") return "bg-blue-50 text-blue-700";
-  if (s === "LIGHT") return "bg-amber-50 text-amber-800";
-  if (s === "COMPLETED") return "bg-emerald-100 text-emerald-700";
+  if (s === "COMPLETED" || s === "ENGAGED") return "bg-emerald-100 text-emerald-700";
   if (s === "FAILED") return "bg-red-50 text-red-700";
   return "bg-gray-100 text-gray-700";
 }
@@ -111,6 +120,10 @@ export default function AnalyticsClient() {
   const [workspaceTenantId, setWorkspaceTenantId] = useState<string | null>(null);
   const [selectedPlayerId, setSelectedPlayerId] = useState<string>("all");
   const [timeRange, setTimeRange] = useState<TimeRange>("7d");
+  const [customRange, setCustomRange] = useState<DateRangeValue>({
+    from: null,
+    to: null,
+  });
 
   const analyticsScopeAll =
     isSuperAdmin && selectedWorkspaceClientId === ANALYTICS_ALL_CLIENTS_ID;
@@ -381,8 +394,18 @@ export default function AnalyticsClient() {
       );
     }
 
+    if (timeRange === "custom") {
+      if (!customRange.from || !customRange.to) return [];
+      const fromTs = customRange.from.getTime();
+      const toTs = customRange.to.getTime();
+      return rows.filter((l) => {
+        const ts = new Date(l.createdAt || l.startedAt || 0).getTime();
+        return !Number.isNaN(ts) && ts >= fromTs && ts <= toTs;
+      });
+    }
+
     const now = Date.now();
-    const cutoffs: Record<TimeRange, number> = {
+    const cutoffs: Record<Exclude<TimeRange, "custom">, number> = {
       today: now - 24 * 60 * 60 * 1000,
       "7d": now - 7 * 24 * 60 * 60 * 1000,
       month: now - 30 * 24 * 60 * 60 * 1000,
@@ -392,7 +415,15 @@ export default function AnalyticsClient() {
       const ts = new Date(l.createdAt || l.startedAt || 0).getTime();
       return !Number.isNaN(ts) && ts >= cut;
     });
-  }, [logs, selectedPlayerId, timeRange, isManager, playerOptions]);
+  }, [
+    logs,
+    selectedPlayerId,
+    timeRange,
+    customRange.from,
+    customRange.to,
+    isManager,
+    playerOptions,
+  ]);
 
   const heartbeatRate = useMemo(() => {
     if (filteredLogs.length > 0) return heartbeatRateFromLogs(filteredLogs);
@@ -426,52 +457,71 @@ export default function AnalyticsClient() {
     };
   }, [selectedPlayerId, playerOptions]);
 
-  const kpiCards = useMemo(() => {
+  const { totalKpi, tierKpis } = useMemo(() => {
     const seg = segmentation;
-    const total = Math.max(seg.totalListeners, 1);
-    return [
-      {
-        title: "Total Listeners",
-        value: seg.totalListeners.toLocaleString(),
+    const total = Math.max(seg.totalSessions, 1);
+    const pctOfTotal = (n: number) => `${((n / total) * 100).toFixed(1)}% of total`;
+
+    return {
+      totalKpi: {
+        title: "Total",
+        value: seg.totalSessions.toLocaleString(),
         icon: Users,
-        trend: seg.engagementTrend,
-        meta: `Retention: ${seg.retentionRate}`,
+        description: "Sum of all engagement tiers",
+        meta: `Retention: ${seg.retentionRate} · ${seg.uniquePlayers.toLocaleString()} unique players`,
       },
-      {
-        title: "Engaged Listeners",
-        value: seg.engagedListeners.toLocaleString(),
-        icon: Activity,
-        trend: `${((seg.engagedListeners / total) * 100).toFixed(1)}%`,
-        meta: "Of operational devices",
-      },
-      {
-        title: "Light Listeners",
-        value: seg.lightListeners.toLocaleString(),
-        icon: Clock,
-        trend: `${((seg.lightListeners / total) * 100).toFixed(1)}%`,
-        meta: "Short / failed sessions",
-      },
-      {
-        title: "Moderate Listeners",
-        value: seg.moderateListeners.toLocaleString(),
-        icon: TrendingUp,
-        trend: `${((seg.moderateListeners / total) * 100).toFixed(1)}%`,
-        meta: "Regular listeners",
-      },
-      {
-        title: "Deep Listeners",
-        value: seg.deepListeners.toLocaleString(),
-        icon: CheckCircle,
-        trend: `${((seg.deepListeners / total) * 100).toFixed(1)}%`,
-        meta: "Highest engagement",
-      },
-    ];
+      tierKpis: [
+        {
+          title: ENGAGEMENT_TIER_META.BOUNCE.label,
+          description: ENGAGEMENT_TIER_META.BOUNCE.description,
+          value: seg.bounceListeners.toLocaleString(),
+          icon: AlertCircle,
+          meta: pctOfTotal(seg.bounceListeners),
+        },
+        {
+          title: ENGAGEMENT_TIER_META.STARTED.label,
+          description: ENGAGEMENT_TIER_META.STARTED.description,
+          value: seg.startedListeners.toLocaleString(),
+          icon: Activity,
+          meta: pctOfTotal(seg.startedListeners),
+        },
+        {
+          title: ENGAGEMENT_TIER_META.LIGHT.label,
+          description: ENGAGEMENT_TIER_META.LIGHT.description,
+          value: seg.lightListeners.toLocaleString(),
+          icon: Clock,
+          meta: pctOfTotal(seg.lightListeners),
+        },
+        {
+          title: ENGAGEMENT_TIER_META.MODERATE.label,
+          description: ENGAGEMENT_TIER_META.MODERATE.description,
+          value: seg.moderateListeners.toLocaleString(),
+          icon: TrendingUp,
+          meta: pctOfTotal(seg.moderateListeners),
+        },
+        {
+          title: ENGAGEMENT_TIER_META.DEEP.label,
+          description: ENGAGEMENT_TIER_META.DEEP.description,
+          value: seg.deepListeners.toLocaleString(),
+          icon: CheckCircle,
+          meta: pctOfTotal(seg.deepListeners),
+        },
+      ],
+    };
   }, [segmentation]);
 
   return (
     <div className={dashboardPageClass}>
       <div className={dashboardContainerClass}>
-        <AnalyticsHero timeRange={timeRange} onTimeRangeChange={setTimeRange} />
+        <AnalyticsHero
+          timeRange={timeRange}
+          onTimeRangeChange={setTimeRange}
+          customRange={customRange}
+          onCustomRangeApply={(range) => {
+            setCustomRange(range);
+            setTimeRange("custom");
+          }}
+        />
 
         <AnalyticsToolbar
           isSuperAdmin={isSuperAdmin}
@@ -495,7 +545,7 @@ export default function AnalyticsClient() {
               </div>
             )}
 
-            <KpiGrid stats={kpiCards} />
+            <KpiGrid total={totalKpi} stats={tierKpis} />
 
             <ChartsPanel engagementData={engagementData} hourlyTraffic={hourlyTraffic} />
 

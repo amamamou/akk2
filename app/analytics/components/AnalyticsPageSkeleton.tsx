@@ -28,6 +28,7 @@ function AnalyticsHeroSkeleton() {
             <Bone className="h-7 w-16 rounded-lg" />
             <Bone className="h-7 w-24 rounded-lg" />
             <Bone className="h-7 w-20 rounded-lg" />
+            <Bone className="h-7 w-20 rounded-lg" />
           </div>
         </div>
       </div>
@@ -49,12 +50,13 @@ export default function AnalyticsPageSkeleton() {
         </div>
       </div>
 
-      <div className="animate-pulse">
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-          {Array.from({ length: 4 }).map((_, i) => (
+      <div className="animate-pulse space-y-3">
+        <div className="h-24 rounded-2xl bg-gray-100 shadow-[0_8px_30px_rgba(0,0,0,0.04)] dark:bg-zinc-800 dark:shadow-none" aria-hidden />
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+          {Array.from({ length: 5 }).map((_, i) => (
             <div
               key={i}
-              className="h-20 rounded-2xl bg-gray-100 shadow-[0_8px_30px_rgba(0,0,0,0.04)] dark:bg-zinc-800 dark:shadow-none"
+              className="h-24 rounded-2xl bg-gray-100 shadow-[0_8px_30px_rgba(0,0,0,0.04)] dark:bg-zinc-800 dark:shadow-none"
               aria-hidden
             />
           ))}

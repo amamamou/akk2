@@ -294,6 +294,15 @@ export interface SystemHealthMetrics {
   totalPlaybackLogs: number;
   successfulPlaybacks: number;
   failedPlaybacks: number;
+  /** Sum of Bounce + Started + Light + Moderate + Deep */
+  totalEngagementSessions?: number;
+  bouncePlaybacksCount?: number;
+  startedPlaybacksCount?: number;
+  lightPlaybacksCount?: number;
+  moderatePlaybacksCount?: number;
+  deepPlaybacksCount?: number;
+  /** Retained sessions (excludes Bounce); legacy field name kept for compatibility */
+  engagedPlaybacksCount?: number;
 }
 
 export interface AnalyticsTimelineEntry {

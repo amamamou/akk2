@@ -75,7 +75,7 @@ function isBroadcastAction(action: string): boolean {
 
 function isSuccessfulPlayback(status: string): boolean {
   const s = status.trim().toUpperCase();
-  return s !== "FAILED" && s !== "ERROR" && s !== "LIGHT";
+  return s !== "FAILED" && s !== "ERROR" && s !== "LIGHT" && s !== "BOUNCE" && s !== "TOTAL";
 }
 
 function bumpDay(

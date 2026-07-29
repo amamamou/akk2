@@ -35,7 +35,7 @@ Production-ready **Next.js 16** web application for the Akoustic Arts multi-tena
 ### Administration
 
 - **Clients** (SUPER_ADMIN) — Enterprise client management, billing overview, invoice issuance via `POST /v1/invoices/`.
-- **Analytics** — Playback verification tiers (Engaged, Deep, Moderate, Light) from live `PlaybackLog` API data.
+- **Analytics** — Duration-based engagement tiers (Total = sum of Bounce <3s, Started 3–10s, Light 10–20s, Moderate 20–30s, Deep >30s) from live `PlaybackLog` API data.
 - **Settings** — Profile (first/last name, photo), tenant plan, billing tab.
 
 ### Platform capabilities
@@ -234,6 +234,21 @@ SUPER_ADMIN users can override the tenant scope in memory via `apiClient.setWork
 Type definitions live in `types/api.ts` and mirror backend Pydantic schemas.
 
 Data-fetching pages use `lib/query-fetchers.ts` as the TanStack Query integration layer.
+
+### Analytics engagement tiers
+
+Playback sessions are classified by **listened duration** (`PlaybackLog.duration`), not by opaque labels:
+
+| Tier | Duration | Status code |
+|------|----------|-------------|
+| **Total** | Sum of all five tiers below | — |
+| Bounce | < 3s | `BOUNCE` |
+| Started | 3s ≤ d < 10s | `STARTED` (legacy `ENGAGED`) |
+| Light | 10s ≤ d < 20s | `LIGHT` |
+| Moderate | 20s ≤ d ≤ 30s | `MODERATE` |
+| Deep | > 30s | `DEEP` |
+
+Implementation: `lib/analytics-metrics.ts` (frontend) and `app/lib/engagement.py` (backend). Each analytics KPI card shows the duration window and `% of total`.
 
 ---
 
