@@ -71,7 +71,6 @@ Production-ready **Next.js 16** web application for the Akoustic Arts multi-tena
 frontend/
 ├── app/                    # Next.js App Router pages and feature UI
 │   ├── layout.tsx          # Root layout (AuthProvider, QueryProvider, LayoutShell)
-│   ├── proxy.ts            # Edge authentication guard
 │   ├── context/            # AuthContext, ThemeContext
 │   ├── dashboard/          # Operational dashboard
 │   ├── players/            # Player management
@@ -82,6 +81,7 @@ frontend/
 │   ├── settings/           # Profile, plan, billing
 │   ├── login/ signup/      # Authentication flows
 │   └── admin/              # Legacy admin section
+├── proxy.ts                # Edge authentication guard (Next.js proxy)
 ├── lib/
 │   ├── api-client.ts       # Axios singleton + all API methods + auth interceptors
 │   ├── auth-session.ts     # Token storage, JWT validation, session helpers
@@ -187,7 +187,7 @@ The frontend uses a **dual-token model**:
 | `lib/auth-session.ts` | Storage keys, JWT expiry parsing, structural token validation (`isStructurallyValidAccessToken`) |
 | `lib/api-client.ts` | `ensureAccessToken()`, `refreshAccessTokenSingleFlight()`, request/response interceptors |
 | `app/context/AuthContext.tsx` | React session state, `/auth/me` hydration, `akou:unauthorized` event handling |
-| `app/proxy.ts` | Edge guard — redirects unauthenticated users using cookie mirror of JWT |
+| `proxy.ts` | Edge guard — redirects unauthenticated users using cookie mirror of JWT |
 
 ### Silent refresh flow
 
