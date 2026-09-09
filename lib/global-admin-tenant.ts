@@ -21,7 +21,8 @@ export function isVisibleCatalogItem(
 ): boolean {
   const tid = resolveItemTenantId(item);
   if (!isSuperAdminUser) {
-    // Tenant-scoped API responses may omit per-row tenantId — trust the workspace header.
+    // Prefer exact tenant match when the API sends tenantId.
+    // Missing tenantId: trust tenant-scoped API responses (backend already filters).
     if (!tid) return true;
     return tid === workspaceTenantId;
   }

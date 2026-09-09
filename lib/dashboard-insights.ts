@@ -523,6 +523,7 @@ export function buildSystemAlerts(
       message: `${systemHealth.failedSchedules} schedule${systemHealth.failedSchedules > 1 ? "s" : ""} failed`,
     });
   }
+  // Do not alert on endedSchedules — those are past windows, not failures.
 
   const failedLogs = playbackLogs.filter((l) => !isSuccessfulPlayback(l.status)).length;
   if (failedLogs > 0 && !alerts.some((a) => a.id === "playback-failures")) {

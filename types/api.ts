@@ -262,6 +262,8 @@ export interface ClientsListResponse {
 export interface ClientResponse {
   ok: boolean;
   client: ClientInfo;
+  storageTreeSeeded?: boolean | null;
+  storageTreeWarning?: string | null;
 }
 
 // ============ Activity Log Types ============
@@ -290,7 +292,10 @@ export interface SystemHealthMetrics {
   onlinePlayers: number;
   offlinePlayers: number;
   activeSchedules: number;
+  /** Always 0 until Schedule has a real failure/error status. */
   failedSchedules: number;
+  /** Past schedule windows (ended), not failures. */
+  endedSchedules?: number;
   totalPlaybackLogs: number;
   successfulPlaybacks: number;
   failedPlaybacks: number;

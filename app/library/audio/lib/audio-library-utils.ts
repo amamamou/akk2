@@ -53,7 +53,8 @@ export function matchesSizeFilter(
   filter: AudioSizeFilterKey
 ): boolean {
   if (filter === "all") return true;
-  if (sizeBytes == null || !Number.isFinite(sizeBytes)) return false;
+  // Unknown size: keep visible so size pills never empty the library by accident.
+  if (sizeBytes == null || !Number.isFinite(sizeBytes)) return true;
   const mb = sizeBytes / MB;
   if (filter === "small") return mb < 5;
   if (filter === "medium") return mb >= 5 && mb <= 20;

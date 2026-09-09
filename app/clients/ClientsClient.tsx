@@ -220,10 +220,20 @@ export default function ClientsClient() {
   const handleCreateClient = async (payload: ClientCreateInput) => {
     setCreateLoading(true);
     try {
-      await createClientMutation.mutateAsync(payload);
-      setToastMessage(`Created client: ${payload.name}`);
+      const created = await createClientMutation.mutateAsync(payload);
+      if (created?.storageTreeWarning) {
+        setToastMessage(
+          `Created ${payload.name}, but R2 folders were not seeded. Retry storage-tree seed.`
+        );
+      } else {
+        setToastMessage(
+          created?.storageTreeSeeded === false
+            ? `Created client: ${payload.name} (storage tree pending)`
+            : `Created client: ${payload.name}`
+        );
+      }
       setToastOpen(true);
-      window.setTimeout(() => setToastOpen(false), 2500);
+      window.setTimeout(() => setToastOpen(false), 3500);
     } finally {
       setCreateLoading(false);
     }
