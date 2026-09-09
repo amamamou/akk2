@@ -1064,6 +1064,8 @@ export class ApiClient {
      total: number | null;
      label: string;
      note?: string | null;
+     totalSeconds?: number | null;
+     sourceDate?: string | null;
    }> {
      const response = await this.instance.get('/analytics/museum-connections');
      return response.data;

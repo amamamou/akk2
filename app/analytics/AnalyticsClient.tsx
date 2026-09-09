@@ -530,6 +530,14 @@ export default function AnalyticsClient() {
                   <p className="mt-0.5 text-2xl font-semibold tabular-nums text-gray-950 dark:text-zinc-50">
                     {museumQuery.data.total.toLocaleString()}
                   </p>
+                  {museumQuery.data.totalSeconds != null ? (
+                    <p className="mt-1 text-xs text-gray-500 dark:text-zinc-400">
+                      {Math.round(museumQuery.data.totalSeconds)}s total listening
+                      {museumQuery.data.sourceDate
+                        ? ` · source ${museumQuery.data.sourceDate}`
+                        : ""}
+                    </p>
+                  ) : null}
                   {museumQuery.data.note ? (
                     <p className="mt-1 text-xs text-gray-500 dark:text-zinc-400">
                       {museumQuery.data.note}
