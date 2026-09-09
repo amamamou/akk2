@@ -1056,6 +1056,20 @@ export class ApiClient {
    }
 
    /**
+    * GET /analytics/museum-connections - Temporary JB museum figures for salon
+    */
+   async getMuseumConnections(): Promise<{
+     ok: boolean;
+     available: boolean;
+     total: number | null;
+     label: string;
+     note?: string | null;
+   }> {
+     const response = await this.instance.get('/analytics/museum-connections');
+     return response.data;
+   }
+
+   /**
     * GET /dashboard/stats - Get dashboard statistics
     */
    async getDashboardStats(): Promise<any> {

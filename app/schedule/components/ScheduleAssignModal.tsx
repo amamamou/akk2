@@ -54,6 +54,7 @@ export default function ScheduleAssignModal({
 }) {
   const { user } = useAuth();
   const isSuperAdminUser = isSuperAdminRole(user?.role);
+  const sessionTenantSlug = user?.tenantSlug;
 
   const [tab, setTab] = useState<Tab>("audio");
   const [loopPlayback, setLoopPlayback] = useState(false);
@@ -67,7 +68,8 @@ export default function ScheduleAssignModal({
   const fetchWorkspaceCatalog = React.useCallback(
     async (tenantId: string) => {
       const api = getApiClient();
-      const workspaceSlug = frenchDemoTenantSlug(tenantId);
+      const workspaceSlug =
+        frenchDemoTenantSlug(tenantId) ?? sessionTenantSlug ?? undefined;
       api.setWorkspaceTenant(tenantId, workspaceSlug);
 
       setLoadingAudio(true);
@@ -75,8 +77,11 @@ export default function ScheduleAssignModal({
       setAudioError(null);
       setPlaylistError(null);
 
+      const tenantSlugFor = (tid: string) =>
+        frenchDemoTenantSlug(tid) ?? sessionTenantSlug ?? undefined;
+
       const loadMediaForTenant = async (tid: string): Promise<MediaInfo[]> => {
-        api.setWorkspaceTenant(tid, frenchDemoTenantSlug(tid));
+        api.setWorkspaceTenant(tid, tenantSlugFor(tid));
         const res = await api.listMedia();
         return res.media ?? [];
       };
@@ -84,8 +89,12 @@ export default function ScheduleAssignModal({
       const loadPlaylistsForTenant = async (
         tid: string
       ): Promise<PlaylistPick[]> => {
-        api.setWorkspaceTenant(tid, frenchDemoTenantSlug(tid));
+        api.setWorkspaceTenant(tid, tenantSlugFor(tid));
         const res = await api.listPlaylists();
+        const responseTenantId =
+          (res as { tenantId?: string; tenant_id?: string }).tenantId ??
+          (res as { tenant_id?: string }).tenant_id ??
+          tid;
         const picks: PlaylistPick[] = [];
         for (const row of res.playlists ?? []) {
           const ui = apiPlaylistToUi(row as PlaylistApiInfo);
@@ -95,7 +104,10 @@ export default function ScheduleAssignModal({
             title: ui.title,
             trackCount: ui.trackCount,
             totalDuration: ui.totalDuration,
-            tenantId: row.tenantId ?? row.tenant_id,
+            tenantId:
+              row.tenantId ??
+              row.tenant_id ??
+              responseTenantId,
           });
         }
         return picks;
@@ -110,7 +122,7 @@ export default function ScheduleAssignModal({
         const visibleMedia = filterSuperAdminCatalog(
           mediaRows.map((m) => ({
             ...m,
-            tenantId: m.tenantId ?? m.tenant_id,
+            tenantId: m.tenantId ?? m.tenant_id ?? tenantId,
           })),
           tenantId,
           isSuperAdminUser
@@ -151,7 +163,7 @@ export default function ScheduleAssignModal({
         api.setWorkspaceTenant(tenantId, workspaceSlug);
       }
     },
-    [isSuperAdminUser]
+    [isSuperAdminUser, sessionTenantSlug]
   );
 
   useEffect(() => {

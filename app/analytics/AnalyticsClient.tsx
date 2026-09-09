@@ -10,6 +10,7 @@ import {
   TrendingUp,
   Users,
   Activity,
+  Landmark,
 } from "lucide-react";
 import { useAuth } from "@/app/context/AuthContext";
 import { getApiClient } from "@/lib/api-client";
@@ -119,7 +120,7 @@ export default function AnalyticsClient() {
   );
   const [workspaceTenantId, setWorkspaceTenantId] = useState<string | null>(null);
   const [selectedPlayerId, setSelectedPlayerId] = useState<string>("all");
-  const [timeRange, setTimeRange] = useState<TimeRange>("7d");
+  const [timeRange, setTimeRange] = useState<TimeRange>("month");
   const [customRange, setCustomRange] = useState<DateRangeValue>({
     from: null,
     to: null,
@@ -233,45 +234,17 @@ export default function AnalyticsClient() {
     enabled: telemetryEnabled,
   });
 
-  const tenantPlayerIds = useMemo(() => {
-    if (analyticsScopeAll) {
-      return new Set(
-        FRENCH_DEMO_ENTERPRISES.flatMap((e) =>
-          Array.from(frenchDemoPlayerIdsForTenant(e.tenantId))
-        )
-      );
-    }
-    return frenchDemoPlayerIdsForTenant(activeAnalyticsTenantId ?? "");
-  }, [analyticsScopeAll, activeAnalyticsTenantId]);
+  const museumQuery = useQuery({
+    queryKey: ["analytics", "museum-connections"],
+    queryFn: () => apiClient.getMuseumConnections(),
+    staleTime: 60_000,
+  });
 
-  const shouldScope =
-    !analyticsScopeAll && (isManager || Boolean(workspaceTenantId));
+  // Playback logs are already tenant-scoped by the API (x-tenant-id). Do not re-filter
+  // through the French demo player registry — that drops real production player IDs.
+  const logs = useMemo(() => logsQuery.data ?? [], [logsQuery.data]);
 
-  const logs = useMemo(() => {
-    const raw = logsQuery.data ?? [];
-    return raw.filter((log) => {
-      if (!shouldScope || tenantPlayerIds.size === 0) return true;
-      return (
-        tenantPlayerIds.has(log.playerId) ||
-        Array.from(tenantPlayerIds).some(
-          (id) => normalizePlayerId(id) === normalizePlayerId(log.playerId)
-        )
-      );
-    });
-  }, [logsQuery.data, shouldScope, tenantPlayerIds]);
-
-  const players = useMemo(() => {
-    const raw = playersQuery.data ?? [];
-    return raw.filter((p) => {
-      if (!shouldScope || tenantPlayerIds.size === 0) return true;
-      return (
-        tenantPlayerIds.has(p.id) ||
-        Array.from(tenantPlayerIds).some(
-          (id) => normalizePlayerId(id) === normalizePlayerId(p.id)
-        )
-      );
-    });
-  }, [playersQuery.data, shouldScope, tenantPlayerIds]);
+  const players = useMemo(() => playersQuery.data ?? [], [playersQuery.data]);
 
   const health = healthQuery.data ?? null;
   const isLoading =
@@ -542,6 +515,27 @@ export default function AnalyticsClient() {
             {error && (
               <div className="rounded-2xl border border-red-200 bg-red-50 p-3 text-sm text-red-800 dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-200">
                 {error}
+              </div>
+            )}
+
+            {museumQuery.data?.available && museumQuery.data.total != null && (
+              <div className="flex items-start gap-3 rounded-2xl border border-[#E8DEFF] bg-[#F8F5FF] p-4 dark:border-violet-900/40 dark:bg-violet-950/20">
+                <div className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-xl bg-white shadow-sm dark:bg-zinc-800">
+                  <Landmark size={16} className="text-[#6B46FF]" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-medium uppercase tracking-tight text-gray-500 dark:text-zinc-400">
+                    {museumQuery.data.label || "Museum connections"}
+                  </p>
+                  <p className="mt-0.5 text-2xl font-semibold tabular-nums text-gray-950 dark:text-zinc-50">
+                    {museumQuery.data.total.toLocaleString()}
+                  </p>
+                  {museumQuery.data.note ? (
+                    <p className="mt-1 text-xs text-gray-500 dark:text-zinc-400">
+                      {museumQuery.data.note}
+                    </p>
+                  ) : null}
+                </div>
               </div>
             )}
 

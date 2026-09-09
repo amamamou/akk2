@@ -1,7 +1,8 @@
-import ClientsClient from './ClientsClient';
+import { redirect } from "next/navigation";
 
-export const metadata = { title: 'Admin - Clients' };
+export const metadata = { title: "Admin - Clients" };
 
-export default function Page() {
-  return <ClientsClient />;
+/** Legacy /admin/clients → live Super Admin Clients page. */
+export default function AdminClientsPage() {
+  redirect("/clients");
 }

@@ -1,7 +1,8 @@
-import PlayersClient from './PlayersClient';
+import { redirect } from "next/navigation";
 
-export const metadata = { title: 'Admin - Players' };
+export const metadata = { title: "Admin - Players" };
 
-export default function Page() {
-  return <PlayersClient />;
+/** Prefer the live Players workspace (tenant-scoped + Super Admin switcher). */
+export default function AdminPlayersPage() {
+  redirect("/players");
 }

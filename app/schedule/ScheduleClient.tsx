@@ -201,6 +201,17 @@ export default function ScheduleClientPage() {
     return user?.tenantId || apiClient.getEffectiveTenantId() || null;
   }, [pickerCell?.tenantId, isSuperAdmin, workspaceTenantId, user?.tenantId, apiClient]);
 
+  // Keep API workspace scope aligned for tenant managers (Month/Hour assign modal).
+  useEffect(() => {
+    if (authLoading || isSuperAdmin) return;
+    const tid = user?.tenantId || apiClient.getEffectiveTenantId();
+    if (!tid) return;
+    apiClient.setWorkspaceTenant(
+      tid,
+      frenchDemoTenantSlug(tid) ?? user?.tenantSlug ?? undefined
+    );
+  }, [authLoading, isSuperAdmin, user?.tenantId, user?.tenantSlug, apiClient]);
+
   const workspaceClientsQuery = useQuery({
     queryKey: queryKeys.workspaceClients(),
     queryFn: fetchWorkspaceClientsBundle,

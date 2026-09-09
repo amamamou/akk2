@@ -42,7 +42,8 @@ export default function OperationalMetricsStrip({
 
   const metrics: MetricDef[] = [
     { key: "broadcasts", label: "Broadcasts today", format: (v) => String(v ?? 0), highlight: true },
-    { key: "activePlayers", label: "Active players", format: (v) => String(v ?? 0) },
+    // Online-only — offline units still count toward locations / offlinePlayers.
+    { key: "activePlayers", label: "Online players", format: (v) => String(v ?? 0) },
     workspaceMetric,
     { key: "successRate", label: "Success rate", format: (v) => formatPercent(v ?? 0) },
     { key: "offlineCount", label: "Offline players", format: (v) => String(v ?? 0) },

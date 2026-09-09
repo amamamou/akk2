@@ -98,6 +98,7 @@ export default function Sidebar() {
           {isAdmin && (
             <SidebarButton
               href="/clients"
+              label="Clients (Super Admin)"
               icon={<Users size={15} strokeWidth={1.9} />}
             />
           )}
@@ -189,11 +190,13 @@ function SidebarButton({
   icon,
   active = false,
   href,
+  label,
   onClick,
 }: {
   icon: React.ReactNode;
   active?: boolean;
   href?: string;
+  label?: string;
   onClick?: (e?: React.MouseEvent) => void;
 }) {
   const router = useRouter();
@@ -226,6 +229,8 @@ function SidebarButton({
     <button
       type="button"
       onClick={handleClick}
+      aria-label={label}
+      title={label}
       aria-current={isActive ? "page" : undefined}
       className={cn(
         "group relative flex h-8 w-8 items-center justify-center rounded-full transition-all duration-200",

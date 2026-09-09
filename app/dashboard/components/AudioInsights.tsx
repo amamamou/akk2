@@ -83,12 +83,30 @@ export default function AudioInsights({ data }: { data: AudioInsightData }) {
         />
         <AudioStat
           icon={AudioLines}
-          label="Library"
-          value={`${data.librarySize} tracks`}
-          sub={`${data.playbackCount} logged plays`}
-          showWaveform={data.playbackCount > 0}
+          label="Last import"
+          value={data.recentlyUploaded?.title ?? "No imports yet"}
+          sub={
+            data.recentlyUploaded?.uploadedAt
+              ? relativeUploadLabel(data.recentlyUploaded.uploadedAt)
+              : data.librarySize > 0
+                ? `${data.librarySize} tracks in library`
+                : undefined
+          }
+          showWaveform={Boolean(data.recentlyUploaded)}
         />
       </div>
     </DashboardPanel>
   );
+}
+
+function relativeUploadLabel(iso: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "Recently uploaded";
+  const diffMs = Date.now() - date.getTime();
+  const absMinutes = Math.round(Math.abs(diffMs) / 60000);
+  if (absMinutes < 60) return `Imported ${absMinutes}m ago`;
+  const absHours = Math.round(absMinutes / 60);
+  if (absHours < 24) return `Imported ${absHours}h ago`;
+  const absDays = Math.round(absHours / 24);
+  return `Imported ${absDays}d ago`;
 }

@@ -100,7 +100,7 @@ export interface PlayerInsightData {
 export interface AudioInsightData {
   mostPlayed: { title: string; count: number } | null;
   mostScheduled: { title: string; count: number } | null;
-  recentlyUploaded: { title: string } | null;
+  recentlyUploaded: { title: string; uploadedAt?: string } | null;
   librarySize: number;
   playbackCount: number;
 }
@@ -380,7 +380,25 @@ export function buildAudioInsights(
     if (!mostScheduled || count > mostScheduled.count) mostScheduled = { title, count };
   }
 
-  const recentlyUploaded = null;
+  let recentlyUploaded: AudioInsightData["recentlyUploaded"] = null;
+  let newestTs = -Infinity;
+  for (const item of media) {
+    const raw =
+      item.createdAt ||
+      item.created_at ||
+      item.addedAt ||
+      item.updatedAt ||
+      item.updated_at ||
+      item.modifiedAt;
+    if (!raw) continue;
+    const ts = new Date(raw).getTime();
+    if (Number.isNaN(ts) || ts < newestTs) continue;
+    newestTs = ts;
+    recentlyUploaded = {
+      title: item.title?.trim() || "Untitled",
+      uploadedAt: raw,
+    };
+  }
 
   return {
     mostPlayed,
