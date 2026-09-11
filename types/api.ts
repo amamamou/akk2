@@ -264,6 +264,10 @@ export interface ClientResponse {
   client: ClientInfo;
   storageTreeSeeded?: boolean | null;
   storageTreeWarning?: string | null;
+  inviteSent?: boolean | null;
+  inviteEmail?: string | null;
+  inviteWarning?: string | null;
+  loginHint?: string | null;
 }
 
 // ============ Activity Log Types ============

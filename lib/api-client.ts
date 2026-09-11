@@ -1058,7 +1058,7 @@ export class ApiClient {
    /**
     * GET /analytics/museum-connections - Temporary JB museum figures for salon
     */
-   async getMuseumConnections(): Promise<{
+   async getMuseumConnections(params?: { scope?: string }): Promise<{
      ok: boolean;
      available: boolean;
      total: number | null;
@@ -1067,7 +1067,9 @@ export class ApiClient {
      totalSeconds?: number | null;
      sourceDate?: string | null;
    }> {
-     const response = await this.instance.get('/analytics/museum-connections');
+     const response = await this.instance.get('/analytics/museum-connections', {
+       params: params?.scope ? { scope: params.scope } : undefined,
+     });
      return response.data;
    }
 

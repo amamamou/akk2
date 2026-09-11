@@ -221,19 +221,23 @@ export default function ClientsClient() {
     setCreateLoading(true);
     try {
       const created = await createClientMutation.mutateAsync(payload);
-      if (created?.storageTreeWarning) {
-        setToastMessage(
-          `Created ${payload.name}, but R2 folders were not seeded. Retry storage-tree seed.`
-        );
-      } else {
-        setToastMessage(
-          created?.storageTreeSeeded === false
-            ? `Created client: ${payload.name} (storage tree pending)`
-            : `Created client: ${payload.name}`
-        );
+      const parts: string[] = [`Created client: ${payload.name}`];
+      if (created?.inviteSent && created.inviteEmail) {
+        parts.push(`Invite sent to ${created.inviteEmail}`);
+      } else if (created?.inviteWarning) {
+        parts.push(created.inviteWarning);
       }
+      if (created?.storageTreeWarning) {
+        parts.push(created.storageTreeWarning);
+      } else if (created?.storageTreeSeeded) {
+        parts.push("Cloudflare folders seeded");
+      }
+      if (created?.loginHint) {
+        parts.push(created.loginHint);
+      }
+      setToastMessage(parts.join(" · "));
       setToastOpen(true);
-      window.setTimeout(() => setToastOpen(false), 3500);
+      window.setTimeout(() => setToastOpen(false), 6000);
     } finally {
       setCreateLoading(false);
     }

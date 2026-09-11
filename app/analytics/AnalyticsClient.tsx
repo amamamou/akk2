@@ -120,7 +120,7 @@ export default function AnalyticsClient() {
   );
   const [workspaceTenantId, setWorkspaceTenantId] = useState<string | null>(null);
   const [selectedPlayerId, setSelectedPlayerId] = useState<string>("all");
-  const [timeRange, setTimeRange] = useState<TimeRange>("month");
+  const [timeRange, setTimeRange] = useState<TimeRange>("7d");
   const [customRange, setCustomRange] = useState<DateRangeValue>({
     from: null,
     to: null,
@@ -235,9 +235,15 @@ export default function AnalyticsClient() {
   });
 
   const museumQuery = useQuery({
-    queryKey: ["analytics", "museum-connections"],
-    queryFn: () => apiClient.getMuseumConnections(),
+    queryKey: ["analytics", "museum-connections", telemetryScopeKey],
+    queryFn: async () => {
+      applyAnalyticsTenantScope();
+      return apiClient.getMuseumConnections(
+        analyticsScopeAll ? { scope: "all" } : undefined
+      );
+    },
     staleTime: 60_000,
+    enabled: telemetryEnabled,
   });
 
   // Playback logs are already tenant-scoped by the API (x-tenant-id). Do not re-filter
