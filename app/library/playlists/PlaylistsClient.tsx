@@ -286,15 +286,23 @@ export default function LibraryPlaylistsClient() {
                 onClick={() => navigateToPlaylist(playlist)}
                 onEdit={async (id, newTitle) => {
                   if (!newTitle?.trim()) return;
+                  const previous = playlists.find((pl) => pl.id === id)?.title;
+                  setPlaylists((prev) =>
+                    prev.map((pl) =>
+                      pl.id === id ? { ...pl, title: newTitle.trim() } : pl
+                    )
+                  );
                   try {
                     await apiClient.updatePlaylist(id, { title: newTitle.trim() });
                     await loadPlaylists({ refresh: true });
                   } catch {
-                    setPlaylists((prev) =>
-                      prev.map((pl) =>
-                        pl.id === id ? { ...pl, title: newTitle.trim() } : pl
-                      )
-                    );
+                    if (previous != null) {
+                      setPlaylists((prev) =>
+                        prev.map((pl) =>
+                          pl.id === id ? { ...pl, title: previous } : pl
+                        )
+                      );
+                    }
                   }
                 }}
                 onDelete={(id) => {

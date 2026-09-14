@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Image from "next/image";
 import {
   ArrowLeft,
@@ -46,16 +46,24 @@ const VIEW_COPY: Record<
   forgot: {
     eyebrow: "Account recovery",
     title: "Reset your password",
-    subtitle: "We'll send a secure link to your email if an account exists.",
+    subtitle:
+      "Invited clients: use this form to receive a secure link and create your password, then sign in.",
     cta: "Send reset link",
     loading: "Sending…",
   },
 };
 
+function initialAuthView(): AuthView {
+  if (typeof window === "undefined") return "login";
+  const view = new URLSearchParams(window.location.search).get("view");
+  if (view === "forgot" || view === "register") return view;
+  return "login";
+}
+
 export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [currentView, setCurrentView] = useState<AuthView>("login");
+  const [currentView, setCurrentView] = useState<AuthView>(initialAuthView);
   const { login, isLoading, error, clearError } = useAuth();
   const [submitting, setSubmitting] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -67,6 +75,19 @@ export default function LoginPage() {
     name: "",
     confirmPassword: "",
   });
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const view = params.get("view");
+    if (view === "forgot" || view === "register") {
+      setCurrentView(view);
+    }
+    const email = params.get("email");
+    if (email) {
+      setFormData((prev) => ({ ...prev, email }));
+    }
+  }, []);
 
   const copy = VIEW_COPY[currentView];
 
@@ -140,7 +161,18 @@ export default function LoginPage() {
         setFormError(null);
       }
     } catch (err) {
-      setFormError(resolveApiError(err, "Request failed. Please try again."));
+      const message = resolveApiError(err, "Request failed. Please try again.");
+      setFormError(message);
+      // Invited clients often try Sign up → EMAIL_EXISTS. Route them to password reset.
+      if (
+        currentView === "register" &&
+        /already exists|invite|forgot password/i.test(message)
+      ) {
+        setCurrentView("forgot");
+        setSuccessMessage(
+          "This email already has an invite. Enter the same email below to receive a password setup link."
+        );
+      }
     } finally {
       setSubmitting(false);
     }

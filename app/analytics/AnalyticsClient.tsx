@@ -10,7 +10,6 @@ import {
   TrendingUp,
   Users,
   Activity,
-  Landmark,
 } from "lucide-react";
 import { useAuth } from "@/app/context/AuthContext";
 import { getApiClient } from "@/lib/api-client";
@@ -231,18 +230,6 @@ export default function AnalyticsClient() {
       applyAnalyticsTenantScope();
       return fetchPlayers(activeAnalyticsTenantId ?? undefined);
     },
-    enabled: telemetryEnabled,
-  });
-
-  const museumQuery = useQuery({
-    queryKey: ["analytics", "museum-connections", telemetryScopeKey],
-    queryFn: async () => {
-      applyAnalyticsTenantScope();
-      return apiClient.getMuseumConnections(
-        analyticsScopeAll ? { scope: "all" } : undefined
-      );
-    },
-    staleTime: 60_000,
     enabled: telemetryEnabled,
   });
 
@@ -521,35 +508,6 @@ export default function AnalyticsClient() {
             {error && (
               <div className="rounded-2xl border border-red-200 bg-red-50 p-3 text-sm text-red-800 dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-200">
                 {error}
-              </div>
-            )}
-
-            {museumQuery.data?.available && museumQuery.data.total != null && (
-              <div className="flex items-start gap-3 rounded-2xl border border-[#E8DEFF] bg-[#F8F5FF] p-4 dark:border-violet-900/40 dark:bg-violet-950/20">
-                <div className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-xl bg-white shadow-sm dark:bg-zinc-800">
-                  <Landmark size={16} className="text-[#6B46FF]" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="text-xs font-medium uppercase tracking-tight text-gray-500 dark:text-zinc-400">
-                    {museumQuery.data.label || "Museum connections"}
-                  </p>
-                  <p className="mt-0.5 text-2xl font-semibold tabular-nums text-gray-950 dark:text-zinc-50">
-                    {museumQuery.data.total.toLocaleString()}
-                  </p>
-                  {museumQuery.data.totalSeconds != null ? (
-                    <p className="mt-1 text-xs text-gray-500 dark:text-zinc-400">
-                      {Math.round(museumQuery.data.totalSeconds)}s total listening
-                      {museumQuery.data.sourceDate
-                        ? ` · source ${museumQuery.data.sourceDate}`
-                        : ""}
-                    </p>
-                  ) : null}
-                  {museumQuery.data.note ? (
-                    <p className="mt-1 text-xs text-gray-500 dark:text-zinc-400">
-                      {museumQuery.data.note}
-                    </p>
-                  ) : null}
-                </div>
               </div>
             )}
 

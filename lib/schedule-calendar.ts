@@ -76,7 +76,7 @@ export function buildWeekDays(anchor = new Date()): DayColumn[] {
     return {
       short,
       full: fullLabels[i],
-      date: d.toISOString().slice(0, 10),
+      date: formatLocalIsoDate(d),
     };
   });
 }
@@ -87,19 +87,32 @@ export function buildMonthGrid(anchor = new Date()): MonthCell[][] {
   const year = anchor.getFullYear();
   const month = anchor.getMonth();
   const first = new Date(year, month, 1);
-  const startPad = first.getDay();
+  // Match week view: Monday-first grid (Mon…Sun).
+  const startPad = (first.getDay() + 6) % 7;
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const cells: MonthCell[] = [];
 
   for (let i = 0; i < startPad; i++) {
-    cells.push({ date: "", day: null, inMonth: false });
+    const padDate = new Date(year, month, 1 - (startPad - i));
+    cells.push({
+      date: formatLocalIsoDate(padDate),
+      day: padDate.getDate(),
+      inMonth: false,
+    });
   }
   for (let d = 1; d <= daysInMonth; d++) {
-    const iso = new Date(year, month, d).toISOString().slice(0, 10);
-    cells.push({ date: iso, day: d, inMonth: true });
+    const local = new Date(year, month, d);
+    cells.push({ date: formatLocalIsoDate(local), day: d, inMonth: true });
   }
   while (cells.length % 7 !== 0) {
-    cells.push({ date: "", day: null, inMonth: false });
+    const last = cells[cells.length - 1];
+    const next = new Date(`${last.date}T12:00:00`);
+    next.setDate(next.getDate() + 1);
+    cells.push({
+      date: formatLocalIsoDate(next),
+      day: next.getDate(),
+      inMonth: false,
+    });
   }
 
   const weeks: MonthCell[][] = [];

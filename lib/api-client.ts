@@ -1056,7 +1056,8 @@ export class ApiClient {
    }
 
    /**
-    * GET /analytics/museum-connections - Temporary JB museum figures for salon
+    * GET /analytics/museum-connections — deprecated; always unavailable.
+    * Purple Museum/Numbers Connections salon card removed from Analytics UI.
     */
    async getMuseumConnections(params?: { scope?: string }): Promise<{
      ok: boolean;

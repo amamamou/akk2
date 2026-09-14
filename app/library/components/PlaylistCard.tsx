@@ -79,6 +79,12 @@ export default function PlaylistCard({
   }, [playlist.id, playlist.cover, playlist.coverColor]);
 
   useEffect(() => {
+    if (!isEditing) {
+      setName(playlist.title);
+    }
+  }, [playlist.id, playlist.title, isEditing]);
+
+  useEffect(() => {
     if (!menuOpen) return;
     const onDocClick = (e: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
