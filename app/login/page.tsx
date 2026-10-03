@@ -78,7 +78,20 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (typeof window === "undefined") return;
+    const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ""));
     const params = new URLSearchParams(window.location.search);
+    const type = (hashParams.get("type") || params.get("type") || "").toLowerCase();
+    const hasSetupToken = Boolean(
+      hashParams.get("access_token") ||
+        params.get("access_token") ||
+        hashParams.get("token_hash") ||
+        params.get("token_hash")
+    );
+    if (hasSetupToken && (type === "recovery" || type === "invite" || type === "")) {
+      const dest = type === "invite" ? "/set-password" : "/reset-password";
+      window.location.replace(`${dest}${window.location.search}${window.location.hash}`);
+      return;
+    }
     const view = params.get("view");
     if (view === "forgot" || view === "register") {
       setCurrentView(view);
@@ -86,6 +99,9 @@ export default function LoginPage() {
     const email = params.get("email");
     if (email) {
       setFormData((prev) => ({ ...prev, email }));
+    }
+    if (params.get("password") === "updated") {
+      setSuccessMessage("Password saved. Sign in with your new password.");
     }
   }, []);
 
@@ -192,7 +208,7 @@ export default function LoginPage() {
   );
 
   return (
-    <div className="flex min-h-screen bg-[#FAFAFA] font-sans">
+    <div className="flex min-h-screen bg-[#FAFAFA] font-sans dark:bg-[#09090C]">
       <AuthBrandPanel />
 
       {/* Form panel */}
@@ -210,7 +226,7 @@ export default function LoginPage() {
             />
           </div>
           <div>
-            <p className="text-sm font-semibold text-zinc-900">Akoustic Arts</p>
+            <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Akoustic Arts</p>
             <p className={cn(dashboardSectionLabel, "text-zinc-400")}>Workspace platform</p>
           </div>
         </div>
@@ -235,7 +251,7 @@ export default function LoginPage() {
 
             <div className="mb-8 space-y-2">
               <p className={cn(dashboardSectionLabel, "text-zinc-400")}>{copy.eyebrow}</p>
-              <h1 className="text-2xl font-semibold tracking-tight text-zinc-950">{copy.title}</h1>
+              <h1 className="text-2xl font-semibold tracking-tight text-zinc-950 dark:text-zinc-50">{copy.title}</h1>
               <p className="text-sm leading-relaxed text-zinc-500">{copy.subtitle}</p>
             </div>
 

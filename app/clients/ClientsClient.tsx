@@ -266,9 +266,18 @@ export default function ClientsClient() {
       setToastOpen(true);
       window.setTimeout(() => setToastOpen(false), 2500);
     } catch (err: unknown) {
-      const ax = err as { response?: { data?: { error?: string } }; message?: string };
+      const ax = err as {
+        response?: { data?: { error?: string; detail?: { error?: string } | string } };
+        message?: string;
+      };
+      const data = ax.response?.data;
+      const detail =
+        data && typeof data.detail === "object" && data.detail ? data.detail.error : undefined;
+      const detailText = typeof data?.detail === "string" ? data.detail : undefined;
       setToastMessage(
-        ax?.response?.data?.error ||
+        data?.error ||
+          detail ||
+          detailText ||
           (err instanceof Error ? err.message : "Failed to delete client")
       );
       setToastOpen(true);

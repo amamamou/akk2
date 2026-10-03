@@ -28,7 +28,7 @@ export default function AuthField({
 }: AuthFieldProps) {
   return (
     <div className="space-y-2">
-      <label htmlFor={id} className="text-[13px] font-medium text-zinc-700">
+      <label htmlFor={id} className="text-[13px] font-medium text-zinc-700 dark:text-zinc-300">
         {label}
       </label>
       <div className="relative">
@@ -49,6 +49,7 @@ export default function AuthField({
           className={cn(
             "flex h-12 w-full rounded-xl border border-zinc-200/80 bg-white text-sm text-zinc-900 shadow-[0_1px_2px_rgba(0,0,0,0.04)] transition-all placeholder:text-zinc-400",
             "focus:border-[#A473FF]/40 focus:outline-none focus:ring-4 focus:ring-[#A473FF]/10",
+            "dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:placeholder:text-zinc-500",
             Icon ? "pl-10 pr-3" : "px-3.5",
             trailing ? "pr-11" : undefined
           )}

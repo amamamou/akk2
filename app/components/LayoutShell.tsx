@@ -12,7 +12,11 @@ export default function LayoutShell({
 }) {
   const pathname = usePathname();
 
-  const isAuthPage = pathname === "/login" || pathname === "/create-account";
+  const isAuthPage =
+    pathname === "/login" ||
+    pathname === "/create-account" ||
+    pathname === "/reset-password" ||
+    pathname === "/set-password";
 
   if (isAuthPage) {
     return <>{children}</>;

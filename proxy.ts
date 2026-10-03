@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { AUTH_TOKEN_KEY, getJwtExpiryMs } from '@/lib/auth-session';
 
-const PUBLIC_ROUTES = new Set(['/login', '/signup', '/create-account']);
+const PUBLIC_ROUTES = new Set([
+  '/login',
+  '/signup',
+  '/create-account',
+  '/reset-password',
+  '/set-password',
+]);
 
 function hasValidToken(token: string | undefined | null): boolean {
   if (!token) return false;
@@ -16,7 +22,10 @@ export function proxy(request: NextRequest) {
   const isPublicRoute = PUBLIC_ROUTES.has(pathname);
   const isRoot = pathname === '/';
 
-  if (isAuthenticated && (isPublicRoute || isRoot)) {
+  const isPasswordSetup =
+    pathname === '/reset-password' || pathname === '/set-password';
+
+  if (isAuthenticated && (isPublicRoute || isRoot) && !isPasswordSetup) {
     const url = request.nextUrl.clone();
     url.pathname = '/dashboard';
     return NextResponse.redirect(url);

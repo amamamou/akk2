@@ -120,7 +120,8 @@ export class ApiClient {
           requestUrl.includes(AUTH_REFRESH_PATH) ||
           requestUrl.includes('/auth/login') ||
           requestUrl.includes('/auth/register') ||
-          requestUrl.includes('/auth/password-reset');
+          requestUrl.includes('/auth/password-reset') ||
+          requestUrl.includes('/auth/complete-password');
 
         const token = isAuthRoute
           ? this.getToken()
@@ -689,6 +690,26 @@ export class ApiClient {
   async requestPasswordReset(data: PasswordResetRequest): Promise<PasswordResetResponse> {
     const response = await this.instance.post<PasswordResetResponse>('/auth/password-reset', {
       email: data.email.trim().toLowerCase(),
+    });
+    return response.data;
+  }
+
+  /**
+   * POST /auth/complete-password — set a password from an invite or recovery link.
+   */
+  async completePasswordSetup(data: {
+    password: string;
+    accessToken?: string | null;
+    refreshToken?: string | null;
+    tokenHash?: string | null;
+    type?: string | null;
+  }): Promise<PasswordResetResponse> {
+    const response = await this.instance.post<PasswordResetResponse>('/auth/complete-password', {
+      password: data.password,
+      accessToken: data.accessToken || undefined,
+      refreshToken: data.refreshToken || undefined,
+      tokenHash: data.tokenHash || undefined,
+      type: data.type || undefined,
     });
     return response.data;
   }
