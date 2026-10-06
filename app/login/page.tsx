@@ -22,6 +22,7 @@ import {
 import { cn } from "@/utils/cn";
 import AuthBrandPanel from "./components/AuthBrandPanel";
 import AuthField from "./components/AuthField";
+import { passwordSetupPathFromUrl } from "@/lib/auth-public-routes";
 
 type AuthView = "login" | "register" | "forgot";
 
@@ -78,20 +79,16 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ""));
-    const params = new URLSearchParams(window.location.search);
-    const type = (hashParams.get("type") || params.get("type") || "").toLowerCase();
-    const hasSetupToken = Boolean(
-      hashParams.get("access_token") ||
-        params.get("access_token") ||
-        hashParams.get("token_hash") ||
-        params.get("token_hash")
+    const dest = passwordSetupPathFromUrl(
+      window.location.search,
+      window.location.hash,
+      window.location.pathname
     );
-    if (hasSetupToken && (type === "recovery" || type === "invite" || type === "")) {
-      const dest = type === "invite" ? "/set-password" : "/reset-password";
+    if (dest) {
       window.location.replace(`${dest}${window.location.search}${window.location.hash}`);
       return;
     }
+    const params = new URLSearchParams(window.location.search);
     const view = params.get("view");
     if (view === "forgot" || view === "register") {
       setCurrentView(view);

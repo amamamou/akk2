@@ -44,6 +44,11 @@ export default function RootLayout({
             __html: `(function(){try{var t=localStorage.getItem('akou.theme');var d=t==='dark'||(t!=='light'&&window.matchMedia('(prefers-color-scheme: dark)').matches);var r=document.documentElement;if(d){r.classList.add('dark');}else{r.classList.remove('dark');}}catch(e){}})();`,
           }}
         />
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var p=location.pathname;if(p==='/set-password'||p==='/reset-password')return;var h=location.hash.replace(/^#/,'');var q=location.search;var hp=new URLSearchParams(h);var qp=new URLSearchParams(q);var ty=(hp.get('type')||qp.get('type')||'').toLowerCase();var tok=hp.get('access_token')||qp.get('access_token')||hp.get('token_hash')||qp.get('token_hash')||qp.get('code');if(!tok)return;var dest=ty==='invite'?'/set-password':'/reset-password';location.replace(dest+q+h);}catch(e){}})();`,
+          }}
+        />
       </head>
       <body suppressHydrationWarning className="min-h-full bg-background text-foreground">
         <SuppressConsole />

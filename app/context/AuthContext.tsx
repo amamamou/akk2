@@ -4,6 +4,7 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import { usePathname, useRouter } from 'next/navigation';
 import { getApiClient } from '@/lib/api-client';
 import { isStructurallyValidAccessToken } from '@/lib/auth-session';
+import { isAuthPublicPath } from '@/lib/auth-public-routes';
 import type { AuthUser, LoginRequest, LoginResponse } from '@/types/api';
 
 interface AuthContextType {
@@ -173,7 +174,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   // Keep protected routes in sync with token deletion from DevTools or other tabs.
   useEffect(() => {
-    if (pathname === '/login' || isLoading) return;
+    if (isAuthPublicPath(pathname) || isLoading) return;
 
     const enforceAuth = () => {
       if (apiClient.isRefreshingToken()) return;

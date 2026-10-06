@@ -26,10 +26,14 @@ function readSetupToken(): SetupToken {
   const hash = new URLSearchParams(window.location.hash.replace(/^#/, ""));
   const query = new URLSearchParams(window.location.search);
   const type = (hash.get("type") || query.get("type") || "").toLowerCase() || null;
+  const pkceCode = query.get("code");
   return {
     accessToken: hash.get("access_token") || query.get("access_token"),
     refreshToken: hash.get("refresh_token") || query.get("refresh_token"),
-    tokenHash: hash.get("token_hash") || query.get("token_hash"),
+    tokenHash:
+      hash.get("token_hash") ||
+      query.get("token_hash") ||
+      (pkceCode ? `pkce:${pkceCode}` : null),
     type,
   };
 }
@@ -65,6 +69,7 @@ export default function PasswordSetupClient() {
     if (parsed.accessToken || parsed.tokenHash) {
       window.history.replaceState(null, "", window.location.pathname);
     }
+    // Do not persist GoTrue tokens in app cookies — invite/recovery is one-shot setup.
     setReady(true);
   }, []);
 

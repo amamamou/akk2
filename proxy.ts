@@ -1,13 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { AUTH_TOKEN_KEY, getJwtExpiryMs } from '@/lib/auth-session';
-
-const PUBLIC_ROUTES = new Set([
-  '/login',
-  '/signup',
-  '/create-account',
-  '/reset-password',
-  '/set-password',
-]);
+import { AUTH_PUBLIC_PATHS } from '@/lib/auth-public-routes';
 
 function hasValidToken(token: string | undefined | null): boolean {
   if (!token) return false;
@@ -19,7 +12,7 @@ export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const token = request.cookies.get(AUTH_TOKEN_KEY)?.value;
   const isAuthenticated = hasValidToken(token);
-  const isPublicRoute = PUBLIC_ROUTES.has(pathname);
+  const isPublicRoute = AUTH_PUBLIC_PATHS.has(pathname);
   const isRoot = pathname === '/';
 
   const isPasswordSetup =
